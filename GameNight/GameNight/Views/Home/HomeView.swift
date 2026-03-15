@@ -108,8 +108,10 @@ struct HomeView: View {
         .task {
             await viewModel.loadData()
         }
-        .onAppear {
-            Task { await viewModel.loadData() }
+        .onChange(of: selectedEvent) { _, newValue in
+            if newValue == nil {
+                Task { await viewModel.loadData() }
+            }
         }
     }
 }
