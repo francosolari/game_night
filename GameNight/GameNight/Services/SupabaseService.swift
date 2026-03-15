@@ -192,12 +192,14 @@ final class SupabaseService: ObservableObject {
 
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {
         let session = try await client.auth.session
-        let entry = [
-            "user_id": session.user.id.uuidString,
-            "game_id": gameId.uuidString,
-            "category_id": categoryId?.uuidString ?? "",
-            "play_count": "0"
+        var entry: [String: AnyJSON] = [
+            "user_id": .string(session.user.id.uuidString),
+            "game_id": .string(gameId.uuidString),
+            "play_count": .int(0)
         ]
+        if let categoryId = categoryId {
+            entry["category_id"] = .string(categoryId.uuidString)
+        }
         try await client
             .from("game_library")
             .insert(entry)
