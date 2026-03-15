@@ -1,26 +1,31 @@
 // Supabase Edge Function: Send invite notification (SMS + Push)
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import { createServiceClient, requireAuthenticatedUser } from "../_shared/auth.ts";
+import { sendSMS } from "../_shared/sms.ts";
 const APP_URL = Deno.env.get("APP_URL") || "https://gamenight.app";
 
 interface InviteRequest {
   invite_id: string;
-  event_id: string;
 }
 
 serve(async (req) => {
   try {
-    const { invite_id, event_id }: InviteRequest = await req.json();
+    const caller = await requireAuthenticatedUser(req);
+    const { invite_id }: InviteRequest = await req.json();
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    if (!invite_id) {
+      return new Response(
+        JSON.stringify({ error: "invite_id is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createServiceClient();
 
     // Fetch invite details
     const { data: invite, error: inviteError } = await supabase
       .from("invites")
-      .select("*")
+      .select("id, event_id, host_user_id, phone_number, invite_token")
       .eq("id", invite_id)
       .single();
 
@@ -28,6 +33,13 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Invite not found" }),
         { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (invite.host_user_id !== caller.id) {
+      return new Response(
+        JSON.stringify({ error: "Only the event host can send invites" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -42,7 +54,7 @@ serve(async (req) => {
           game:games(name, complexity, min_playtime, max_playtime)
         )
       `)
-      .eq("id", event_id)
+      .eq("id", invite.event_id)
       .single();
 
     if (!event) {
@@ -70,34 +82,44 @@ serve(async (req) => {
 
     const hostName = event.host?.display_name || "Someone";
 
-    // Send SMS
     const smsMessage = `🎲 ${hostName} invited you to "${event.title}"!\n\nGames: ${gameList}\n\nRSVP: ${inviteLink}`;
 
-    // Call the send-sms function
-    const { error: smsError } = await supabase.functions.invoke("send-sms", {
-      body: {
+    try {
+      await sendSMS({
         to: invite.phone_number,
         message: smsMessage,
-      },
-    });
+      });
 
-    // Update SMS delivery status
-    await supabase
-      .from("invites")
-      .update({
-        sms_delivery_status: smsError ? "failed" : "sent",
-      })
-      .eq("id", invite_id);
+      await supabase
+        .from("invites")
+        .update({ sms_delivery_status: "sent" })
+        .eq("id", invite_id);
+    } catch (smsError) {
+      await supabase
+        .from("invites")
+        .update({ sms_delivery_status: "failed" })
+        .eq("id", invite_id);
+
+      console.error("Send invite SMS error:", smsError);
+      return new Response(
+        JSON.stringify({ error: "Failed to send invite SMS" }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        sms_sent: !smsError,
+        sms_sent: true,
         invite_link: inviteLink,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
+
     console.error("Send invite error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),

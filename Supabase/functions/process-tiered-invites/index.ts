@@ -1,10 +1,9 @@
 // Supabase Edge Function: Process tiered invite logic
 // When someone declines, automatically promote next person from waitlist
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import { createServiceClient, requireAuthenticatedUser } from "../_shared/auth.ts";
+import { sendSMS } from "../_shared/sms.ts";
+const APP_URL = Deno.env.get("APP_URL") || "https://gamenight.app";
 
 interface ProcessRequest {
   invite_id: string;
@@ -12,14 +11,15 @@ interface ProcessRequest {
 
 serve(async (req) => {
   try {
+    const caller = await requireAuthenticatedUser(req);
     const { invite_id }: ProcessRequest = await req.json();
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const supabase = createServiceClient();
 
     // Fetch the invite that was just responded to
     const { data: respondedInvite } = await supabase
       .from("invites")
-      .select("*")
+      .select("id, event_id, host_user_id, status")
       .eq("id", invite_id)
       .single();
 
@@ -27,6 +27,13 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Invite not found" }),
         { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (respondedInvite.host_user_id !== caller.id) {
+      return new Response(
+        JSON.stringify({ error: "Only the event host can process tiered invites" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -91,24 +98,30 @@ serve(async (req) => {
       })
       .eq("id", promotedInvite.id);
 
-    // Send invite notification to the promoted person
-    await supabase.functions.invoke("send-invite", {
-      body: {
-        invite_id: promotedInvite.id,
-        event_id: respondedInvite.event_id,
-      },
-    });
-
-    // Also send a special "spot opened up" SMS
-    const APP_URL = Deno.env.get("APP_URL") || "https://gamenight.app";
     const inviteLink = `${APP_URL}/invite/${promotedInvite.invite_token}`;
 
-    await supabase.functions.invoke("send-sms", {
-      body: {
+    try {
+      await sendSMS({
         to: promotedInvite.phone_number,
         message: `🎉 A spot opened up for "${event.title}"! You've been moved off the waitlist. RSVP now: ${inviteLink}`,
-      },
-    });
+      });
+
+      await supabase
+        .from("invites")
+        .update({ sms_delivery_status: "sent" })
+        .eq("id", promotedInvite.id);
+    } catch (smsError) {
+      await supabase
+        .from("invites")
+        .update({ sms_delivery_status: "failed" })
+        .eq("id", promotedInvite.id);
+
+      console.error("Tiered invite SMS error:", smsError);
+      return new Response(
+        JSON.stringify({ error: "Failed to notify promoted invitee" }),
+        { status: 502, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({
@@ -119,6 +132,10 @@ serve(async (req) => {
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
+    if (error instanceof Response) {
+      return error;
+    }
+
     console.error("Tiered invite error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
