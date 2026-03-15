@@ -4,6 +4,7 @@ struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @EnvironmentObject var appState: AppState
     @State private var selectedEvent: GameEvent?
+    @State private var draftToResume: GameEvent?
 
     var body: some View {
         NavigationStack {
@@ -34,6 +35,26 @@ struct HomeView: View {
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.lg)
 
+                    // Drafts section (always visible when drafts exist, even while loading)
+                    if !viewModel.drafts.isEmpty {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            SectionHeader(title: "Drafts")
+                                .padding(.horizontal, Theme.Spacing.xl)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    ForEach(viewModel.drafts) { draft in
+                                        DraftCard(draft: draft) {
+                                            draftToResume = draft
+                                        }
+                                        .frame(width: 200)
+                                    }
+                                }
+                                .padding(.horizontal, Theme.Spacing.xl)
+                            }
+                        }
+                    }
+
                     if viewModel.isLoading {
                         // Skeleton loading
                         VStack(spacing: Theme.Spacing.lg) {
@@ -45,7 +66,7 @@ struct HomeView: View {
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
-                    } else if viewModel.upcomingEvents.isEmpty {
+                    } else if viewModel.upcomingEvents.isEmpty && viewModel.drafts.isEmpty {
                         EmptyStateView(
                             icon: "dice.fill",
                             title: "No Game Nights Yet",
@@ -113,6 +134,11 @@ struct HomeView: View {
                 Task { await viewModel.loadData() }
             }
         }
+        .sheet(item: $draftToResume) { draft in
+            CreateEventView(eventToEdit: draft) { _ in
+                Task { await viewModel.loadData() }
+            }
+        }
     }
 }
 
@@ -151,6 +177,64 @@ struct PendingInviteCard: View {
             RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                 .stroke(Theme.Colors.primary.opacity(0.3), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Draft Card
+struct DraftCard: View {
+    let draft: GameEvent
+    let onResume: () -> Void
+
+    var body: some View {
+        Button(action: onResume) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack {
+                    Image(systemName: "doc.text")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Spacer()
+                    Text("DRAFT")
+                        .font(Theme.Typography.caption2)
+                        .foregroundColor(Theme.Colors.accent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule().fill(Theme.Colors.accent.opacity(0.15))
+                        )
+                }
+
+                Text(draft.title.isEmpty ? "Untitled" : draft.title)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                HStack(spacing: Theme.Spacing.sm) {
+                    if !draft.games.isEmpty {
+                        Label("\(draft.games.count)", systemImage: "gamecontroller")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    if let invitees = draft.draftInvitees, !invitees.isEmpty {
+                        Label("\(invitees.count)", systemImage: "person.2")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                }
+
+                Text(draft.updatedAt, style: .relative)
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                Text("Continue")
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.primary)
+            }
+            .cardStyle()
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .stroke(Theme.Colors.accent.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

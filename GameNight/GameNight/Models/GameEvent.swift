@@ -17,6 +17,7 @@ struct GameEvent: Identifiable, Codable {
     var minPlayers: Int
     var maxPlayers: Int?
     var coverImageUrl: String?
+    var draftInvitees: [DraftInvitee]?
     var deletedAt: Date?
     var createdAt: Date
     var updatedAt: Date
@@ -38,6 +39,7 @@ struct GameEvent: Identifiable, Codable {
         case minPlayers = "min_players"
         case maxPlayers = "max_players"
         case coverImageUrl = "cover_image_url"
+        case draftInvitees = "draft_invitees"
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -59,6 +61,7 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(minPlayers, forKey: .minPlayers)
         try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
+        try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)
         try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
@@ -110,6 +113,23 @@ struct InviteStrategy: Codable {
     enum InviteType: String, Codable {
         case allAtOnce = "all_at_once"
         case tiered
+    }
+}
+
+// MARK: - Draft Invitee (stored as JSON in events.draft_invitees)
+struct DraftInvitee: Codable, Identifiable {
+    let id: UUID
+    var name: String
+    var phoneNumber: String
+    var userId: UUID?
+    var tier: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case phoneNumber = "phone_number"
+        case userId = "user_id"
+        case tier
     }
 }
 
@@ -176,6 +196,7 @@ extension GameEvent {
         minPlayers: 3,
         maxPlayers: 4,
         coverImageUrl: nil,
+        draftInvitees: nil,
         deletedAt: nil,
         createdAt: Date(),
         updatedAt: Date()

@@ -6,6 +6,7 @@ struct CreateEventView: View {
     @EnvironmentObject var appState: AppState
     @State private var showContactPicker = false
     @State private var showContactList = false
+    @State private var showCancelConfirmation = false
     let onSaved: ((GameEvent) -> Void)?
 
     init(eventToEdit: GameEvent? = nil, onSaved: ((GameEvent) -> Void)? = nil) {
@@ -14,7 +15,8 @@ struct CreateEventView: View {
     }
 
     private var visibleSteps: [CreateEventViewModel.CreateStep] {
-        viewModel.isEditing ? [.details, .games, .schedule, .review] : CreateEventViewModel.CreateStep.allCases
+        // Edit mode (including drafts) shows all 5 steps; new creation also shows all 5
+        CreateEventViewModel.CreateStep.allCases
     }
 
     private var currentStepIndex: Int {
@@ -37,7 +39,18 @@ struct CreateEventView: View {
                                 case .review: return "Review"
                                 }
                             },
-                            currentStep: currentStepIndex
+                            currentStep: currentStepIndex,
+                            completedSteps: Set(visibleSteps.enumerated().compactMap { index, step in
+                                viewModel.completedSteps.contains(step) ? index : nil
+                            }),
+                            onStepTapped: { index in
+                                let step = visibleSteps[index]
+                                if viewModel.canNavigateToStep(step) {
+                                    withAnimation(Theme.Animation.snappy) {
+                                        viewModel.navigateToStep(step)
+                                    }
+                                }
+                            }
                         )
                         .padding(.horizontal, Theme.Spacing.xl)
 
@@ -62,7 +75,25 @@ struct CreateEventView: View {
                     Divider().background(Theme.Colors.divider)
 
                     HStack(spacing: Theme.Spacing.md) {
-                        if viewModel.currentStep != .details {
+                        // Save Draft — visible during create and draft-edit, not for published events
+                        if !viewModel.isEditing || viewModel.isDraftEdit {
+                            Button("Save Draft") {
+                                Task {
+                                    await viewModel.saveDraft()
+                                    if let savedEvent = viewModel.createdEvent {
+                                        onSaved?(savedEvent)
+                                        dismiss()
+                                    }
+                                }
+                            }
+                            .font(Theme.Typography.calloutMedium)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                            .disabled(viewModel.isSaving)
+                        }
+
+                        Spacer()
+
+                        if viewModel.currentStep != visibleSteps.first {
                             Button("Back") {
                                 withAnimation(Theme.Animation.snappy) {
                                     let steps = visibleSteps
@@ -85,6 +116,7 @@ struct CreateEventView: View {
                                 }
                             } else {
                                 withAnimation(Theme.Animation.snappy) {
+                                    viewModel.markCurrentStepCompleted()
                                     let steps = visibleSteps
                                     if let idx = steps.firstIndex(of: viewModel.currentStep),
                                        idx < steps.count - 1 {
@@ -94,7 +126,7 @@ struct CreateEventView: View {
                             }
                         }
                         .buttonStyle(PrimaryButtonStyle(isEnabled: viewModel.canProceed))
-                        .disabled(!viewModel.canProceed)
+                        .disabled(!viewModel.canProceed || viewModel.isSaving)
                     }
                     .padding(Theme.Spacing.xl)
                     .background(Theme.Colors.cardBackground.ignoresSafeArea())
@@ -104,9 +136,34 @@ struct CreateEventView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(Theme.Colors.textSecondary)
+                    Button("Cancel") {
+                        if !viewModel.isEditing || viewModel.isDraftEdit {
+                            showCancelConfirmation = true
+                        } else {
+                            dismiss()
+                        }
+                    }
+                    .foregroundColor(Theme.Colors.textSecondary)
                 }
+            }
+            .confirmationDialog(
+                "Unsaved Changes",
+                isPresented: $showCancelConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Save Draft") {
+                    Task {
+                        await viewModel.saveDraft()
+                        if viewModel.createdEvent != nil {
+                            onSaved?(viewModel.createdEvent!)
+                        }
+                        dismiss()
+                    }
+                }
+                Button("Discard", role: .destructive) {
+                    dismiss()
+                }
+                Button("Keep Editing", role: .cancel) { }
             }
             .sheet(isPresented: $showContactList) {
                 ContactListSheet(
@@ -725,19 +782,41 @@ struct CreateEventView: View {
 struct StepIndicator: View {
     let steps: [String]
     let currentStep: Int
+    var completedSteps: Set<Int> = []
+    var onStepTapped: ((Int) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
             ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                VStack(spacing: 4) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(index <= currentStep ? Theme.Colors.primary : Theme.Colors.divider)
-                        .frame(height: 3)
+                let isCurrent = index == currentStep
+                let isCompleted = completedSteps.contains(index)
+                let isTappable = isCurrent || isCompleted || index <= currentStep
+                    || index == (completedSteps.max() ?? -1) + 1
 
-                    Text(step)
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(index <= currentStep ? Theme.Colors.primary : Theme.Colors.textTertiary)
+                Button {
+                    onStepTapped?(index)
+                } label: {
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(
+                                isCurrent ? Theme.Colors.primary
+                                : isCompleted ? Theme.Colors.primary.opacity(0.6)
+                                : Theme.Colors.divider
+                            )
+                            .frame(height: 3)
+
+                        Text(step)
+                            .font(Theme.Typography.caption2)
+                            .foregroundColor(
+                                isCurrent ? Theme.Colors.primary
+                                : isCompleted ? Theme.Colors.primary.opacity(0.6)
+                                : Theme.Colors.textTertiary
+                            )
+                    }
                 }
+                .buttonStyle(.plain)
+                .disabled(!isTappable)
+                .opacity(isTappable ? 1.0 : 0.5)
             }
         }
     }

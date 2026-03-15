@@ -135,7 +135,8 @@ final class CreateEventViewModel: ObservableObject {
 
     // Steps
     @Published var currentStep: CreateStep = .details
-    enum CreateStep: Int, CaseIterable {
+    @Published var completedSteps: Set<CreateStep> = []
+    enum CreateStep: Int, CaseIterable, Hashable {
         case details = 0
         case games
         case schedule
@@ -160,13 +161,44 @@ final class CreateEventViewModel: ObservableObject {
             inviteStrategy = eventToEdit.inviteStrategy
             minPlayers = eventToEdit.minPlayers
             maxPlayers = eventToEdit.maxPlayers
+
+            if eventToEdit.status == .draft {
+                // Resume draft: load draft invitees, start at first incomplete step
+                if let draftInvitees = eventToEdit.draftInvitees {
+                    invitees = draftInvitees.map { draft in
+                        InviteeEntry(
+                            id: draft.id,
+                            name: draft.name,
+                            phoneNumber: draft.phoneNumber,
+                            userId: draft.userId,
+                            tier: draft.tier
+                        )
+                    }
+                }
+                // Mark steps that have data as completed
+                if !title.isEmpty { completedSteps.insert(.details) }
+                if !selectedGames.isEmpty { completedSteps.insert(.games) }
+                if !timeOptions.isEmpty { completedSteps.insert(.schedule) }
+                if !invitees.isEmpty { completedSteps.insert(.invites) }
+                // Start at first incomplete step
+                currentStep = CreateStep.allCases.first { !completedSteps.contains($0) } ?? .review
+            } else {
+                // Editing published event: all steps completed, start at review
+                completedSteps = Set(CreateStep.allCases)
+                currentStep = .review
+            }
         }
     }
 
     var isEditing: Bool { eventToEdit != nil }
 
+    var isDraftEdit: Bool { eventToEdit?.status == .draft }
+
     var nextButtonLabel: String {
-        if currentStep == .review { return isEditing ? "Save Changes" : "Send Invites" }
+        if currentStep == .review {
+            if isDraftEdit { return "Send Invites" }
+            return isEditing ? "Save Changes" : "Send Invites"
+        }
         if currentStep == .games && selectedGames.isEmpty { return "Add Game Later" }
         return "Next"
     }
@@ -176,9 +208,28 @@ final class CreateEventViewModel: ObservableObject {
         case .details: return !title.isEmpty
         case .games: return true
         case .schedule: return !timeOptions.isEmpty
-        case .invites: return !invitees.isEmpty
+        case .invites: return isEditing && !isDraftEdit ? true : !invitees.isEmpty
         case .review: return true
         }
+    }
+
+    func navigateToStep(_ step: CreateStep) {
+        // Can always go backward or to completed steps or to the next incomplete step
+        if step.rawValue <= currentStep.rawValue
+            || completedSteps.contains(step)
+            || step.rawValue == (completedSteps.map(\.rawValue).max() ?? -1) + 1 {
+            currentStep = step
+        }
+    }
+
+    func canNavigateToStep(_ step: CreateStep) -> Bool {
+        step.rawValue <= currentStep.rawValue
+            || completedSteps.contains(step)
+            || step.rawValue == (completedSteps.map(\.rawValue).max() ?? -1) + 1
+    }
+
+    func markCurrentStepCompleted() {
+        completedSteps.insert(currentStep)
     }
 
     func searchGames() async {
@@ -364,68 +415,112 @@ final class CreateEventViewModel: ObservableObject {
         }
     }
 
-    func createEvent() async {
+    private func buildEvent(status: EventStatus, session: Supabase.Session) -> GameEvent {
+        let existingEvent = eventToEdit
+        return GameEvent(
+            id: existingEvent?.id ?? UUID(),
+            hostId: existingEvent?.hostId ?? session.user.id,
+            host: nil,
+            title: title,
+            description: description.isEmpty ? nil : description,
+            location: location.isEmpty ? nil : location,
+            locationAddress: locationAddress.isEmpty ? nil : locationAddress,
+            status: status,
+            games: selectedGames,
+            timeOptions: timeOptions,
+            confirmedTimeOptionId: nil,
+            allowTimeSuggestions: allowTimeSuggestions,
+            inviteStrategy: inviteStrategy,
+            minPlayers: minPlayers,
+            maxPlayers: maxPlayers,
+            coverImageUrl: existingEvent?.coverImageUrl,
+            draftInvitees: status == .draft ? invitees.map { entry in
+                DraftInvitee(
+                    id: entry.id,
+                    name: entry.name,
+                    phoneNumber: entry.phoneNumber,
+                    userId: entry.userId,
+                    tier: entry.tier
+                )
+            } : nil,
+            deletedAt: existingEvent?.deletedAt,
+            createdAt: existingEvent?.createdAt ?? Date(),
+            updatedAt: Date()
+        )
+    }
+
+    private func createInviteRecords(eventId: UUID, hostId: UUID) async throws {
+        let sortedInvitees = invitees.sorted { $0.tier < $1.tier }
+        let firstTierSize = inviteStrategy.tierSize ?? sortedInvitees.count
+
+        let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
+            let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
+            return Invite(
+                id: UUID(),
+                eventId: eventId,
+                hostUserId: hostId,
+                userId: invitee.userId,
+                phoneNumber: invitee.phoneNumber,
+                displayName: invitee.name,
+                status: isFirstTier ? .pending : .waitlisted,
+                tier: invitee.tier,
+                tierPosition: index,
+                isActive: isFirstTier,
+                respondedAt: nil,
+                selectedTimeOptionIds: [],
+                suggestedTimes: nil,
+                sentVia: .both,
+                smsDeliveryStatus: nil,
+                createdAt: Date()
+            )
+        }
+
+        try await supabase.createInvites(invites)
+    }
+
+    func saveDraft() async {
         isSaving = true
         error = nil
 
         do {
             let session = try await supabase.client.auth.session
-            let existingEvent = eventToEdit
-
-            let event = GameEvent(
-                id: existingEvent?.id ?? UUID(),
-                hostId: existingEvent?.hostId ?? session.user.id,
-                host: nil,
-                title: title,
-                description: description.isEmpty ? nil : description,
-                location: location.isEmpty ? nil : location,
-                locationAddress: locationAddress.isEmpty ? nil : locationAddress,
-                status: .published,
-                games: selectedGames,
-                timeOptions: timeOptions,
-                confirmedTimeOptionId: nil,
-                allowTimeSuggestions: allowTimeSuggestions,
-                inviteStrategy: inviteStrategy,
-                minPlayers: minPlayers,
-                maxPlayers: maxPlayers,
-                coverImageUrl: existingEvent?.coverImageUrl,
-                deletedAt: existingEvent?.deletedAt,
-                createdAt: existingEvent?.createdAt ?? Date(),
-                updatedAt: Date()
-            )
+            let event = buildEvent(status: .draft, session: session)
 
             if isEditing {
                 try await supabase.updateEvent(event)
                 self.createdEvent = try await supabase.fetchEvent(id: event.id)
             } else {
                 let created = try await supabase.createEvent(event)
+                self.createdEvent = created
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
 
-                let sortedInvitees = invitees.sorted { $0.tier < $1.tier }
-                let firstTierSize = inviteStrategy.tierSize ?? sortedInvitees.count
+        isSaving = false
+    }
 
-                let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
-                    let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
-                    return Invite(
-                        id: UUID(),
-                        eventId: created.id,
-                        hostUserId: created.hostId,
-                        userId: invitee.userId,
-                        phoneNumber: invitee.phoneNumber,
-                        displayName: invitee.name,
-                        status: isFirstTier ? .pending : .waitlisted,
-                        tier: invitee.tier,
-                        tierPosition: index,
-                        isActive: isFirstTier,
-                        respondedAt: nil,
-                        selectedTimeOptionIds: [],
-                        suggestedTimes: nil,
-                        sentVia: .both,
-                        smsDeliveryStatus: nil,
-                        createdAt: Date()
-                    )
-                }
+    func createEvent() async {
+        isSaving = true
+        error = nil
 
-                try await supabase.createInvites(invites)
+        do {
+            let session = try await supabase.client.auth.session
+            let event = buildEvent(status: .published, session: session)
+
+            if isEditing && !isDraftEdit {
+                // Editing a published event — update only, no new invites
+                try await supabase.updateEvent(event)
+                self.createdEvent = try await supabase.fetchEvent(id: event.id)
+            } else if isDraftEdit {
+                // Publishing a draft — update event + create invite records
+                try await supabase.updateEvent(event)
+                try await createInviteRecords(eventId: event.id, hostId: event.hostId)
+                self.createdEvent = try await supabase.fetchEvent(id: event.id)
+            } else {
+                // Brand new event
+                let created = try await supabase.createEvent(event)
+                try await createInviteRecords(eventId: created.id, hostId: created.hostId)
                 self.createdEvent = created
             }
         } catch {

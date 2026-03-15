@@ -118,6 +118,20 @@ final class SupabaseService: ObservableObject {
         return events
     }
 
+    func fetchDrafts() async throws -> [GameEvent] {
+        let session = try await client.auth.session
+        let events: [GameEvent] = try await client
+            .from("events")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .eq("host_id", value: session.user.id.uuidString)
+            .eq("status", value: "draft")
+            .is("deleted_at", value: nil)
+            .order("updated_at", ascending: false)
+            .execute()
+            .value
+        return events
+    }
+
     func fetchEvent(id: UUID) async throws -> GameEvent {
         let event: GameEvent = try await client
             .from("events")
