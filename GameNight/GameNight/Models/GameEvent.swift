@@ -17,6 +17,7 @@ struct GameEvent: Identifiable, Codable {
     var minPlayers: Int
     var maxPlayers: Int?
     var coverImageUrl: String?
+    var deletedAt: Date?
     var createdAt: Date
     var updatedAt: Date
 
@@ -37,6 +38,7 @@ struct GameEvent: Identifiable, Codable {
         case minPlayers = "min_players"
         case maxPlayers = "max_players"
         case coverImageUrl = "cover_image_url"
+        case deletedAt = "deleted_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -57,6 +59,7 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(minPlayers, forKey: .minPlayers)
         try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         // Intentionally skip: host, games, timeOptions — these are related tables, not columns
@@ -173,6 +176,7 @@ extension GameEvent {
         minPlayers: 3,
         maxPlayers: 4,
         coverImageUrl: nil,
+        deletedAt: nil,
         createdAt: Date(),
         updatedAt: Date()
     )

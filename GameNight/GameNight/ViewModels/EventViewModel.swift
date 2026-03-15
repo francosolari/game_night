@@ -9,6 +9,7 @@ final class EventViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: String?
     @Published var isSending = false
+    @Published var isDeleting = false
 
     private let supabase = SupabaseService.shared
     private var realtimeChannel: RealtimeChannelV2?
@@ -72,6 +73,21 @@ final class EventViewModel: ObservableObject {
         isSending = false
     }
 
+    func deleteEvent() async -> Bool {
+        guard let event else { return false }
+        error = nil
+        isDeleting = true
+        defer { isDeleting = false }
+
+        do {
+            try await supabase.softDeleteEvent(id: event.id)
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
+    }
+
     private func subscribeToUpdates(eventId: UUID) {
         realtimeChannel = supabase.subscribeToEventUpdates(eventId: eventId) { [weak self] updatedEvent in
             Task { @MainActor in
@@ -105,6 +121,7 @@ final class CreateEventViewModel: ObservableObject {
     @Published var isSaving = false
     @Published var error: String?
     @Published var createdEvent: GameEvent?
+    let eventToEdit: GameEvent?
 
     // Game search
     @Published var gameSearchQuery = ""
@@ -129,8 +146,27 @@ final class CreateEventViewModel: ObservableObject {
     private let supabase = SupabaseService.shared
     private let bgg = BGGService.shared
 
+    init(eventToEdit: GameEvent? = nil) {
+        self.eventToEdit = eventToEdit
+
+        if let eventToEdit {
+            title = eventToEdit.title
+            description = eventToEdit.description ?? ""
+            location = eventToEdit.location ?? ""
+            locationAddress = eventToEdit.locationAddress ?? ""
+            selectedGames = eventToEdit.games
+            timeOptions = eventToEdit.timeOptions
+            allowTimeSuggestions = eventToEdit.allowTimeSuggestions
+            inviteStrategy = eventToEdit.inviteStrategy
+            minPlayers = eventToEdit.minPlayers
+            maxPlayers = eventToEdit.maxPlayers
+        }
+    }
+
+    var isEditing: Bool { eventToEdit != nil }
+
     var nextButtonLabel: String {
-        if currentStep == .review { return "Send Invites" }
+        if currentStep == .review { return isEditing ? "Save Changes" : "Send Invites" }
         if currentStep == .games && selectedGames.isEmpty { return "Add Game Later" }
         return "Next"
     }
@@ -334,10 +370,11 @@ final class CreateEventViewModel: ObservableObject {
 
         do {
             let session = try await supabase.client.auth.session
+            let existingEvent = eventToEdit
 
             let event = GameEvent(
-                id: UUID(),
-                hostId: session.user.id,
+                id: existingEvent?.id ?? UUID(),
+                hostId: existingEvent?.hostId ?? session.user.id,
                 host: nil,
                 title: title,
                 description: description.isEmpty ? nil : description,
@@ -351,41 +388,46 @@ final class CreateEventViewModel: ObservableObject {
                 inviteStrategy: inviteStrategy,
                 minPlayers: minPlayers,
                 maxPlayers: maxPlayers,
-                coverImageUrl: nil,
-                createdAt: Date(),
+                coverImageUrl: existingEvent?.coverImageUrl,
+                deletedAt: existingEvent?.deletedAt,
+                createdAt: existingEvent?.createdAt ?? Date(),
                 updatedAt: Date()
             )
 
-            let created = try await supabase.createEvent(event)
+            if isEditing {
+                try await supabase.updateEvent(event)
+                self.createdEvent = try await supabase.fetchEvent(id: event.id)
+            } else {
+                let created = try await supabase.createEvent(event)
 
-            // Create invites
-            let sortedInvitees = invitees.sorted { $0.tier < $1.tier }
-            let firstTierSize = inviteStrategy.tierSize ?? sortedInvitees.count
+                let sortedInvitees = invitees.sorted { $0.tier < $1.tier }
+                let firstTierSize = inviteStrategy.tierSize ?? sortedInvitees.count
 
-            let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
-                let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
-                return Invite(
-                    id: UUID(),
-                    eventId: created.id,
-                    hostUserId: created.hostId,
-                    userId: invitee.userId,
-                    phoneNumber: invitee.phoneNumber,
-                    displayName: invitee.name,
-                    status: isFirstTier ? .pending : .waitlisted,
-                    tier: invitee.tier,
-                    tierPosition: index,
-                    isActive: isFirstTier,
-                    respondedAt: nil,
-                    selectedTimeOptionIds: [],
-                    suggestedTimes: nil,
-                    sentVia: .both,
-                    smsDeliveryStatus: nil,
-                    createdAt: Date()
-                )
+                let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
+                    let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
+                    return Invite(
+                        id: UUID(),
+                        eventId: created.id,
+                        hostUserId: created.hostId,
+                        userId: invitee.userId,
+                        phoneNumber: invitee.phoneNumber,
+                        displayName: invitee.name,
+                        status: isFirstTier ? .pending : .waitlisted,
+                        tier: invitee.tier,
+                        tierPosition: index,
+                        isActive: isFirstTier,
+                        respondedAt: nil,
+                        selectedTimeOptionIds: [],
+                        suggestedTimes: nil,
+                        sentVia: .both,
+                        smsDeliveryStatus: nil,
+                        createdAt: Date()
+                    )
+                }
+
+                try await supabase.createInvites(invites)
+                self.createdEvent = created
             }
-
-            try await supabase.createInvites(invites)
-            self.createdEvent = created
         } catch {
             self.error = error.localizedDescription
         }

@@ -2,6 +2,18 @@ import Foundation
 import Supabase
 import Combine
 
+private struct EventSoftDeletePatch: Encodable {
+    let deletedAt: Date
+    let status: EventStatus
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case deletedAt = "deleted_at"
+        case status
+        case updatedAt = "updated_at"
+    }
+}
+
 @MainActor
 final class SupabaseService: ObservableObject {
     static let shared = SupabaseService()
@@ -86,6 +98,7 @@ final class SupabaseService: ObservableObject {
             .from("events")
             .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .or("status.eq.published,status.eq.confirmed")
+            .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
             .execute()
             .value
@@ -98,6 +111,7 @@ final class SupabaseService: ObservableObject {
             .from("events")
             .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .eq("host_id", value: session.user.id.uuidString)
+            .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
             .execute()
             .value
@@ -109,6 +123,7 @@ final class SupabaseService: ObservableObject {
             .from("events")
             .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .eq("id", value: id.uuidString)
+            .is("deleted_at", value: nil)
             .single()
             .execute()
             .value
@@ -131,6 +146,19 @@ final class SupabaseService: ObservableObject {
             .from("events")
             .update(event)
             .eq("id", value: event.id.uuidString)
+            .execute()
+    }
+
+    func softDeleteEvent(id: UUID) async throws {
+        let patch = EventSoftDeletePatch(
+            deletedAt: Date(),
+            status: .cancelled,
+            updatedAt: Date()
+        )
+        try await client
+            .from("events")
+            .update(patch, returning: .minimal)
+            .eq("id", value: id.uuidString)
             .execute()
     }
 

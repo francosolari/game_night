@@ -3,195 +3,248 @@ import SwiftUI
 struct EventDetailView: View {
     let eventId: UUID
     @StateObject private var viewModel = EventViewModel()
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
     @State private var selectedTimeIds = Set<UUID>()
     @State private var showTimeSuggestion = false
     @State private var showInviteList = false
+    @State private var showEditSheet = false
+    @State private var showDeleteConfirmation = false
+
+    private var isOwner: Bool {
+        guard let event = viewModel.event else { return false }
+        return appState.currentUser?.id == event.hostId
+    }
+
+    private var deleteErrorPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.error?.isEmpty == false },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.error = nil
+                }
+            }
+        )
+    }
 
     var body: some View {
-        ScrollView {
-            if viewModel.isLoading {
-                LoadingView()
-            } else if let event = viewModel.event {
-                VStack(spacing: 0) {
-                    // Hero Header
-                    EventHeroHeader(event: event)
+        ZStack {
+            ScrollView {
+                if viewModel.isLoading {
+                    LoadingView()
+                } else if let event = viewModel.event {
+                    VStack(spacing: 0) {
+                        // Hero Header
+                        EventHeroHeader(event: event)
 
-                    VStack(spacing: Theme.Spacing.xxl) {
-                        // Games Section
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            SectionHeader(title: "Games")
+                        VStack(spacing: Theme.Spacing.xxl) {
+                            // Games Section
+                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                SectionHeader(title: "Games")
 
-                            ForEach(event.games) { eventGame in
-                                if let game = eventGame.game {
-                                    CompactGameCard(game: game, isPrimary: eventGame.isPrimary)
+                                ForEach(event.games) { eventGame in
+                                    if let game = eventGame.game {
+                                        CompactGameCard(game: game, isPrimary: eventGame.isPrimary)
+                                    }
                                 }
                             }
-                        }
-                        .cardStyle()
+                            .cardStyle()
 
-                        // Schedule Section
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            SectionHeader(title: "When Works?")
+                            // Schedule Section
+                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                SectionHeader(title: "When Works?")
+
+                                if let myInvite = viewModel.myInvite, myInvite.status == .pending {
+                                    Text("Select the times that work for you:")
+                                        .font(Theme.Typography.callout)
+                                        .foregroundColor(Theme.Colors.textSecondary)
+
+                                    TimeOptionPicker(
+                                        timeOptions: event.timeOptions,
+                                        selectedIds: $selectedTimeIds,
+                                        allowMultiple: true,
+                                        showVoteCounts: false
+                                    )
+
+                                    if event.allowTimeSuggestions {
+                                        Button {
+                                            showTimeSuggestion = true
+                                        } label: {
+                                            HStack {
+                                                Image(systemName: "plus.circle")
+                                                Text("Suggest another time")
+                                            }
+                                            .font(Theme.Typography.calloutMedium)
+                                            .foregroundColor(Theme.Colors.accent)
+                                        }
+                                    }
+                                } else {
+                                    TimeOptionPicker(
+                                        timeOptions: event.timeOptions,
+                                        selectedIds: $selectedTimeIds,
+                                        allowMultiple: false,
+                                        showVoteCounts: true
+                                    )
+                                }
+                            }
+                            .cardStyle()
 
                             if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                                Text("Select the times that work for you:")
-                                    .font(Theme.Typography.callout)
-                                    .foregroundColor(Theme.Colors.textSecondary)
-
-                                TimeOptionPicker(
-                                    timeOptions: event.timeOptions,
-                                    selectedIds: $selectedTimeIds,
-                                    allowMultiple: true,
-                                    showVoteCounts: false
+                                RSVPSection(
+                                    onAccept: {
+                                        await viewModel.respondToInvite(
+                                            status: .accepted,
+                                            selectedTimeIds: Array(selectedTimeIds),
+                                            suggestedTimes: nil
+                                        )
+                                    },
+                                    onDecline: {
+                                        await viewModel.respondToInvite(
+                                            status: .declined,
+                                            selectedTimeIds: [],
+                                            suggestedTimes: nil
+                                        )
+                                    },
+                                    onMaybe: {
+                                        await viewModel.respondToInvite(
+                                            status: .maybe,
+                                            selectedTimeIds: Array(selectedTimeIds),
+                                            suggestedTimes: nil
+                                        )
+                                    },
+                                    isSending: viewModel.isSending
                                 )
-
-                                if event.allowTimeSuggestions {
-                                    Button {
-                                        showTimeSuggestion = true
-                                    } label: {
-                                        HStack {
-                                            Image(systemName: "plus.circle")
-                                            Text("Suggest another time")
-                                        }
-                                        .font(Theme.Typography.calloutMedium)
-                                        .foregroundColor(Theme.Colors.accent)
-                                    }
-                                }
-                            } else {
-                                TimeOptionPicker(
-                                    timeOptions: event.timeOptions,
-                                    selectedIds: $selectedTimeIds,
-                                    allowMultiple: false,
-                                    showVoteCounts: true
-                                )
-                            }
-                        }
-                        .cardStyle()
-
-                        // RSVP Section (if I'm invited and pending)
-                        if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                            RSVPSection(
-                                onAccept: {
-                                    await viewModel.respondToInvite(
-                                        status: .accepted,
-                                        selectedTimeIds: Array(selectedTimeIds),
-                                        suggestedTimes: nil
-                                    )
-                                },
-                                onDecline: {
-                                    await viewModel.respondToInvite(
-                                        status: .declined,
-                                        selectedTimeIds: [],
-                                        suggestedTimes: nil
-                                    )
-                                },
-                                onMaybe: {
-                                    await viewModel.respondToInvite(
-                                        status: .maybe,
-                                        selectedTimeIds: Array(selectedTimeIds),
-                                        suggestedTimes: nil
-                                    )
-                                },
-                                isSending: viewModel.isSending
-                            )
-                        } else if let myInvite = viewModel.myInvite {
-                            // Show current status
-                            HStack {
-                                Image(systemName: myInvite.status.icon)
-                                Text("You're \(myInvite.status.displayLabel.lowercased())")
-                                    .font(Theme.Typography.bodyMedium)
-                            }
-                            .foregroundColor(statusColor(myInvite.status))
-                            .frame(maxWidth: .infinity)
-                            .padding(Theme.Spacing.lg)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                    .fill(statusColor(myInvite.status).opacity(0.1))
-                            )
-                        }
-
-                        // Guest List Section
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            Button {
-                                showInviteList = true
-                            } label: {
+                            } else if let myInvite = viewModel.myInvite {
                                 HStack {
-                                    SectionHeader(title: "Guest List")
-
-                                    Spacer()
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(Theme.Colors.textTertiary)
+                                    Image(systemName: myInvite.status.icon)
+                                    Text("You're \(myInvite.status.displayLabel.lowercased())")
+                                        .font(Theme.Typography.bodyMedium)
                                 }
-                            }
-
-                            let summary = viewModel.inviteSummary
-                            HStack(spacing: Theme.Spacing.lg) {
-                                GuestCountBadge(count: summary.accepted, label: "Going", color: Theme.Colors.success)
-                                GuestCountBadge(count: summary.pending, label: "Pending", color: Theme.Colors.warning)
-                                GuestCountBadge(count: summary.maybe, label: "Maybe", color: Theme.Colors.accent)
-                                GuestCountBadge(count: summary.declined, label: "Can't", color: Theme.Colors.error)
-                            }
-
-                            // Avatar row of accepted guests
-                            if !summary.acceptedUsers.isEmpty {
-                                AvatarStack(
-                                    urls: summary.acceptedUsers.map(\.avatarUrl),
-                                    size: 36
+                                .foregroundColor(statusColor(myInvite.status))
+                                .frame(maxWidth: .infinity)
+                                .padding(Theme.Spacing.lg)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                        .fill(statusColor(myInvite.status).opacity(0.1))
                                 )
                             }
-                        }
-                        .cardStyle()
 
-                        // Location
-                        if let location = event.location {
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                SectionHeader(title: "Location")
+                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                Button {
+                                    showInviteList = true
+                                } label: {
+                                    HStack {
+                                        SectionHeader(title: "Guest List")
 
-                                HStack(spacing: Theme.Spacing.md) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                            .fill(Theme.Colors.secondary.opacity(0.15))
-                                            .frame(width: 44, height: 44)
-                                        Image(systemName: "mappin.circle.fill")
-                                            .font(.system(size: 24))
-                                            .foregroundColor(Theme.Colors.secondary)
+                                        Spacer()
+
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(Theme.Colors.textTertiary)
                                     }
+                                }
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(location)
-                                            .font(Theme.Typography.bodyMedium)
-                                            .foregroundColor(Theme.Colors.textPrimary)
-                                        if let address = event.locationAddress {
-                                            Text(address)
-                                                .font(Theme.Typography.caption)
-                                                .foregroundColor(Theme.Colors.textTertiary)
+                                let summary = viewModel.inviteSummary
+                                HStack(spacing: Theme.Spacing.lg) {
+                                    GuestCountBadge(count: summary.accepted, label: "Going", color: Theme.Colors.success)
+                                    GuestCountBadge(count: summary.pending, label: "Pending", color: Theme.Colors.warning)
+                                    GuestCountBadge(count: summary.maybe, label: "Maybe", color: Theme.Colors.accent)
+                                    GuestCountBadge(count: summary.declined, label: "Can't", color: Theme.Colors.error)
+                                }
+
+                                if !summary.acceptedUsers.isEmpty {
+                                    AvatarStack(
+                                        urls: summary.acceptedUsers.map(\.avatarUrl),
+                                        size: 36
+                                    )
+                                }
+                            }
+                            .cardStyle()
+
+                            if let location = event.location {
+                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                    SectionHeader(title: "Location")
+
+                                    HStack(spacing: Theme.Spacing.md) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                                .fill(Theme.Colors.secondary.opacity(0.15))
+                                                .frame(width: 44, height: 44)
+                                            Image(systemName: "mappin.circle.fill")
+                                                .font(.system(size: 24))
+                                                .foregroundColor(Theme.Colors.secondary)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(location)
+                                                .font(Theme.Typography.bodyMedium)
+                                                .foregroundColor(Theme.Colors.textPrimary)
+                                            if let address = event.locationAddress {
+                                                Text(address)
+                                                    .font(Theme.Typography.caption)
+                                                    .foregroundColor(Theme.Colors.textTertiary)
+                                            }
                                         }
                                     }
                                 }
+                                .cardStyle()
                             }
-                            .cardStyle()
-                        }
 
-                        // Description
-                        if let desc = event.description, !desc.isEmpty {
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                SectionHeader(title: "Details")
-                                Text(desc)
-                                    .font(Theme.Typography.body)
-                                    .foregroundColor(Theme.Colors.textSecondary)
+                            if let desc = event.description, !desc.isEmpty {
+                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                    SectionHeader(title: "Details")
+                                    Text(desc)
+                                        .font(Theme.Typography.body)
+                                        .foregroundColor(Theme.Colors.textSecondary)
+                                }
+                                .cardStyle()
                             }
-                            .cardStyle()
                         }
+                        .padding(Theme.Spacing.xl)
                     }
-                    .padding(Theme.Spacing.xl)
+                    .padding(.bottom, 100)
                 }
-                .padding(.bottom, 100)
+            }
+            .disabled(viewModel.isDeleting)
+
+            if viewModel.isDeleting {
+                Color.black.opacity(0.2)
+                    .ignoresSafeArea()
+
+                VStack(spacing: Theme.Spacing.md) {
+                    ProgressView()
+                        .tint(Theme.Colors.primary)
+                    Text("Deleting event...")
+                        .font(Theme.Typography.calloutMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                }
+                .padding(Theme.Spacing.xl)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                        .fill(Theme.Colors.cardBackground)
+                )
             }
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isOwner {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Edit Event") {
+                            showEditSheet = true
+                        }
+
+                        Button("Delete Event", role: .destructive) {
+                            showDeleteConfirmation = true
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(Theme.Colors.textPrimary)
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showTimeSuggestion) {
             TimeSuggestionSheet { option in
                 // Handle time suggestion
@@ -199,6 +252,34 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showInviteList) {
             InviteListSheet(invites: viewModel.invites, summary: viewModel.inviteSummary)
+        }
+        .sheet(isPresented: $showEditSheet) {
+            if let event = viewModel.event {
+                CreateEventView(eventToEdit: event) { _ in
+                    Task { await viewModel.loadEvent(id: eventId) }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete this event?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Event", role: .destructive) {
+                Task {
+                    if await viewModel.deleteEvent() {
+                        dismiss()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
+        }
+        .alert("Couldn't delete event", isPresented: deleteErrorPresented) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.error ?? "Please try again.")
         }
         .task {
             await viewModel.loadEvent(id: eventId)

@@ -1,11 +1,25 @@
 import SwiftUI
 
 struct CreateEventView: View {
-    @StateObject private var viewModel = CreateEventViewModel()
+    @StateObject private var viewModel: CreateEventViewModel
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var appState: AppState
     @State private var showContactPicker = false
     @State private var showContactList = false
+    let onSaved: ((GameEvent) -> Void)?
+
+    init(eventToEdit: GameEvent? = nil, onSaved: ((GameEvent) -> Void)? = nil) {
+        _viewModel = StateObject(wrappedValue: CreateEventViewModel(eventToEdit: eventToEdit))
+        self.onSaved = onSaved
+    }
+
+    private var visibleSteps: [CreateEventViewModel.CreateStep] {
+        viewModel.isEditing ? [.details, .games, .schedule, .review] : CreateEventViewModel.CreateStep.allCases
+    }
+
+    private var currentStepIndex: Int {
+        visibleSteps.firstIndex(of: viewModel.currentStep) ?? 0
+    }
 
     var body: some View {
         NavigationStack {
@@ -14,7 +28,7 @@ struct CreateEventView: View {
                     VStack(spacing: Theme.Spacing.xxl) {
                         // Step indicator
                         StepIndicator(
-                            steps: CreateEventViewModel.CreateStep.allCases.map { step in
+                            steps: visibleSteps.map { step in
                                 switch step {
                                 case .details: return "Details"
                                 case .games: return "Games"
@@ -23,7 +37,7 @@ struct CreateEventView: View {
                                 case .review: return "Review"
                                 }
                             },
-                            currentStep: viewModel.currentStep.rawValue
+                            currentStep: currentStepIndex
                         )
                         .padding(.horizontal, Theme.Spacing.xl)
 
@@ -51,7 +65,7 @@ struct CreateEventView: View {
                         if viewModel.currentStep != .details {
                             Button("Back") {
                                 withAnimation(Theme.Animation.snappy) {
-                                    let steps = CreateEventViewModel.CreateStep.allCases
+                                    let steps = visibleSteps
                                     if let idx = steps.firstIndex(of: viewModel.currentStep), idx > 0 {
                                         viewModel.currentStep = steps[idx - 1]
                                     }
@@ -64,13 +78,14 @@ struct CreateEventView: View {
                             if viewModel.currentStep == .review {
                                 Task {
                                     await viewModel.createEvent()
-                                    if viewModel.createdEvent != nil {
+                                    if let savedEvent = viewModel.createdEvent {
+                                        onSaved?(savedEvent)
                                         dismiss()
                                     }
                                 }
                             } else {
                                 withAnimation(Theme.Animation.snappy) {
-                                    let steps = CreateEventViewModel.CreateStep.allCases
+                                    let steps = visibleSteps
                                     if let idx = steps.firstIndex(of: viewModel.currentStep),
                                        idx < steps.count - 1 {
                                         viewModel.currentStep = steps[idx + 1]
@@ -85,7 +100,7 @@ struct CreateEventView: View {
                     .background(Theme.Colors.cardBackground.ignoresSafeArea())
                 }
             }
-            .navigationTitle("Create Game Night")
+            .navigationTitle(viewModel.isEditing ? "Edit Game Night" : "Create Game Night")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -404,6 +419,12 @@ struct CreateEventView: View {
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
+            if viewModel.isEditing {
+                Text("Invite list editing is separate for now. This flow updates the event without changing existing invites.")
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textSecondary)
+            }
+
             // Quick-add: suggested contacts (top 3 frequent)
             if !viewModel.topSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -667,14 +688,20 @@ struct CreateEventView: View {
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textTertiary)
 
-                    Text("\(viewModel.tier1Invitees.count) playing")
-                        .font(Theme.Typography.body)
-                        .foregroundColor(Theme.Colors.textPrimary)
-
-                    if !viewModel.tier2Invitees.isEmpty {
-                        Text("\(viewModel.tier2Invitees.count) on bench")
+                    if viewModel.isEditing {
+                        Text("Existing invitees stay unchanged in edit mode")
                             .font(Theme.Typography.body)
-                            .foregroundColor(Theme.Colors.accent)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                    } else {
+                        Text("\(viewModel.tier1Invitees.count) playing")
+                            .font(Theme.Typography.body)
+                            .foregroundColor(Theme.Colors.textPrimary)
+
+                        if !viewModel.tier2Invitees.isEmpty {
+                            Text("\(viewModel.tier2Invitees.count) on bench")
+                                .font(Theme.Typography.body)
+                                .foregroundColor(Theme.Colors.accent)
+                        }
                     }
                 }
             }
