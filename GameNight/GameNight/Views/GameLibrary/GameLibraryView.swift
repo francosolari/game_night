@@ -569,5 +569,3 @@ struct FlowLayout: Layout {
         }
     }
 }
-
-extension Game: Identifiable {}

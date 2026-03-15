@@ -8,14 +8,10 @@ final class SupabaseService: ObservableObject {
 
     let client: SupabaseClient
 
-    // TODO: Move to environment config / plist
-    private static let supabaseURL = URL(string: "https://YOUR_PROJECT.supabase.co")!
-    private static let supabaseAnonKey = "YOUR_ANON_KEY"
-
     private init() {
         self.client = SupabaseClient(
-            supabaseURL: Self.supabaseURL,
-            supabaseKey: Self.supabaseAnonKey
+            supabaseURL: Secrets.supabaseURL,
+            supabaseKey: Secrets.supabasePublishableKey
         )
     }
 

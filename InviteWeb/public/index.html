@@ -313,10 +313,8 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
-
         // Get invite token from URL
         const pathParts = window.location.pathname.split('/');
         const inviteToken = pathParts[pathParts.length - 1];
@@ -329,8 +327,8 @@
             try {
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?invite_token=eq.${inviteToken}&select=*,event:events(*,host:users(display_name),games:event_games(*,game:games(*)),time_options:time_options(*))`, {
                     headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                        'apikey': SUPABASE_PUBLISHABLE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
                     }
                 });
 
@@ -491,8 +489,8 @@
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?id=eq.${inviteData.id}`, {
                     method: 'PATCH',
                     headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_PUBLISHABLE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
                         'Content-Type': 'application/json',
                         'Prefer': 'return=minimal'
                     },
@@ -508,7 +506,7 @@
                     await fetch(`${SUPABASE_URL}/functions/v1/process-tiered-invites`, {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ invite_id: inviteData.id })

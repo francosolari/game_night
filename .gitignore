@@ -2,6 +2,7 @@
 build/
 DerivedData/
 *.xcuserdata
+xcuserdata/
 *.xcworkspace/xcuserdata/
 *.pbxuser
 *.mode1v3
@@ -16,6 +17,7 @@ DerivedData/
 .build/
 Packages/
 Package.resolved
+.swiftpm/
 
 # CocoaPods
 Pods/
@@ -25,6 +27,12 @@ Pods/
 .env.local
 *.key
 *.pem
+Secrets.swift
+config.js
+!config.js.example
+
+# IDE
+.idea/
 
 # OS
 .DS_Store

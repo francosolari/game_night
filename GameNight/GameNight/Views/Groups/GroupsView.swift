@@ -402,5 +402,3 @@ struct MemberRow: View {
         .padding(Theme.Spacing.sm)
     }
 }
-
-extension GameGroup: Identifiable {}

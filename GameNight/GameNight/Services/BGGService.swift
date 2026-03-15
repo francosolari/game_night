@@ -169,7 +169,7 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
     private var maxPlaytime: Int = 60
     private var weight: Double = 2.5
     private var rating: Double = 0
-    private var description: String?
+    private var gameDescription: String?
     private var categories: [String] = []
     private var mechanics: [String] = []
     private var currentText = ""
@@ -190,7 +190,7 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
                 image = nil
                 categories = []
                 mechanics = []
-                description = nil
+                gameDescription = nil
             }
         case "name":
             if inItem && attributeDict["type"] == "primary" {
@@ -232,7 +232,7 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
             switch elementName {
             case "thumbnail": thumbnail = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
             case "image": image = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-            case "description": description = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+            case "description": gameDescription = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
             case "item":
                 if let id = currentId, let name = currentName {
                     games.append(Game(
@@ -249,7 +249,7 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
                         maxPlaytime: maxPlaytime,
                         complexity: weight,
                         bggRating: rating > 0 ? rating : nil,
-                        description: description,
+                        description: gameDescription,
                         categories: categories,
                         mechanics: mechanics
                     ))
