@@ -583,6 +583,7 @@ struct AuthFlowView: View {
                 discoverableByPhone: true,
                 marketingOptIn: false,
                 contactsSynced: false,
+                phoneVerified: true,
                 privacyAcceptedAt: Date()
             )
             try await SupabaseService.shared.updateUser(user)
