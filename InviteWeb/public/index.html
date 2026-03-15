@@ -325,20 +325,23 @@
 
         async function fetchInvite() {
             try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?invite_token=eq.${inviteToken}&select=*,event:events(*,host:users(display_name),games:event_games(*,game:games(*)),time_options:time_options(*))`, {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/get-public-invite`, {
+                    method: 'POST',
                     headers: {
                         'apikey': SUPABASE_PUBLISHABLE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`
-                    }
+                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ invite_token: inviteToken })
                 });
 
                 const data = await res.json();
-                if (!data || data.length === 0) {
+                if (!res.ok || !data) {
                     showError('Invite not found or expired.');
                     return;
                 }
 
-                inviteData = data[0];
+                inviteData = data;
                 eventData = inviteData.event;
                 renderInvite();
             } catch (err) {
@@ -468,6 +471,9 @@
                             <button class="btn btn-secondary" onclick="respond('maybe')">Maybe</button>
                             <button class="btn btn-decline" onclick="respond('declined')">Can't Go</button>
                         </div>
+                        <p style="margin-top: 14px; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
+                            RSVP requires signing in with the phone number that received this invite.
+                        </p>
                     </div>
                 </div>
             `;
@@ -485,38 +491,7 @@
         }
 
         async function respond(status) {
-            try {
-                const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?id=eq.${inviteData.id}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'apikey': SUPABASE_PUBLISHABLE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-                        'Content-Type': 'application/json',
-                        'Prefer': 'return=minimal'
-                    },
-                    body: JSON.stringify({
-                        status: status,
-                        responded_at: new Date().toISOString(),
-                        selected_time_option_ids: Array.from(selectedTimeIds)
-                    })
-                });
-
-                if (res.ok) {
-                    // Trigger tiered invite processing
-                    await fetch(`${SUPABASE_URL}/functions/v1/process-tiered-invites`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ invite_id: inviteData.id })
-                    });
-
-                    showSuccess(status);
-                }
-            } catch (err) {
-                alert('Failed to send response. Please try again.');
-            }
+            alert('RSVP requires signing in with the phone number that received this invite.');
         }
 
         function showSuccess(status) {
