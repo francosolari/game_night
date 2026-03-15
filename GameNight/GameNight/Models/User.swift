@@ -12,6 +12,7 @@ struct User: Identifiable, Codable, Hashable {
     var discoverableByPhone: Bool
     var marketingOptIn: Bool
     var contactsSynced: Bool
+    var phoneVerified: Bool
     var privacyAcceptedAt: Date?
     var createdAt: Date
     var updatedAt: Date
@@ -27,6 +28,7 @@ struct User: Identifiable, Codable, Hashable {
         case discoverableByPhone = "discoverable_by_phone"
         case marketingOptIn = "marketing_opt_in"
         case contactsSynced = "contacts_synced"
+        case phoneVerified = "phone_verified"
         case privacyAcceptedAt = "privacy_accepted_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -43,6 +45,7 @@ struct User: Identifiable, Codable, Hashable {
         discoverableByPhone: Bool = true,
         marketingOptIn: Bool = false,
         contactsSynced: Bool = false,
+        phoneVerified: Bool = false,
         privacyAcceptedAt: Date? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -57,6 +60,7 @@ struct User: Identifiable, Codable, Hashable {
         self.discoverableByPhone = discoverableByPhone
         self.marketingOptIn = marketingOptIn
         self.contactsSynced = contactsSynced
+        self.phoneVerified = phoneVerified
         self.privacyAcceptedAt = privacyAcceptedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
