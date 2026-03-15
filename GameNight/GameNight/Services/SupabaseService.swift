@@ -304,6 +304,58 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
+    // MARK: - Blocking
+
+    func blockUser(blockedId: UUID?, blockedPhone: String?, reason: String?) async throws {
+        let session = try await client.auth.session
+        let block = BlockedUser(
+            id: UUID(),
+            blockerId: session.user.id,
+            blockedId: blockedId ?? UUID(),
+            blockedPhone: blockedPhone,
+            reason: reason,
+            createdAt: Date()
+        )
+        try await client
+            .from("blocked_users")
+            .insert(block)
+            .execute()
+    }
+
+    func unblockUser(blockId: UUID) async throws {
+        try await client
+            .from("blocked_users")
+            .delete()
+            .eq("id", value: blockId.uuidString)
+            .execute()
+    }
+
+    func fetchBlockedUsers() async throws -> [BlockedUser] {
+        let session = try await client.auth.session
+        let blocked: [BlockedUser] = try await client
+            .from("blocked_users")
+            .select()
+            .eq("blocker_id", value: session.user.id.uuidString)
+            .execute()
+            .value
+        return blocked
+    }
+
+    // MARK: - Consent Logging
+
+    func logConsent(type: String, granted: Bool) async throws {
+        let session = try await client.auth.session
+        let entry: [String: String] = [
+            "user_id": session.user.id.uuidString,
+            "consent_type": type,
+            "granted": granted ? "true" : "false"
+        ]
+        try await client
+            .from("consent_log")
+            .insert(entry)
+            .execute()
+    }
+
     // MARK: - Realtime
 
     func subscribeToEventUpdates(eventId: UUID, onUpdate: @escaping (GameEvent) -> Void) -> RealtimeChannelV2 {

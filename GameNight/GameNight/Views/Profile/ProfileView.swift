@@ -4,6 +4,7 @@ struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @State private var showEditProfile = false
     @State private var showBGGLink = false
+    @State private var showPrivacy = false
 
     var body: some View {
         NavigationStack {
@@ -18,7 +19,8 @@ struct ProfileView: View {
                                 .font(Theme.Typography.displaySmall)
                                 .foregroundColor(Theme.Colors.textPrimary)
 
-                            Text(appState.currentUser?.phoneNumber ?? "")
+                            // Show masked phone by default (privacy-first)
+                            Text(appState.currentUser?.maskedPhone ?? "")
                                 .font(Theme.Typography.callout)
                                 .foregroundColor(Theme.Colors.textSecondary)
 
@@ -40,6 +42,16 @@ struct ProfileView: View {
 
                     // Settings sections
                     VStack(spacing: Theme.Spacing.md) {
+                        // Privacy & Safety (prominent position)
+                        SettingsRow(
+                            icon: "lock.shield.fill",
+                            title: "Privacy & Safety",
+                            subtitle: "Phone visibility, blocking, your data",
+                            color: Theme.Colors.accent
+                        ) {
+                            showPrivacy = true
+                        }
+
                         // BGG Integration
                         SettingsRow(
                             icon: "dice.fill",
@@ -65,14 +77,14 @@ struct ProfileView: View {
                             icon: "paintbrush.fill",
                             title: "Appearance",
                             subtitle: "Dark mode, accent color",
-                            color: Theme.Colors.accent
+                            color: Theme.Colors.warning
                         ) {
                             // TODO: Appearance settings
                         }
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
 
-                    // Danger zone
+                    // Sign out
                     VStack(spacing: Theme.Spacing.md) {
                         Button {
                             Task { await appState.signOut() }
@@ -102,6 +114,9 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showBGGLink) {
                 LinkBGGSheet()
+            }
+            .navigationDestination(isPresented: $showPrivacy) {
+                PrivacySettingsView()
             }
         }
     }
@@ -160,13 +175,18 @@ struct EditProfileSheet: View {
         NavigationStack {
             VStack(spacing: Theme.Spacing.xxl) {
                 AvatarView(url: appState.currentUser?.avatarUrl, size: 80)
-                // TODO: Avatar upload
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Display Name")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.textSecondary)
-                    TextField("Your name", text: $displayName)
+                    HStack {
+                        Text("Display Name")
+                            .font(Theme.Typography.label)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                        Spacer()
+                        Text("No real name required")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    TextField("Any name, nickname, or alias", text: $displayName)
                         .font(Theme.Typography.body)
                         .padding(Theme.Spacing.md)
                         .background(
@@ -176,7 +196,7 @@ struct EditProfileSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Bio")
+                    Text("Bio (optional)")
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textSecondary)
                     TextField("Tell us about your gaming style", text: $bio, axis: .vertical)

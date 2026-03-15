@@ -9,41 +9,38 @@ struct OnboardingView: View {
             Theme.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Pages
                 TabView(selection: $currentPage) {
+                    // Page 1: Hero
                     OnboardingPage(
                         icon: "dice.fill",
                         gradient: Theme.Gradients.primary,
-                        title: "Plan Game Nights\nEffortlessly",
-                        subtitle: "Create events, invite friends, and coordinate schedules for the perfect game night."
+                        title: "Game Night,\nSorted.",
+                        subtitle: "The easiest way to get your crew together for board games. No more group chat scheduling chaos."
                     )
                     .tag(0)
 
+                    // Page 2: Smart invites
                     OnboardingPage(
-                        icon: "list.star",
+                        icon: "person.3.sequence.fill",
                         gradient: Theme.Gradients.secondary,
-                        title: "Build Your\nGame Library",
-                        subtitle: "Search BoardGameGeek to add games with player counts, complexity, and play times."
+                        title: "Smart Invites\nThat Fill Seats",
+                        subtitle: "Set your player count. Invites go out in tiers — if someone can't make it, the next person is automatically invited."
                     )
                     .tag(1)
 
-                    OnboardingPage(
-                        icon: "person.3.fill",
-                        gradient: Theme.Gradients.accent,
-                        title: "Smart Invites\nThat Fill Seats",
-                        subtitle: "Tiered invites automatically fill spots as people decline. No more empty chairs."
-                    )
-                    .tag(2)
+                    // Page 3: Privacy promise (inspired by Partiful)
+                    PrivacyPromisePage()
+                        .tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
-                // Bottom section
+                // Bottom
                 VStack(spacing: Theme.Spacing.xxl) {
                     // Page dots
                     HStack(spacing: Theme.Spacing.sm) {
                         ForEach(0..<3, id: \.self) { index in
                             Capsule()
-                                .fill(index == currentPage ? Theme.Colors.primary : Theme.Colors.textTertiary)
+                                .fill(index == currentPage ? Theme.Colors.primary : Theme.Colors.textTertiary.opacity(0.4))
                                 .frame(width: index == currentPage ? 24 : 8, height: 8)
                                 .animation(Theme.Animation.snappy, value: currentPage)
                         }
@@ -54,17 +51,99 @@ struct OnboardingView: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Theme.Spacing.xxxl)
+
+                    Text("By continuing you agree to our Terms & Privacy Policy")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.Spacing.xxxl)
                 }
                 .padding(.bottom, Theme.Spacing.jumbo)
             }
         }
-        .sheet(isPresented: $showAuth) {
-            AuthView()
+        .fullScreenCover(isPresented: $showAuth) {
+            AuthFlowView()
         }
     }
 }
 
-// MARK: - Onboarding Page
+// MARK: - Privacy Promise Page (Partiful-inspired)
+struct PrivacyPromisePage: View {
+    var body: some View {
+        VStack(spacing: Theme.Spacing.xxxl) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Theme.Gradients.accent.opacity(0.15))
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Theme.Gradients.accent)
+            }
+
+            VStack(spacing: Theme.Spacing.lg) {
+                Text("Your Privacy\nIs Sacred")
+                    .font(Theme.Typography.displayLarge)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                PrivacyBullet(
+                    icon: "person.text.rectangle",
+                    text: "No full name required — use any display name you want"
+                )
+                PrivacyBullet(
+                    icon: "person.crop.circle.badge.xmark",
+                    text: "We only store contacts you choose to invite, never your whole address book"
+                )
+                PrivacyBullet(
+                    icon: "eye.slash.fill",
+                    text: "Your phone number is hidden from other users by default"
+                )
+                PrivacyBullet(
+                    icon: "hand.raised.fill",
+                    text: "Block anyone, anytime — they'll never know"
+                )
+                PrivacyBullet(
+                    icon: "megaphone.fill",
+                    text: "Zero marketing spam — we never add you to a mailing list"
+                )
+                PrivacyBullet(
+                    icon: "dollarsign.circle",
+                    text: "We never sell your personal data. Period."
+                )
+            }
+            .padding(.horizontal, Theme.Spacing.xxxl)
+
+            Spacer()
+            Spacer()
+        }
+    }
+}
+
+struct PrivacyBullet: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(Theme.Colors.accent)
+                .frame(width: 24, height: 24)
+
+            Text(text)
+                .font(Theme.Typography.callout)
+                .foregroundColor(Theme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+// MARK: - Onboarding Page (reusable)
 struct OnboardingPage: View {
     let icon: String
     let gradient: LinearGradient
@@ -108,156 +187,467 @@ struct OnboardingPage: View {
     }
 }
 
-// MARK: - Auth View (Phone Number OTP)
-struct AuthView: View {
+// MARK: - Auth Flow (Partiful-style minimal friction)
+struct AuthFlowView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
 
-    @State private var phoneNumber = ""
-    @State private var otpCode = ""
     @State private var step: AuthStep = .phone
+    @State private var phoneNumber = ""
+    @State private var countryCode = "+1"
+    @State private var otpDigits: [String] = Array(repeating: "", count: 6)
+    @State private var displayName = ""
     @State private var isLoading = false
     @State private var error: String?
+    @State private var otpTimer = 0
+    @State private var timerTask: Task<Void, Never>?
+    @FocusState private var focusedOTPIndex: Int?
+    @FocusState private var phoneFieldFocused: Bool
+    @FocusState private var nameFieldFocused: Bool
 
     enum AuthStep {
-        case phone
-        case otp
-        case profile
+        case phone, otp, name
     }
-
-    @State private var displayName = ""
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Theme.Spacing.xxl) {
-                // Header
-                VStack(spacing: Theme.Spacing.md) {
-                    Image(systemName: step == .phone ? "phone.fill" : step == .otp ? "lock.shield.fill" : "person.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Theme.Gradients.primary)
+            ZStack {
+                Theme.Colors.background.ignoresSafeArea()
 
-                    Text(step == .phone ? "Enter your number" : step == .otp ? "Verify your number" : "Set up your profile")
-                        .font(Theme.Typography.displaySmall)
-                        .foregroundColor(Theme.Colors.textPrimary)
+                VStack(spacing: 0) {
+                    // Progress bar
+                    GeometryReader { geo in
+                        HStack(spacing: 4) {
+                            ForEach(0..<3, id: \.self) { i in
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(stepIndex >= i ? Theme.Colors.primary : Theme.Colors.divider)
+                                    .frame(height: 3)
+                            }
+                        }
+                        .padding(.horizontal, Theme.Spacing.xl)
+                    }
+                    .frame(height: 3)
+                    .padding(.top, Theme.Spacing.md)
 
-                    Text(step == .phone
-                         ? "We'll send you a code to verify your number."
-                         : step == .otp
-                         ? "Enter the 6-digit code sent to \(phoneNumber)"
-                         : "Choose a display name for your friends to see.")
-                        .font(Theme.Typography.body)
-                        .foregroundColor(Theme.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
+                    ScrollView {
+                        VStack(spacing: Theme.Spacing.xxl) {
+                            Spacer().frame(height: Theme.Spacing.jumbo)
 
-                // Input
-                Group {
-                    switch step {
-                    case .phone:
-                        TextField("+1 (555) 123-4567", text: $phoneNumber)
-                            .keyboardType(.phonePad)
-                            .font(Theme.Typography.displaySmall)
-                            .multilineTextAlignment(.center)
-
-                    case .otp:
-                        TextField("000000", text: $otpCode)
-                            .keyboardType(.numberPad)
-                            .font(Theme.Typography.displaySmall)
-                            .multilineTextAlignment(.center)
-
-                    case .profile:
-                        TextField("Your name", text: $displayName)
-                            .font(Theme.Typography.displaySmall)
-                            .multilineTextAlignment(.center)
+                            // Step content
+                            Group {
+                                switch step {
+                                case .phone: phoneStep
+                                case .otp: otpStep
+                                case .name: nameStep
+                                }
+                            }
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                        }
+                        .padding(.horizontal, Theme.Spacing.xl)
                     }
                 }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if step != .phone {
+                        Button {
+                            withAnimation(Theme.Animation.snappy) {
+                                switch step {
+                                case .otp: step = .phone
+                                case .name: step = .otp
+                                case .phone: break
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                        .font(Theme.Typography.calloutMedium)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+            }
+        }
+    }
+
+    private var stepIndex: Int {
+        switch step {
+        case .phone: return 0
+        case .otp: return 1
+        case .name: return 2
+        }
+    }
+
+    // MARK: - Phone Step
+    private var phoneStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Text("What's your number?")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("We'll text you a code to sign in.\nNo passwords, no hassle.")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Phone input
+            HStack(spacing: Theme.Spacing.sm) {
+                // Country code
+                Menu {
+                    Button("+1 US") { countryCode = "+1" }
+                    Button("+44 UK") { countryCode = "+44" }
+                    Button("+61 AU") { countryCode = "+61" }
+                    Button("+49 DE") { countryCode = "+49" }
+                    Button("+33 FR") { countryCode = "+33" }
+                    Button("+81 JP") { countryCode = "+81" }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(countryCode)
+                            .font(Theme.Typography.headlineLarge)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(Theme.Colors.backgroundElevated)
+                    )
+                }
+
+                TextField("(555) 123-4567", text: $phoneNumber)
+                    .keyboardType(.phonePad)
+                    .font(Theme.Typography.headlineLarge)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .focused($phoneFieldFocused)
+                    .padding(Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(Theme.Colors.backgroundElevated)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                    .stroke(phoneFieldFocused ? Theme.Colors.primary.opacity(0.5) : .clear, lineWidth: 1.5)
+                            )
+                    )
+            }
+
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
+                    .transition(.opacity)
+            }
+
+            Button("Send Code") {
+                Task { await sendCode() }
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: isPhoneValid && !isLoading))
+            .disabled(!isPhoneValid || isLoading)
+
+            if isLoading {
+                ProgressView()
+                    .tint(Theme.Colors.primary)
+            }
+
+            // Privacy assurance
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.Colors.accent)
+                Text("Your number is never shared with other users")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            .padding(.top, Theme.Spacing.md)
+        }
+        .onAppear { phoneFieldFocused = true }
+    }
+
+    // MARK: - OTP Step
+    private var otpStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Text("Enter the code")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("Sent to \(countryCode) \(phoneNumber)")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+            }
+
+            // OTP boxes
+            HStack(spacing: Theme.Spacing.sm) {
+                ForEach(0..<6, id: \.self) { index in
+                    OTPDigitBox(
+                        digit: $otpDigits[index],
+                        isFocused: focusedOTPIndex == index,
+                        onType: { char in
+                            otpDigits[index] = String(char.prefix(1))
+                            if !char.isEmpty && index < 5 {
+                                focusedOTPIndex = index + 1
+                            }
+                            // Auto-submit when all filled
+                            if otpDigits.allSatisfy({ !$0.isEmpty }) {
+                                Task { await verifyCode() }
+                            }
+                        },
+                        onBackspace: {
+                            if otpDigits[index].isEmpty && index > 0 {
+                                focusedOTPIndex = index - 1
+                            }
+                            otpDigits[index] = ""
+                        }
+                    )
+                    .focused($focusedOTPIndex, equals: index)
+                }
+            }
+
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
+                    .transition(.opacity)
+            }
+
+            if isLoading {
+                ProgressView()
+                    .tint(Theme.Colors.primary)
+            }
+
+            // Resend
+            VStack(spacing: Theme.Spacing.sm) {
+                if otpTimer > 0 {
+                    Text("Resend code in \(otpTimer)s")
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                } else {
+                    Button("Resend Code") {
+                        Task { await resendCode() }
+                    }
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.primary)
+                }
+
+                Button("Wrong number? Go back") {
+                    withAnimation(Theme.Animation.snappy) { step = .phone }
+                }
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.textTertiary)
+            }
+        }
+        .onAppear {
+            focusedOTPIndex = 0
+            startResendTimer()
+        }
+    }
+
+    // MARK: - Name Step
+    private var nameStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Text("What should we\ncall you?")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("Pick any name, nickname, or alias.\nThis is what friends see on invites.")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            TextField("e.g. Alex, GameMaster, A.", text: $displayName)
+                .font(Theme.Typography.headlineLarge)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .multilineTextAlignment(.center)
+                .focused($nameFieldFocused)
                 .padding(Theme.Spacing.lg)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                         .fill(Theme.Colors.backgroundElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .stroke(nameFieldFocused ? Theme.Colors.primary.opacity(0.5) : .clear, lineWidth: 1.5)
+                        )
                 )
 
-                if let error {
-                    Text(error)
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.error)
-                }
-
-                Button(step == .profile ? "Let's Go!" : "Continue") {
-                    Task { await handleAction() }
-                }
-                .buttonStyle(PrimaryButtonStyle(isEnabled: isValid && !isLoading))
-                .disabled(!isValid || isLoading)
-
-                if isLoading {
-                    ProgressView()
-                        .tint(Theme.Colors.primary)
-                }
-
-                Spacer()
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
             }
-            .padding(Theme.Spacing.xl)
-            .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(Theme.Colors.textSecondary)
-                }
+
+            Button("Let's Play!") {
+                Task { await createProfile() }
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: !displayName.trimmingCharacters(in: .whitespaces).isEmpty && !isLoading))
+            .disabled(displayName.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+
+            if isLoading {
+                ProgressView()
+                    .tint(Theme.Colors.primary)
+            }
+
+            // No real name required
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "theatermasks.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.Colors.primaryLight)
+                Text("No real name required — use whatever you like")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
         }
+        .onAppear { nameFieldFocused = true }
     }
 
-    private var isValid: Bool {
-        switch step {
-        case .phone: return phoneNumber.count >= 10
-        case .otp: return otpCode.count == 6
-        case .profile: return !displayName.isEmpty
-        }
+    // MARK: - Validation
+
+    private var isPhoneValid: Bool {
+        let digits = phoneNumber.filter(\.isNumber)
+        return digits.count >= 7
     }
 
-    private func handleAction() async {
+    private var fullPhoneNumber: String {
+        let digits = phoneNumber.filter(\.isNumber)
+        return "\(countryCode)\(digits)"
+    }
+
+    private var otpCode: String {
+        otpDigits.joined()
+    }
+
+    // MARK: - Actions
+
+    private func sendCode() async {
         isLoading = true
         error = nil
-
         do {
-            switch step {
-            case .phone:
-                try await SupabaseService.shared.signInWithOTP(phoneNumber: phoneNumber)
-                withAnimation { step = .otp }
+            try await SupabaseService.shared.signInWithOTP(phoneNumber: fullPhoneNumber)
+            withAnimation(Theme.Animation.snappy) { step = .otp }
+        } catch {
+            self.error = "Couldn't send code. Check your number and try again."
+        }
+        isLoading = false
+    }
 
-            case .otp:
-                try await SupabaseService.shared.verifyOTP(phoneNumber: phoneNumber, code: otpCode)
-                // Check if user exists
-                if let _ = try? await SupabaseService.shared.fetchCurrentUser() {
-                    appState.currentUser = try await SupabaseService.shared.fetchCurrentUser()
-                    appState.isAuthenticated = true
-                    dismiss()
-                } else {
-                    withAnimation { step = .profile }
-                }
-
-            case .profile:
-                let session = try await SupabaseService.shared.client.auth.session
-                let user = User(
-                    id: session.user.id,
-                    phoneNumber: phoneNumber,
-                    displayName: displayName,
-                    avatarUrl: nil,
-                    bio: nil,
-                    bggUsername: nil,
-                    createdAt: Date(),
-                    updatedAt: Date()
-                )
-                try await SupabaseService.shared.updateUser(user)
-                appState.currentUser = user
+    private func verifyCode() async {
+        isLoading = true
+        error = nil
+        do {
+            try await SupabaseService.shared.verifyOTP(phoneNumber: fullPhoneNumber, code: otpCode)
+            // Check if returning user
+            if let existingUser = try? await SupabaseService.shared.fetchCurrentUser() {
+                appState.currentUser = existingUser
                 appState.isAuthenticated = true
                 dismiss()
+            } else {
+                withAnimation(Theme.Animation.snappy) { step = .name }
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = "Invalid code. Please try again."
+            otpDigits = Array(repeating: "", count: 6)
+            focusedOTPIndex = 0
         }
-
         isLoading = false
+    }
+
+    private func createProfile() async {
+        isLoading = true
+        error = nil
+        do {
+            let session = try await SupabaseService.shared.client.auth.session
+            let user = User(
+                id: session.user.id,
+                phoneNumber: fullPhoneNumber,
+                displayName: displayName.trimmingCharacters(in: .whitespaces),
+                phoneVisible: false,
+                discoverableByPhone: true,
+                marketingOptIn: false,
+                contactsSynced: false,
+                privacyAcceptedAt: Date()
+            )
+            try await SupabaseService.shared.updateUser(user)
+            appState.currentUser = user
+            appState.isAuthenticated = true
+            dismiss()
+        } catch {
+            self.error = "Something went wrong. Please try again."
+        }
+        isLoading = false
+    }
+
+    private func resendCode() async {
+        error = nil
+        do {
+            try await SupabaseService.shared.signInWithOTP(phoneNumber: fullPhoneNumber)
+            startResendTimer()
+        } catch {
+            self.error = "Couldn't resend code."
+        }
+    }
+
+    private func startResendTimer() {
+        otpTimer = 30
+        timerTask?.cancel()
+        timerTask = Task {
+            while otpTimer > 0 && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                otpTimer -= 1
+            }
+        }
+    }
+}
+
+// MARK: - OTP Digit Box
+struct OTPDigitBox: View {
+    @Binding var digit: String
+    let isFocused: Bool
+    let onType: (String) -> Void
+    let onBackspace: () -> Void
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.backgroundElevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .stroke(
+                            isFocused ? Theme.Colors.primary : (digit.isEmpty ? Theme.Colors.divider : Theme.Colors.primary.opacity(0.3)),
+                            lineWidth: isFocused ? 2 : 1
+                        )
+                )
+                .frame(width: 48, height: 56)
+
+            TextField("", text: Binding(
+                get: { digit },
+                set: { newValue in
+                    if newValue.isEmpty {
+                        onBackspace()
+                    } else {
+                        onType(newValue)
+                    }
+                }
+            ))
+            .keyboardType(.numberPad)
+            .textContentType(.oneTimeCode)
+            .multilineTextAlignment(.center)
+            .font(Theme.Typography.displaySmall)
+            .foregroundColor(Theme.Colors.textPrimary)
+            .frame(width: 48, height: 56)
+        }
     }
 }

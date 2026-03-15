@@ -4,6 +4,7 @@ struct CreateEventView: View {
     @StateObject private var viewModel = CreateEventViewModel()
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var appState: AppState
+    @State private var showContactPicker = false
 
     var body: some View {
         NavigationStack {
@@ -89,6 +90,17 @@ struct CreateEventView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(Theme.Colors.textSecondary)
+                }
+            }
+            .sheet(isPresented: $showContactPicker) {
+                ContactPickerSheet { selectedContacts in
+                    for contact in selectedContacts {
+                        viewModel.addInvitee(
+                            name: contact.name,
+                            phoneNumber: contact.phoneNumber,
+                            tier: 1
+                        )
+                    }
                 }
             }
         }
@@ -402,17 +414,52 @@ struct CreateEventView: View {
                 }
             }
 
-            // Add from groups or contacts
-            // TODO: Contact picker integration
+            // Add from contacts or manually
             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                 Text("Add People")
                     .font(Theme.Typography.headlineMedium)
                     .foregroundColor(Theme.Colors.textPrimary)
 
-                // Quick add field
+                // Contact picker button
+                Button {
+                    showContactPicker = true
+                } label: {
+                    HStack(spacing: Theme.Spacing.md) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.primary.opacity(0.15))
+                                .frame(width: 40, height: 40)
+                            Image(systemName: "person.crop.circle.badge.plus")
+                                .font(.system(size: 18))
+                                .foregroundColor(Theme.Colors.primary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Add from Contacts")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Text("Only selected contacts are stored — never your whole address book")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .cardStyle()
+                }
+                .buttonStyle(.plain)
+
+                // Or add manually
+                Text("Or add manually:")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+
                 AddInviteeField { name, phone in
-                    let tier = viewModel.inviteStrategy.type == .tiered ? 1 : 1
-                    viewModel.addInvitee(name: name, phoneNumber: phone, tier: tier)
+                    viewModel.addInvitee(name: name, phoneNumber: phone, tier: 1)
                 }
             }
 
