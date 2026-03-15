@@ -627,6 +627,8 @@ struct OTPDigitBox: View {
     let onType: (String) -> Void
     let onBackspace: () -> Void
 
+    @State private var fieldText: String = ""
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
@@ -640,22 +642,27 @@ struct OTPDigitBox: View {
                 )
                 .frame(width: 48, height: 56)
 
-            TextField("", text: Binding(
-                get: { digit },
-                set: { newValue in
+            TextField("", text: $fieldText)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.center)
+                .font(Theme.Typography.displaySmall)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .frame(width: 48, height: 56)
+                .onChange(of: fieldText) { _, newValue in
                     if newValue.isEmpty {
                         onBackspace()
                     } else {
-                        onType(newValue)
+                        let filtered = String(newValue.filter(\.isNumber).prefix(1))
+                        fieldText = filtered
+                        onType(filtered)
                     }
                 }
-            ))
-            .keyboardType(.numberPad)
-            .textContentType(.oneTimeCode)
-            .multilineTextAlignment(.center)
-            .font(Theme.Typography.displaySmall)
-            .foregroundColor(Theme.Colors.textPrimary)
-            .frame(width: 48, height: 56)
+                .onAppear { fieldText = digit }
+                .onChange(of: digit) { _, newValue in
+                    if fieldText != newValue {
+                        fieldText = newValue
+                    }
+                }
         }
     }
 }
