@@ -49,6 +49,36 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
+    func invokeAuthenticatedFunction(
+        _ functionName: String,
+        body: some Encodable
+    ) async throws {
+        let session = try await client.auth.session
+        try await client.functions.invoke(
+            functionName,
+            options: .init(
+                headers: ["Authorization": "Bearer \(session.accessToken)"],
+                body: body
+            )
+        )
+    }
+
+    func invokeAuthenticatedFunction<Response: Decodable>(
+        _ functionName: String,
+        body: some Encodable,
+        decoder: JSONDecoder = JSONDecoder()
+    ) async throws -> Response {
+        let session = try await client.auth.session
+        return try await client.functions.invoke(
+            functionName,
+            options: .init(
+                headers: ["Authorization": "Bearer \(session.accessToken)"],
+                body: body
+            ),
+            decoder: decoder
+        )
+    }
+
     // MARK: - Events
 
     func fetchUpcomingEvents() async throws -> [GameEvent] {
@@ -130,49 +160,79 @@ final class SupabaseService: ObservableObject {
     }
 
     func respondToInvite(inviteId: UUID, status: InviteStatus, selectedTimeIds: [UUID], suggestedTimes: [TimeOption]?) async throws {
-        var updates: [String: AnyJSON] = [
-            "status": .string(status.rawValue),
-            "responded_at": .string(ISO8601DateFormatter().string(from: Date())),
-            "selected_time_option_ids": .array(selectedTimeIds.map { .string($0.uuidString) })
-        ]
-
-        try await client
-            .from("invites")
-            .update(updates)
-            .eq("id", value: inviteId.uuidString)
-            .execute()
-
-        // Insert suggested times if any
-        if let suggestedTimes, !suggestedTimes.isEmpty {
-            try await client
-                .from("time_options")
-                .insert(suggestedTimes)
-                .execute()
+        struct SuggestedTimePayload: Encodable {
+            let date: String
+            let start_time: String
+            let end_time: String?
+            let label: String?
         }
 
-        // Trigger tiered invite processing via Edge Function
-        try await client.functions.invoke(
-            "process-tiered-invites",
-            options: .init(body: ["invite_id": inviteId.uuidString])
-        )
+        struct RespondToInviteParams: Encodable {
+            let p_invite_id: String
+            let p_status: String
+            let p_selected_time_option_ids: [String]
+            let p_suggested_times: [SuggestedTimePayload]
+        }
+
+        let isoDateFormatter = ISO8601DateFormatter()
+        let dateFormatter = DateFormatter()
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let suggestedPayload = (suggestedTimes ?? []).map { option in
+            SuggestedTimePayload(
+                date: dateFormatter.string(from: option.date),
+                start_time: isoDateFormatter.string(from: option.startTime),
+                end_time: option.endTime.map { isoDateFormatter.string(from: $0) },
+                label: option.label
+            )
+        }
+
+        try await client
+            .rpc("respond_to_invite", params: RespondToInviteParams(
+                p_invite_id: inviteId.uuidString,
+                p_status: status.rawValue,
+                p_selected_time_option_ids: selectedTimeIds.map(\.uuidString),
+                p_suggested_times: suggestedPayload
+            ))
+            .execute()
+
+        if status == .declined {
+            try await invokeAuthenticatedFunction(
+                "process-tiered-invites",
+                body: ["invite_id": inviteId.uuidString]
+            )
+        }
     }
 
     func createInvites(_ invites: [Invite]) async throws {
+        let normalizedInvites = invites.map { invite in
+            var normalizedInvite = invite
+            normalizedInvite.phoneNumber = ContactPickerService.normalizePhone(invite.phoneNumber)
+            return normalizedInvite
+        }
+
         try await client
             .from("invites")
-            .insert(invites)
+            .insert(normalizedInvites)
             .execute()
 
         // Trigger SMS sending for active invites
-        let activeInvites = invites.filter { $0.isActive }
+        let activeInvites = normalizedInvites.filter { $0.isActive }
         for invite in activeInvites {
-            try await client.functions.invoke(
-                "send-invite",
-                options: .init(body: [
-                    "invite_id": invite.id.uuidString,
-                    "event_id": invite.eventId.uuidString
-                ])
-            )
+            do {
+                try await invokeAuthenticatedFunction(
+                    "send-invite",
+                    body: [
+                        "invite_id": invite.id.uuidString
+                    ]
+                )
+            } catch {
+                // Invite creation has already succeeded; delivery failures should be retriable, not fatal.
+                print("send-invite failed for \(invite.id): \(error.localizedDescription)")
+            }
         }
     }
 

@@ -21,12 +21,12 @@ actor SMSService {
         RSVP here: \(inviteLink)
         """
 
-        try await supabase.client.functions.invoke(
+        try await supabase.invokeAuthenticatedFunction(
             "send-sms",
-            options: .init(body: [
+            body: [
                 "to": phoneNumber,
                 "message": message
-            ])
+            ]
         )
     }
 
@@ -42,12 +42,12 @@ actor SMSService {
         \(dateTime) at \(location). See you there!
         """
 
-        try await supabase.client.functions.invoke(
+        try await supabase.invokeAuthenticatedFunction(
             "send-sms",
-            options: .init(body: [
+            body: [
                 "to": phoneNumber,
                 "message": message
-            ])
+            ]
         )
     }
 
@@ -62,12 +62,12 @@ actor SMSService {
         RSVP now: \(inviteLink)
         """
 
-        try await supabase.client.functions.invoke(
+        try await supabase.invokeAuthenticatedFunction(
             "send-sms",
-            options: .init(body: [
+            body: [
                 "to": phoneNumber,
                 "message": message
-            ])
+            ]
         )
     }
 }

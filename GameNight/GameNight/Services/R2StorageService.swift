@@ -11,12 +11,12 @@ actor R2StorageService {
 
     func uploadImage(data: Data, path: String, contentType: String = "image/jpeg") async throws -> String {
         // Get pre-signed upload URL from Edge Function
-        let response: UploadURLResponse = try await supabase.client.functions.invoke(
+        let response: UploadURLResponse = try await supabase.invokeAuthenticatedFunction(
             "r2-upload-url",
-            options: .init(body: [
+            body: [
                 "path": path,
                 "content_type": contentType
-            ])
+            ]
         )
 
         // Upload directly to R2 using pre-signed URL
@@ -47,9 +47,9 @@ actor R2StorageService {
     // MARK: - Delete
 
     func deleteImage(path: String) async throws {
-        try await supabase.client.functions.invoke(
+        try await supabase.invokeAuthenticatedFunction(
             "r2-delete",
-            options: .init(body: ["path": path])
+            body: ["path": path]
         )
     }
 }
