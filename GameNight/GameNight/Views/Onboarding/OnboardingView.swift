@@ -535,10 +535,14 @@ struct AuthFlowView: View {
     private func sendCode() async {
         isLoading = true
         error = nil
+        print("📱 [sendCode] Attempting OTP for: \(fullPhoneNumber)")
         do {
             try await SupabaseService.shared.signInWithOTP(phoneNumber: fullPhoneNumber)
+            print("✅ [sendCode] OTP sent successfully")
             withAnimation(Theme.Animation.snappy) { step = .otp }
-        } catch {
+        } catch let err {
+            print("❌ [sendCode] Error: \(String(describing: err))")
+            print("❌ [sendCode] Localized: \(err.localizedDescription)")
             self.error = "Couldn't send code. Check your number and try again."
         }
         isLoading = false
@@ -557,7 +561,8 @@ struct AuthFlowView: View {
             } else {
                 withAnimation(Theme.Animation.snappy) { step = .name }
             }
-        } catch {
+        } catch let err {
+            print("❌ [verifyCode] \(err)")
             self.error = "Invalid code. Please try again."
             otpDigits = Array(repeating: "", count: 6)
             focusedOTPIndex = 0
@@ -584,7 +589,8 @@ struct AuthFlowView: View {
             appState.currentUser = user
             appState.isAuthenticated = true
             dismiss()
-        } catch {
+        } catch let err {
+            print("❌ [createProfile] \(err)")
             self.error = "Something went wrong. Please try again."
         }
         isLoading = false
@@ -595,7 +601,8 @@ struct AuthFlowView: View {
         do {
             try await SupabaseService.shared.signInWithOTP(phoneNumber: fullPhoneNumber)
             startResendTimer()
-        } catch {
+        } catch let err {
+            print("❌ [resendCode] \(err)")
             self.error = "Couldn't resend code."
         }
     }
