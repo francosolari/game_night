@@ -40,6 +40,27 @@ struct GameEvent: Identifiable, Codable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
+
+    // Only encode columns that exist on the events table (skip related objects)
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(hostId, forKey: .hostId)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(location, forKey: .location)
+        try container.encodeIfPresent(locationAddress, forKey: .locationAddress)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(confirmedTimeOptionId, forKey: .confirmedTimeOptionId)
+        try container.encode(allowTimeSuggestions, forKey: .allowTimeSuggestions)
+        try container.encode(inviteStrategy, forKey: .inviteStrategy)
+        try container.encode(minPlayers, forKey: .minPlayers)
+        try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
+        try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        // Intentionally skip: host, games, timeOptions — these are related tables, not columns
+    }
 }
 
 enum EventStatus: String, Codable {
@@ -65,6 +86,15 @@ struct EventGame: Identifiable, Codable, Hashable {
         case game
         case isPrimary = "is_primary"
         case sortOrder = "sort_order"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(gameId, forKey: .gameId)
+        try container.encode(isPrimary, forKey: .isPrimary)
+        try container.encode(sortOrder, forKey: .sortOrder)
+        // Skip: game — it's a joined relation, not a column
     }
 }
 

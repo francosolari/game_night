@@ -5,6 +5,7 @@ struct CreateEventView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var appState: AppState
     @State private var showContactPicker = false
+    @State private var showContactList = false
 
     var body: some View {
         NavigationStack {
@@ -59,7 +60,7 @@ struct CreateEventView: View {
                             .buttonStyle(SecondaryButtonStyle())
                         }
 
-                        Button(viewModel.currentStep == .review ? "Send Invites" : "Next") {
+                        Button(viewModel.nextButtonLabel) {
                             if viewModel.currentStep == .review {
                                 Task {
                                     await viewModel.createEvent()
@@ -92,14 +93,26 @@ struct CreateEventView: View {
                         .foregroundColor(Theme.Colors.textSecondary)
                 }
             }
+            .sheet(isPresented: $showContactList) {
+                ContactListSheet(
+                    excludedPhones: viewModel.invitedPhones,
+                    onSelect: { contacts in
+                        for contact in contacts {
+                            viewModel.addContact(contact)
+                        }
+                    }
+                )
+            }
             .sheet(isPresented: $showContactPicker) {
                 ContactPickerSheet { selectedContacts in
+                    // Save to Supabase for future reuse
+                    Task {
+                        let supabase = SupabaseService.shared
+                        _ = try? await supabase.saveContacts(selectedContacts)
+                    }
+                    // Add to invite list
                     for contact in selectedContacts {
-                        viewModel.addInvitee(
-                            name: contact.name,
-                            phoneNumber: contact.phoneNumber,
-                            tier: 1
-                        )
+                        viewModel.addContact(contact)
                     }
                 }
             }
@@ -210,6 +223,33 @@ struct CreateEventView: View {
             }
             .onChange(of: viewModel.gameSearchQuery) { _, _ in
                 Task { await viewModel.searchGames() }
+            }
+
+            // Manual entry
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Or type a game name")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                HStack(spacing: Theme.Spacing.sm) {
+                    TextField("e.g. Catan, Ticket to Ride...", text: $viewModel.manualGameName)
+                        .font(Theme.Typography.body)
+                        .padding(Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.backgroundElevated)
+                        )
+
+                    Button {
+                        guard !viewModel.manualGameName.isEmpty else { return }
+                        Task { await viewModel.addManualGame(name: viewModel.manualGameName) }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(Theme.Gradients.primary)
+                    }
+                    .disabled(viewModel.manualGameName.isEmpty)
+                }
             }
 
             // Search results
@@ -364,153 +404,194 @@ struct CreateEventView: View {
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
-            // Invite strategy
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                Text("Invite Strategy")
-                    .font(Theme.Typography.headlineMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
+            // Quick-add: suggested contacts (top 3 frequent)
+            if !viewModel.topSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("Suggested")
+                        .font(Theme.Typography.label)
+                        .foregroundColor(Theme.Colors.textTertiary)
 
-                HStack(spacing: Theme.Spacing.md) {
-                    StrategyOption(
-                        title: "All at Once",
-                        description: "Everyone gets invited immediately",
-                        icon: "person.3.fill",
-                        isSelected: viewModel.inviteStrategy.type == .allAtOnce
-                    ) {
-                        viewModel.inviteStrategy.type = .allAtOnce
+                    HStack(spacing: Theme.Spacing.sm) {
+                        ForEach(viewModel.topSuggestions) { contact in
+                            Button {
+                                viewModel.addFrequentContact(contact)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    AvatarView(url: contact.contactAvatarUrl, size: 24)
+                                    Text(contact.contactName.components(separatedBy: " ").first ?? contact.contactName)
+                                        .font(Theme.Typography.calloutMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(Theme.Colors.primary)
+                                }
+                                .padding(.horizontal, Theme.Spacing.md)
+                                .padding(.vertical, Theme.Spacing.sm)
+                                .background(
+                                    Capsule()
+                                        .fill(Theme.Colors.backgroundElevated)
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 1)
+                                        )
+                                )
+                            }
+                        }
                     }
-
-                    StrategyOption(
-                        title: "Tiered",
-                        description: "Waitlist fills as others decline",
-                        icon: "list.number",
-                        isSelected: viewModel.inviteStrategy.type == .tiered
-                    ) {
-                        viewModel.inviteStrategy.type = .tiered
-                    }
-                }
-
-                if viewModel.inviteStrategy.type == .tiered {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("First tier size")
-                            .font(Theme.Typography.label)
-                            .foregroundColor(Theme.Colors.textSecondary)
-
-                        Stepper(
-                            "\(viewModel.inviteStrategy.tierSize ?? viewModel.minPlayers) people invited first",
-                            value: Binding(
-                                get: { viewModel.inviteStrategy.tierSize ?? viewModel.minPlayers },
-                                set: { viewModel.inviteStrategy.tierSize = $0 }
-                            ),
-                            in: 1...20
-                        )
-                        .font(Theme.Typography.body)
-
-                        Toggle("Auto-invite from waitlist on decline", isOn: $viewModel.inviteStrategy.autoPromote)
-                            .font(Theme.Typography.callout)
-                            .tint(Theme.Colors.primary)
-                    }
-                    .cardStyle()
                 }
             }
 
-            // Add from contacts or manually
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                Text("Add People")
-                    .font(Theme.Typography.headlineMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
+            // Add people row
+            HStack(spacing: Theme.Spacing.md) {
+                Button {
+                    showContactList = true
+                } label: {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 14))
+                        Text("All Contacts")
+                            .font(Theme.Typography.calloutMedium)
+                    }
+                    .foregroundColor(Theme.Colors.primary)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .fill(Theme.Colors.primary.opacity(0.1))
+                    )
+                }
 
-                // Contact picker button
                 Button {
                     showContactPicker = true
                 } label: {
-                    HStack(spacing: Theme.Spacing.md) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.primary.opacity(0.15))
-                                .frame(width: 40, height: 40)
-                            Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.system(size: 18))
-                                .foregroundColor(Theme.Colors.primary)
-                        }
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Image(systemName: "person.badge.plus")
+                            .font(.system(size: 14))
+                        Text("Phone")
+                            .font(Theme.Typography.calloutMedium)
+                    }
+                    .foregroundColor(Theme.Colors.accent)
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .fill(Theme.Colors.accent.opacity(0.1))
+                    )
+                }
 
+                Spacer()
+            }
+
+            // Manual entry
+            AddInviteeField { name, phone in
+                viewModel.addInvitee(name: name, phoneNumber: phone, tier: 1)
+            }
+
+            // Unified invite list
+            if viewModel.invitees.isEmpty {
+                VStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "person.3.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Text("Add people to invite")
+                        .font(Theme.Typography.body)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.Spacing.xxl)
+            } else {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    // Playing section (Tier 1)
+                    HStack {
+                        Image(systemName: "person.fill.checkmark")
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.Colors.success)
+                        Text("Playing (\(viewModel.tier1Invitees.count))")
+                            .font(Theme.Typography.headlineMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Spacer()
+                        Text("Drag to reorder")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+
+                    ForEach(viewModel.tier1Invitees) { invitee in
+                        InviteeRow(
+                            invitee: invitee,
+                            onBench: {
+                                viewModel.setInviteeTier(invitee.id, tier: 2)
+                            },
+                            onRemove: {
+                                if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
+                                    viewModel.removeInvitee(at: idx)
+                                }
+                            }
+                        )
+                    }
+                    .onMove { from, to in
+                        viewModel.moveInvitee(from: from, to: to, inTier: 1)
+                    }
+
+                    // Bench section (Tier 2 / Waitlist)
+                    HStack {
+                        Image(systemName: "clock.badge.questionmark")
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.Colors.accent)
+                        Text("Bench (\(viewModel.tier2Invitees.count))")
+                            .font(Theme.Typography.headlineMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                    }
+                    .padding(.top, Theme.Spacing.md)
+
+                    if viewModel.tier2Invitees.isEmpty {
+                        Text("Move people here to waitlist them. They get invited in order when someone declines.")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .padding(Theme.Spacing.md)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [6]))
+                                    .foregroundColor(Theme.Colors.divider)
+                            )
+                    } else {
+                        ForEach(viewModel.tier2Invitees) { invitee in
+                            InviteeRow(
+                                invitee: invitee,
+                                onBench: {
+                                    viewModel.setInviteeTier(invitee.id, tier: 1)
+                                },
+                                onRemove: {
+                                    if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
+                                        viewModel.removeInvitee(at: idx)
+                                    }
+                                }
+                            )
+                        }
+                        .onMove { from, to in
+                            viewModel.moveInvitee(from: from, to: to, inTier: 2)
+                        }
+                    }
+
+                    // Auto-promote toggle
+                    Toggle(isOn: $viewModel.inviteStrategy.autoPromote) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Add from Contacts")
+                            Text("Auto-invite from bench")
                                 .font(Theme.Typography.bodyMedium)
                                 .foregroundColor(Theme.Colors.textPrimary)
-                            Text("Only selected contacts are stored — never your whole address book")
+                            Text("Next on bench gets invited when someone declines")
                                 .font(Theme.Typography.caption)
                                 .foregroundColor(Theme.Colors.textTertiary)
                         }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14))
-                            .foregroundColor(Theme.Colors.textTertiary)
                     }
-                    .cardStyle()
-                }
-                .buttonStyle(.plain)
-
-                // Or add manually
-                Text("Or add manually:")
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.textTertiary)
-
-                AddInviteeField { name, phone in
-                    viewModel.addInvitee(name: name, phoneNumber: phone, tier: 1)
+                    .tint(Theme.Colors.primary)
+                    .padding(.top, Theme.Spacing.md)
                 }
             }
-
-            // Invitee list
-            if !viewModel.invitees.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Invitees (\(viewModel.invitees.count))")
-                        .font(Theme.Typography.headlineMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-
-                    ForEach(Array(viewModel.invitees.enumerated()), id: \.element.id) { index, invitee in
-                        HStack {
-                            AvatarView(url: nil, size: 36)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(invitee.name)
-                                    .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
-                                Text(invitee.phoneNumber)
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.textTertiary)
-                            }
-
-                            Spacer()
-
-                            if viewModel.inviteStrategy.type == .tiered {
-                                Menu {
-                                    Button("Tier 1 (First invite)") {
-                                        viewModel.setInviteeTier(invitee.id, tier: 1)
-                                    }
-                                    Button("Tier 2 (Waitlist)") {
-                                        viewModel.setInviteeTier(invitee.id, tier: 2)
-                                    }
-                                } label: {
-                                    Text("Tier \(invitee.tier)")
-                                        .chipStyle(
-                                            color: invitee.tier == 1 ? Theme.Colors.primary : Theme.Colors.accent,
-                                            isSelected: true
-                                        )
-                                }
-                            }
-
-                            Button { viewModel.removeInvitee(at: index) } label: {
-                                Image(systemName: "xmark.circle")
-                                    .foregroundColor(Theme.Colors.textTertiary)
-                            }
-                        }
-                        .padding(.vertical, Theme.Spacing.xs)
-                    }
-                }
-            }
+        }
+        .task {
+            await viewModel.loadSuggestedContacts()
         }
     }
 
@@ -545,9 +626,15 @@ struct CreateEventView: View {
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textTertiary)
 
-                    ForEach(viewModel.selectedGames) { eventGame in
-                        if let game = eventGame.game {
-                            CompactGameCard(game: game, isPrimary: eventGame.isPrimary)
+                    if viewModel.selectedGames.isEmpty {
+                        Text("No games selected — you can add later")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    } else {
+                        ForEach(viewModel.selectedGames) { eventGame in
+                            if let game = eventGame.game {
+                                CompactGameCard(game: game, isPrimary: eventGame.isPrimary)
+                            }
                         }
                     }
                 }
@@ -580,22 +667,15 @@ struct CreateEventView: View {
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textTertiary)
 
-                    let tier1 = viewModel.invitees.filter { $0.tier == 1 }
-                    let tier2 = viewModel.invitees.filter { $0.tier == 2 }
-
-                    Text("\(tier1.count) people in first invite")
+                    Text("\(viewModel.tier1Invitees.count) playing")
                         .font(Theme.Typography.body)
                         .foregroundColor(Theme.Colors.textPrimary)
 
-                    if !tier2.isEmpty {
-                        Text("\(tier2.count) on waitlist")
+                    if !viewModel.tier2Invitees.isEmpty {
+                        Text("\(viewModel.tier2Invitees.count) on bench")
                             .font(Theme.Typography.body)
                             .foregroundColor(Theme.Colors.accent)
                     }
-
-                    Text("Strategy: \(viewModel.inviteStrategy.type == .tiered ? "Tiered (auto-fill)" : "All at once")")
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
             .cardStyle()
@@ -774,5 +854,60 @@ struct AddInviteeField: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Invitee Row
+struct InviteeRow: View {
+    let invitee: InviteeEntry
+    let onBench: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14))
+                .foregroundColor(Theme.Colors.textTertiary)
+
+            AvatarView(url: nil, size: 36)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(invitee.name)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Text(invitee.phoneNumber)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+
+            Spacer()
+
+            Button(action: onBench) {
+                Image(systemName: invitee.tier == 1 ? "arrow.down.to.line" : "arrow.up.to.line")
+                    .font(.system(size: 14))
+                    .foregroundColor(invitee.tier == 1 ? Theme.Colors.accent : Theme.Colors.success)
+                    .padding(8)
+                    .background(
+                        Circle()
+                            .fill((invitee.tier == 1 ? Theme.Colors.accent : Theme.Colors.success).opacity(0.1))
+                    )
+            }
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .padding(8)
+                    .background(
+                        Circle().fill(Theme.Colors.backgroundElevated)
+                    )
+            }
+        }
+        .padding(.vertical, Theme.Spacing.xs)
+        .padding(.horizontal, Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                .fill(Theme.Colors.backgroundElevated)
+        )
     }
 }

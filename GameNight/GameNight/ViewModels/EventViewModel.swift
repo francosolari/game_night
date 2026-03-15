@@ -97,7 +97,7 @@ final class CreateEventViewModel: ObservableObject {
     @Published var selectedGames: [EventGame] = []
     @Published var timeOptions: [TimeOption] = []
     @Published var allowTimeSuggestions = true
-    @Published var inviteStrategy = InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true)
+    @Published var inviteStrategy = InviteStrategy(type: .tiered, tierSize: nil, autoPromote: true)
     @Published var minPlayers = 3
     @Published var maxPlayers: Int? = nil
     @Published var selectedGroup: GameGroup?
@@ -110,6 +110,11 @@ final class CreateEventViewModel: ObservableObject {
     @Published var gameSearchQuery = ""
     @Published var gameSearchResults: [BGGSearchResult] = []
     @Published var isSearchingGames = false
+    @Published var manualGameName = ""
+
+    // Contacts
+    @Published var suggestedContacts: [FrequentContact] = []
+    @Published var isLoadingSuggestions = true
 
     // Steps
     @Published var currentStep: CreateStep = .details
@@ -124,10 +129,16 @@ final class CreateEventViewModel: ObservableObject {
     private let supabase = SupabaseService.shared
     private let bgg = BGGService.shared
 
+    var nextButtonLabel: String {
+        if currentStep == .review { return "Send Invites" }
+        if currentStep == .games && selectedGames.isEmpty { return "Add Game Later" }
+        return "Next"
+    }
+
     var canProceed: Bool {
         switch currentStep {
         case .details: return !title.isEmpty
-        case .games: return !selectedGames.isEmpty
+        case .games: return true
         case .schedule: return !timeOptions.isEmpty
         case .invites: return !invitees.isEmpty
         case .review: return true
@@ -160,6 +171,41 @@ final class CreateEventViewModel: ObservableObject {
                 sortOrder: selectedGames.count
             )
             selectedGames.append(eventGame)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func addManualGame(name: String) async {
+        let game = Game(
+            id: UUID(),
+            bggId: nil,
+            name: name,
+            yearPublished: nil,
+            thumbnailUrl: nil,
+            imageUrl: nil,
+            minPlayers: 1,
+            maxPlayers: 10,
+            recommendedPlayers: nil,
+            minPlaytime: 30,
+            maxPlaytime: 120,
+            complexity: 0,
+            bggRating: nil,
+            description: nil,
+            categories: [],
+            mechanics: []
+        )
+        do {
+            let saved = try await supabase.upsertGame(game)
+            let eventGame = EventGame(
+                id: UUID(),
+                gameId: saved.id,
+                game: saved,
+                isPrimary: selectedGames.isEmpty,
+                sortOrder: selectedGames.count
+            )
+            selectedGames.append(eventGame)
+            manualGameName = ""
         } catch {
             self.error = error.localizedDescription
         }
@@ -204,6 +250,60 @@ final class CreateEventViewModel: ObservableObject {
                 userId: member.userId,
                 tier: member.tier
             )
+        }
+    }
+
+    func loadSuggestedContacts() async {
+        isLoadingSuggestions = true
+        do {
+            suggestedContacts = try await supabase.fetchFrequentContacts(limit: 20)
+        } catch {
+            // Non-critical
+        }
+        isLoadingSuggestions = false
+    }
+
+    /// Top 3 suggested contacts not already in the invite list
+    var topSuggestions: [FrequentContact] {
+        suggestedContacts
+            .filter { fc in !invitees.contains(where: { $0.phoneNumber == fc.contactPhone }) }
+            .prefix(3)
+            .map { $0 }
+    }
+
+    /// Phones already in the invite list
+    var invitedPhones: Set<String> {
+        Set(invitees.map(\.phoneNumber))
+    }
+
+    func addContact(_ contact: UserContact) {
+        guard !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber }) else { return }
+        addInvitee(name: contact.name, phoneNumber: contact.phoneNumber, tier: 1)
+    }
+
+    func addFrequentContact(_ contact: FrequentContact) {
+        guard !invitees.contains(where: { $0.phoneNumber == contact.contactPhone }) else { return }
+        addInvitee(name: contact.contactName, phoneNumber: contact.contactPhone, tier: 1)
+    }
+
+    var tier1Invitees: [InviteeEntry] {
+        invitees.filter { $0.tier == 1 }
+    }
+
+    var tier2Invitees: [InviteeEntry] {
+        invitees.filter { $0.tier == 2 }
+    }
+
+    func moveInvitee(from source: IndexSet, to destination: Int, inTier tier: Int) {
+        var tierItems = tier == 1 ? tier1Invitees : tier2Invitees
+        tierItems.move(fromOffsets: source, toOffset: destination)
+
+        // Rebuild invitees preserving order: tier 1 first, then tier 2
+        let otherTier = invitees.filter { $0.tier != tier }
+        if tier == 1 {
+            invitees = tierItems + otherTier
+        } else {
+            invitees = otherTier + tierItems
         }
     }
 

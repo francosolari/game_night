@@ -109,3 +109,48 @@ struct UserContact: Identifiable, Hashable {
         isAppUser: true
     )
 }
+
+// MARK: - Saved Contact (persisted in Supabase for reuse across events)
+struct SavedContact: Identifiable, Codable, Hashable {
+    let id: UUID
+    var userId: UUID
+    var name: String
+    var phoneNumber: String
+    var avatarUrl: String?
+    var isAppUser: Bool
+    var createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case name
+        case phoneNumber = "phone_number"
+        case avatarUrl = "avatar_url"
+        case isAppUser = "is_app_user"
+        case createdAt = "created_at"
+    }
+
+    var asUserContact: UserContact {
+        UserContact(id: id, name: name, phoneNumber: phoneNumber, avatarUrl: avatarUrl, isAppUser: isAppUser)
+    }
+}
+
+// MARK: - Frequent Contact (from RPC — ranked by mutual events)
+struct FrequentContact: Identifiable, Codable, Hashable {
+    var id: String { contactPhone }
+    let contactPhone: String
+    let contactName: String
+    let contactUserId: UUID?
+    let contactAvatarUrl: String?
+    let isAppUser: Bool
+    let mutualEventCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case contactPhone = "contact_phone"
+        case contactName = "contact_name"
+        case contactUserId = "contact_user_id"
+        case contactAvatarUrl = "contact_avatar_url"
+        case isAppUser = "is_app_user"
+        case mutualEventCount = "mutual_event_count"
+    }
+}

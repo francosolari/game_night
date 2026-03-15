@@ -29,6 +29,7 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - gamenight
+        NSContactsUsageDescription: "Game Night uses your contacts to help you invite friends to game nights. Only the contacts you select are stored."
         CFBundleDisplayName: Game Night
     settings:
       base:

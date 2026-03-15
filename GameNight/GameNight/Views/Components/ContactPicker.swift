@@ -1,7 +1,61 @@
 import SwiftUI
+import Contacts
 
-/// Privacy-first contact picker.
-/// Shows device contacts locally. Only selected contacts are ever sent to the server.
+// MARK: - Reusable Contact Row (shared by all contact sheets)
+struct ContactRow: View {
+    let contact: UserContact
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Theme.Spacing.md) {
+                // Checkbox
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isSelected ? Theme.Colors.primary : Theme.Colors.textTertiary, lineWidth: 1.5)
+                        .frame(width: 22, height: 22)
+
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Theme.Colors.primary)
+                            .frame(width: 22, height: 22)
+                            .overlay(
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
+                    }
+                }
+
+                AvatarView(url: contact.avatarUrl, size: 40, placeholder: "person.fill")
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(contact.name)
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Text(contact.phoneNumber)
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+
+                Spacer()
+
+                if contact.isAppUser {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.Colors.success)
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.xl)
+            .padding(.vertical, Theme.Spacing.sm + 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Device Contact Picker (reads phone contacts)
 struct ContactPickerSheet: View {
     @Environment(\.dismiss) var dismiss
     @State private var contacts: [UserContact] = []
@@ -9,6 +63,7 @@ struct ContactPickerSheet: View {
     @State private var selectedIds = Set<UUID>()
     @State private var isLoading = true
     @State private var permissionDenied = false
+    @State private var isLimited = false
     @State private var error: String?
 
     let onSelect: ([UserContact]) -> Void
@@ -43,12 +98,31 @@ struct ContactPickerSheet: View {
                 } else if isLoading {
                     LoadingView(message: "Reading contacts locally...")
                 } else {
-                    // Search bar
+                    // Limited access banner
+                    if isLimited {
+                        Button {
+                            // Re-trigger the limited contacts picker
+                            Task { await requestMoreAccess() }
+                        } label: {
+                            HStack(spacing: Theme.Spacing.sm) {
+                                Image(systemName: "person.badge.plus")
+                                    .font(.system(size: 14))
+                                Text("Share more contacts with Game Night")
+                                    .font(Theme.Typography.calloutMedium)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                            }
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(Theme.Spacing.md)
+                            .background(Theme.Colors.primary.opacity(0.08))
+                        }
+                    }
+
                     SearchBar(text: $searchText, placeholder: "Search contacts...")
                         .padding(.horizontal, Theme.Spacing.xl)
                         .padding(.vertical, Theme.Spacing.md)
 
-                    // Contact list
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(filteredContacts) { contact in
@@ -68,14 +142,13 @@ struct ContactPickerSheet: View {
                 }
             }
             .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationTitle("Add People")
+            .navigationTitle("Phone Contacts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(Theme.Colors.textSecondary)
                 }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Add (\(selectedIds.count))") {
                         let selected = contacts.filter { selectedIds.contains($0.id) }
@@ -137,10 +210,19 @@ struct ContactPickerSheet: View {
                 isLoading = false
                 return
             }
+            // Check if we got limited after requesting
+            if #available(iOS 18, *) {
+                let newStatus = await picker.authorizationStatus
+                isLimited = (newStatus == .limited)
+            }
         default:
-            permissionDenied = true
-            isLoading = false
-            return
+            if #available(iOS 18, *), status == .limited {
+                isLimited = true
+            } else {
+                permissionDenied = true
+                isLoading = false
+                return
+            }
         }
 
         do {
@@ -150,66 +232,16 @@ struct ContactPickerSheet: View {
         }
         isLoading = false
     }
-}
 
-// MARK: - Contact Row
-struct ContactRow: View {
-    let contact: UserContact
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Theme.Spacing.md) {
-                // Checkbox
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(isSelected ? Theme.Colors.primary : Theme.Colors.textTertiary, lineWidth: 1.5)
-                        .frame(width: 22, height: 22)
-
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Theme.Colors.primary)
-                            .frame(width: 22, height: 22)
-                            .overlay(
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
-                            )
-                    }
-                }
-
-                // Avatar
-                AvatarView(url: nil, size: 40, placeholder: "person.fill")
-
-                // Info
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(contact.name)
-                        .font(Theme.Typography.bodyMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-
-                    Text(contact.phoneNumber)
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
-
-                Spacer()
-
-                if contact.isAppUser {
-                    Text("On Game Night")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.success)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule().fill(Theme.Colors.success.opacity(0.15))
-                        )
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.xl)
-            .padding(.vertical, Theme.Spacing.sm + 2)
-            .contentShape(Rectangle())
+    private func requestMoreAccess() async {
+        let picker = ContactPickerService.shared
+        // On iOS 18+, calling requestAccess when limited re-shows the system picker
+        _ = try? await picker.requestAccess()
+        // Reload contacts after user potentially added more
+        do {
+            contacts = try await picker.fetchLocalContacts()
+        } catch {
+            // ignore
         }
-        .buttonStyle(.plain)
     }
 }

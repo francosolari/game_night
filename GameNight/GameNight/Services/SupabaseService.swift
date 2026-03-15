@@ -54,7 +54,7 @@ final class SupabaseService: ObservableObject {
     func fetchUpcomingEvents() async throws -> [GameEvent] {
         let events: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options(*)")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .or("status.eq.published,status.eq.confirmed")
             .order("created_at", ascending: false)
             .execute()
@@ -66,7 +66,7 @@ final class SupabaseService: ObservableObject {
         let session = try await client.auth.session
         let events: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options(*)")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .eq("host_id", value: session.user.id.uuidString)
             .order("created_at", ascending: false)
             .execute()
@@ -77,7 +77,7 @@ final class SupabaseService: ObservableObject {
     func fetchEvent(id: UUID) async throws -> GameEvent {
         let event: GameEvent = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options(*)")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .eq("id", value: id.uuidString)
             .single()
             .execute()
@@ -89,7 +89,7 @@ final class SupabaseService: ObservableObject {
         let created: GameEvent = try await client
             .from("events")
             .insert(event)
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options(*)")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
             .single()
             .execute()
             .value
@@ -122,7 +122,7 @@ final class SupabaseService: ObservableObject {
         let session = try await client.auth.session
         let invites: [Invite] = try await client
             .from("invites")
-            .select("*, event:events(*, host:users(*), games:event_games(*, game:games(*)), time_options(*))")
+            .select("*, event:events(*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*))")
             .eq("user_id", value: session.user.id.uuidString)
             .execute()
             .value
@@ -215,14 +215,25 @@ final class SupabaseService: ObservableObject {
     }
 
     func upsertGame(_ game: Game) async throws -> Game {
-        let saved: Game = try await client
-            .from("games")
-            .upsert(game, onConflict: "bgg_id")
-            .select()
-            .single()
-            .execute()
-            .value
-        return saved
+        if game.bggId != nil {
+            let saved: Game = try await client
+                .from("games")
+                .upsert(game, onConflict: "bgg_id")
+                .select()
+                .single()
+                .execute()
+                .value
+            return saved
+        } else {
+            let saved: Game = try await client
+                .from("games")
+                .insert(game)
+                .select()
+                .single()
+                .execute()
+                .value
+            return saved
+        }
     }
 
     // MARK: - Categories
@@ -300,6 +311,62 @@ final class SupabaseService: ObservableObject {
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    // MARK: - Saved Contacts
+
+    func fetchSavedContacts() async throws -> [SavedContact] {
+        let session = try await client.auth.session
+        let contacts: [SavedContact] = try await client
+            .from("saved_contacts")
+            .select()
+            .eq("user_id", value: session.user.id.uuidString)
+            .order("name")
+            .execute()
+            .value
+        return contacts
+    }
+
+    func saveContacts(_ contacts: [UserContact]) async throws -> [SavedContact] {
+        let session = try await client.auth.session
+        let toSave = contacts.map { contact in
+            SavedContact(
+                id: UUID(),
+                userId: session.user.id,
+                name: contact.name,
+                phoneNumber: contact.phoneNumber,
+                avatarUrl: contact.avatarUrl,
+                isAppUser: contact.isAppUser,
+                createdAt: nil
+            )
+        }
+        let saved: [SavedContact] = try await client
+            .from("saved_contacts")
+            .upsert(toSave, onConflict: "user_id,phone_number")
+            .select()
+            .execute()
+            .value
+        return saved
+    }
+
+    func deleteSavedContact(id: UUID) async throws {
+        try await client
+            .from("saved_contacts")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func fetchFrequentContacts(limit: Int = 20) async throws -> [FrequentContact] {
+        let session = try await client.auth.session
+        let contacts: [FrequentContact] = try await client
+            .rpc("get_frequent_contacts", params: [
+                "requesting_user_id": session.user.id.uuidString,
+                "max_results": "\(limit)"
+            ])
+            .execute()
+            .value
+        return contacts
     }
 
     // MARK: - Blocking

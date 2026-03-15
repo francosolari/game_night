@@ -21,6 +21,7 @@
 		60CC436E8F6F5AE4F7D37C44 /* SplashScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F58FAF1005984504C7F8AD /* SplashScreen.swift */; };
 		767F1544BB3B4EF53FECFD0D /* ContactPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47B45C3BEB73A0CAF96C797 /* ContactPickerService.swift */; };
 		8EBFE0CD5C9F9E0FADEB8B66 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35ACFC5CF2D84146F1B0E5B2 /* OnboardingView.swift */; };
+		98081CC0AB972190D03DABD9 /* ContactListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC2A9C1BB5C965C30B05BA8 /* ContactListSheet.swift */; };
 		9A1BAE009234F98F2E7E271C /* GameEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5032FD47004A7CB0592B4E83 /* GameEvent.swift */; };
 		9B68501F3F9105CF25668A3A /* ContactPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D392FFBFA41DB94F99E14E09 /* ContactPicker.swift */; };
 		9E72702398FD0A62ABC50C5B /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EDAABF8B93412395C477350 /* ViewModifiers.swift */; };
@@ -84,6 +85,7 @@
 		F45F84908CD5A1C95CFFF098 /* BGGService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGService.swift; sourceTree = "<group>"; };
 		F47B45C3BEB73A0CAF96C797 /* ContactPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactPickerService.swift; sourceTree = "<group>"; };
 		F7C8D2CD62321FDE27933183 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		FAC2A9C1BB5C965C30B05BA8 /* ContactListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactListSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +145,7 @@
 		4497D62AF38CB04640B78258 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				FAC2A9C1BB5C965C30B05BA8 /* ContactListSheet.swift */,
 				D392FFBFA41DB94F99E14E09 /* ContactPicker.swift */,
 				24832623E66C268D9044E240 /* EventCard.swift */,
 				7FFF8F8644B3D6C09B3D23E5 /* GameCard.swift */,
@@ -336,6 +339,7 @@
 			files = (
 				F94FB46D73A94B95CAAB4410 /* AppState.swift in Sources */,
 				B8CB9F46799095CFDF66F26E /* BGGService.swift in Sources */,
+				98081CC0AB972190D03DABD9 /* ContactListSheet.swift in Sources */,
 				9B68501F3F9105CF25668A3A /* ContactPicker.swift in Sources */,
 				767F1544BB3B4EF53FECFD0D /* ContactPickerService.swift in Sources */,
 				03DE6C5AC84BC4458D2EE750 /* ContentView.swift in Sources */,
