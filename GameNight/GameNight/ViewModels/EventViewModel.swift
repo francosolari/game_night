@@ -311,7 +311,7 @@ final class CreateEventViewModel: ObservableObject {
         let entry = InviteeEntry(
             id: UUID(),
             name: name,
-            phoneNumber: phoneNumber,
+            phoneNumber: ContactPickerService.normalizePhone(phoneNumber),
             userId: nil,
             tier: tier
         )
@@ -367,6 +367,7 @@ final class CreateEventViewModel: ObservableObject {
                 return Invite(
                     id: UUID(),
                     eventId: created.id,
+                    hostUserId: created.hostId,
                     userId: invitee.userId,
                     phoneNumber: invitee.phoneNumber,
                     displayName: invitee.name,

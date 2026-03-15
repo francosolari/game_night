@@ -3,6 +3,7 @@ import Foundation
 struct Invite: Identifiable, Codable {
     let id: UUID
     var eventId: UUID
+    var hostUserId: UUID?
     var userId: UUID?           // nil for non-app users
     var phoneNumber: String
     var displayName: String?
@@ -20,6 +21,7 @@ struct Invite: Identifiable, Codable {
     enum CodingKeys: String, CodingKey {
         case id
         case eventId = "event_id"
+        case hostUserId = "host_user_id"
         case userId = "user_id"
         case phoneNumber = "phone_number"
         case displayName = "display_name"
@@ -108,6 +110,7 @@ extension Invite {
     static let preview = Invite(
         id: UUID(),
         eventId: UUID(),
+        hostUserId: UUID(),
         userId: UUID(),
         phoneNumber: "+1234567890",
         displayName: "Jordan",
