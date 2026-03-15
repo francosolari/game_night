@@ -228,16 +228,16 @@ struct PrivacySettingsView: View {
 
     private func exportData() async {
         // Trigger data export via Edge Function
-        try? await SupabaseService.shared.client.functions.invoke(
+        try? await SupabaseService.shared.invokeAuthenticatedFunction(
             "export-user-data",
-            options: .init(body: [:] as [String: String])
+            body: [:] as [String: String]
         )
     }
 
     private func deleteAccount() async {
-        try? await SupabaseService.shared.client.functions.invoke(
+        try? await SupabaseService.shared.invokeAuthenticatedFunction(
             "delete-user-account",
-            options: .init(body: [:] as [String: String])
+            body: [:] as [String: String]
         )
         await appState.signOut()
     }
