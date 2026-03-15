@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Night - RSVP</title>
+    <style>
+        :root {
+            --bg: #0A0A0F;
+            --bg-elevated: #14141F;
+            --card: #1A1A2E;
+            --primary: #8B5CF6;
+            --primary-light: #A78BFA;
+            --secondary: #F97316;
+            --accent: #06B6D4;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --text: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-tertiary: #64748B;
+            --divider: rgba(255,255,255,0.08);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 480px;
+            width: 100%;
+            padding: 24px 20px;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #1E1B4B, #312E81, #0A0A0F);
+            padding: 32px 24px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .hero .emoji { font-size: 48px; margin-bottom: 16px; }
+        .hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        .hero .host { color: var(--text-secondary); font-size: 15px; }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .game-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .game-thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .game-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .game-info { flex: 1; }
+        .game-name {
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .star { color: var(--warning); font-size: 12px; }
+
+        .game-meta {
+            color: var(--text-tertiary);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .complexity-dots {
+            display: flex;
+            gap: 2px;
+        }
+        .complexity-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .time-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--divider);
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .time-option:hover { border-color: var(--primary); }
+        .time-option.selected {
+            border-color: var(--primary);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .radio {
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--text-tertiary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: border-color 0.2s;
+        }
+
+        .selected .radio {
+            border-color: var(--primary);
+        }
+        .radio-inner {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: none;
+        }
+        .selected .radio-inner { display: block; }
+
+        .time-date { font-weight: 500; font-size: 15px; }
+        .time-time { color: var(--text-secondary); font-size: 14px; }
+        .time-label {
+            font-size: 12px;
+            color: var(--primary-light);
+            background: rgba(139, 92, 246, 0.15);
+            padding: 2px 8px;
+            border-radius: 999px;
+            margin-left: 8px;
+        }
+
+        .vote-count {
+            color: var(--success);
+            font-size: 13px;
+            margin-left: auto;
+        }
+
+        .rsvp-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 52px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.15s, opacity 0.15s;
+            width: 100%;
+        }
+        .btn:active { transform: scale(0.97); opacity: 0.9; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            color: white;
+        }
+
+        .btn-row { display: flex; gap: 12px; }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1.5px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-decline {
+            background: transparent;
+            border: 1.5px solid var(--text-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .location {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .location-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: rgba(249, 115, 22, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .location-name { font-weight: 500; }
+        .location-address { color: var(--text-tertiary); font-size: 13px; }
+
+        .app-badge {
+            text-align: center;
+            margin-top: 32px;
+            padding: 24px;
+        }
+        .app-badge p { color: var(--text-tertiary); font-size: 14px; margin-bottom: 12px; }
+        .app-badge a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .success-state {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .success-state .check {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(16, 185, 129, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 20px;
+        }
+        .success-state h2 { margin-bottom: 8px; }
+        .success-state p { color: var(--text-secondary); }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--divider);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading state -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Main content (populated by JS) -->
+        <div id="content" style="display: none;"></div>
+
+        <!-- Success state -->
+        <div id="success" class="success-state">
+            <div class="check">&#10003;</div>
+            <h2 id="success-title">You're in!</h2>
+            <p id="success-message">We'll send you a reminder before the event.</p>
+        </div>
+
+        <!-- App download badge -->
+        <div class="app-badge">
+            <p>Get the full experience</p>
+            <a href="#">Download Game Night App</a>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+
+        // Get invite token from URL
+        const pathParts = window.location.pathname.split('/');
+        const inviteToken = pathParts[pathParts.length - 1];
+
+        let inviteData = null;
+        let eventData = null;
+        let selectedTimeIds = new Set();
+
+        async function fetchInvite() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?invite_token=eq.${inviteToken}&select=*,event:events(*,host:users(display_name),games:event_games(*,game:games(*)),time_options:time_options(*))`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                const data = await res.json();
+                if (!data || data.length === 0) {
+                    showError('Invite not found or expired.');
+                    return;
+                }
+
+                inviteData = data[0];
+                eventData = inviteData.event;
+                renderInvite();
+            } catch (err) {
+                showError('Failed to load invite. Please try again.');
+            }
+        }
+
+        function getComplexityColor(weight) {
+            if (weight < 1.5) return '#10B981';
+            if (weight < 2.5) return '#84CC16';
+            if (weight < 3.5) return '#F59E0B';
+            if (weight < 4.5) return '#F97316';
+            return '#EF4444';
+        }
+
+        function getComplexityLabel(weight) {
+            if (weight < 1.5) return 'Light';
+            if (weight < 2.5) return 'Medium Light';
+            if (weight < 3.5) return 'Medium';
+            if (weight < 4.5) return 'Medium Heavy';
+            return 'Heavy';
+        }
+
+        function renderInvite() {
+            document.getElementById('loading').style.display = 'none';
+            const content = document.getElementById('content');
+            content.style.display = 'block';
+
+            const games = eventData.games
+                .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+
+            const gamesHtml = games.map(eg => {
+                const g = eg.game;
+                const color = getComplexityColor(g.complexity);
+                const dots = Array.from({length: 5}, (_, i) =>
+                    `<div class="complexity-dot" style="background: ${i < Math.round(g.complexity) ? color : color + '33'}"></div>`
+                ).join('');
+                const time = g.min_playtime === g.max_playtime
+                    ? `${g.min_playtime}min`
+                    : `${g.min_playtime}-${g.max_playtime}min`;
+
+                return `
+                    <div class="game-item">
+                        <div class="game-thumb">
+                            ${g.thumbnail_url ? `<img src="${g.thumbnail_url}" alt="${g.name}">` : '🎲'}
+                        </div>
+                        <div class="game-info">
+                            <div class="game-name">
+                                ${eg.is_primary ? '<span class="star">★</span>' : ''}
+                                ${g.name}
+                            </div>
+                            <div class="game-meta">
+                                <div class="complexity-dots">${dots}</div>
+                                <span>${getComplexityLabel(g.complexity)}</span>
+                                <span>·</span>
+                                <span>⏱ ${time}</span>
+                                <span>·</span>
+                                <span>👥 ${g.min_players}-${g.max_players}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const timeOptionsHtml = eventData.time_options.map(opt => {
+                const date = new Date(opt.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const start = new Date(opt.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                const end = opt.end_time ? new Date(opt.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null;
+                const label = opt.label ? `<span class="time-label">${opt.label}</span>` : '';
+
+                return `
+                    <div class="time-option" data-id="${opt.id}" onclick="toggleTime('${opt.id}')">
+                        <div class="radio"><div class="radio-inner"></div></div>
+                        <div>
+                            <div class="time-date">${date} ${label}</div>
+                            <div class="time-time">${start}${end ? ' - ' + end : ''}</div>
+                        </div>
+                        <div class="vote-count">👍 ${opt.vote_count}</div>
+                    </div>
+                `;
+            }).join('');
+
+            const locationHtml = eventData.location ? `
+                <div class="card">
+                    <div class="section-title">Location</div>
+                    <div class="location">
+                        <div class="location-icon">📍</div>
+                        <div>
+                            <div class="location-name">${eventData.location}</div>
+                            ${eventData.location_address ? `<div class="location-address">${eventData.location_address}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            ` : '';
+
+            content.innerHTML = `
+                <div class="hero">
+                    <div class="emoji">🎲</div>
+                    <h1>${eventData.title}</h1>
+                    <div class="host">Hosted by ${eventData.host?.display_name || 'Someone'}</div>
+                </div>
+
+                <div class="card">
+                    <div class="section-title">Games</div>
+                    ${gamesHtml}
+                </div>
+
+                <div class="card">
+                    <div class="section-title">When works for you?</div>
+                    ${timeOptionsHtml}
+                </div>
+
+                ${locationHtml}
+
+                ${eventData.description ? `
+                    <div class="card">
+                        <div class="section-title">Details</div>
+                        <p style="color: var(--text-secondary); font-size: 15px;">${eventData.description}</p>
+                    </div>
+                ` : ''}
+
+                <div class="card">
+                    <div class="section-title">RSVP</div>
+                    <div class="rsvp-buttons">
+                        <button class="btn btn-primary" onclick="respond('accepted')">I'm Going!</button>
+                        <div class="btn-row">
+                            <button class="btn btn-secondary" onclick="respond('maybe')">Maybe</button>
+                            <button class="btn btn-decline" onclick="respond('declined')">Can't Go</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleTime(id) {
+            const el = document.querySelector(`.time-option[data-id="${id}"]`);
+            if (selectedTimeIds.has(id)) {
+                selectedTimeIds.delete(id);
+                el.classList.remove('selected');
+            } else {
+                selectedTimeIds.add(id);
+                el.classList.add('selected');
+            }
+        }
+
+        async function respond(status) {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/invites?id=eq.${inviteData.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({
+                        status: status,
+                        responded_at: new Date().toISOString(),
+                        selected_time_option_ids: Array.from(selectedTimeIds)
+                    })
+                });
+
+                if (res.ok) {
+                    // Trigger tiered invite processing
+                    await fetch(`${SUPABASE_URL}/functions/v1/process-tiered-invites`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ invite_id: inviteData.id })
+                    });
+
+                    showSuccess(status);
+                }
+            } catch (err) {
+                alert('Failed to send response. Please try again.');
+            }
+        }
+
+        function showSuccess(status) {
+            document.getElementById('content').style.display = 'none';
+            const success = document.getElementById('success');
+            success.style.display = 'block';
+
+            const titles = {
+                accepted: "You're in! 🎉",
+                maybe: "Noted! 🤔",
+                declined: "Maybe next time! 👋"
+            };
+            const messages = {
+                accepted: "We'll send you a reminder before the event.",
+                maybe: "We'll keep your spot open. Update anytime!",
+                declined: "We'll miss you! We'll invite you next time."
+            };
+
+            document.getElementById('success-title').textContent = titles[status];
+            document.getElementById('success-message').textContent = messages[status];
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            const content = document.getElementById('content');
+            content.style.display = 'block';
+            content.innerHTML = `
+                <div class="hero">
+                    <div class="emoji">😕</div>
+                    <h1>Oops</h1>
+                    <div class="host">${msg}</div>
+                </div>
+            `;
+        }
+
+        // Initialize
+        fetchInvite();
+    </script>
+</body>
+</html>
