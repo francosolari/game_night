@@ -307,8 +307,8 @@ struct EventHeroHeader: View {
             // Background gradient
             LinearGradient(
                 colors: [
-                    Color(hex: "1E1B4B"),
-                    Color(hex: "312E81"),
+                    Theme.Colors.cardBackgroundHover,
+                    Theme.Colors.cardBackground,
                     Theme.Colors.background
                 ],
                 startPoint: .top,

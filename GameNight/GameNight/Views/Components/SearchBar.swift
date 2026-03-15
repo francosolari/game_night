@@ -31,15 +31,17 @@ struct SearchBar: View {
             }
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.vertical, Theme.Spacing.sm + 2)
+        .padding(.vertical, 12) // Slightly taller
         .background(
             RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .fill(Theme.Colors.backgroundElevated)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                        .stroke(isFocused ? Theme.Colors.primary.opacity(0.5) : Theme.Colors.divider, lineWidth: 1)
-                )
+                .fill(Theme.Colors.cardBackground) // Use card background
+                .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2) // Subtle shadow
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .stroke(isFocused ? Theme.Colors.primary : Theme.Colors.divider, lineWidth: 1) // Clearer focus state
+        )
+        .animation(Theme.Animation.snappy, value: isFocused)
     }
 }
 

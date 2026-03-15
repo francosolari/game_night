@@ -1,46 +1,46 @@
 import SwiftUI
 
 // MARK: - Theme
-/// Design system inspired by Partiful and DICE.
-/// Dark-first, vibrant accents, generous spacing, bold typography.
+/// Design system inspired by Linear and Raycast.
+/// Minimalist dark mode, high contrast, subtle borders, electric blue accents.
 struct Theme {
 
     // MARK: - Colors
     struct Colors {
-        // Backgrounds
-        static let background = Color(hex: "0A0A0F")
-        static let backgroundElevated = Color(hex: "14141F")
-        static let cardBackground = Color(hex: "1A1A2E")
-        static let cardBackgroundHover = Color(hex: "22223A")
+        // Backgrounds - deep, neutral grays/blacks
+        static let background = Color(hex: "08090A")
+        static let backgroundElevated = Color(hex: "121316")
+        static let cardBackground = Color(hex: "1C1D21")
+        static let cardBackgroundHover = Color(hex: "25262B")
 
-        // Primary palette — electric violet / magenta
-        static let primary = Color(hex: "8B5CF6")
-        static let primaryLight = Color(hex: "A78BFA")
-        static let primaryDark = Color(hex: "6D28D9")
+        // Primary palette — electric blue (Interstellar)
+        static let primary = Color(hex: "3B82F6") // Blue 500
+        static let primaryLight = Color(hex: "60A5FA") // Blue 400
+        static let primaryDark = Color(hex: "2563EB") // Blue 600
 
-        // Secondary — warm coral / orange
-        static let secondary = Color(hex: "F97316")
-        static let secondaryLight = Color(hex: "FB923C")
+        // Secondary — neutral slate
+        static let secondary = Color(hex: "64748B") // Slate 500
+        static let secondaryLight = Color(hex: "94A3B8") // Slate 400
 
-        // Accent — electric cyan
-        static let accent = Color(hex: "06B6D4")
-        static let accentLight = Color(hex: "22D3EE")
+        // Accent — vibrant teal
+        static let accent = Color(hex: "14B8A6") // Teal 500
+        static let accentLight = Color(hex: "2DD4BF") // Teal 400
 
         // Success / Warning / Error
-        static let success = Color(hex: "10B981")
-        static let warning = Color(hex: "F59E0B")
-        static let error = Color(hex: "EF4444")
+        static let success = Color(hex: "10B981") // Emerald 500
+        static let warning = Color(hex: "F59E0B") // Amber 500
+        static let error = Color(hex: "EF4444")   // Red 500
 
         // Text
-        static let textPrimary = Color(hex: "F8FAFC")
-        static let textSecondary = Color(hex: "94A3B8")
-        static let textTertiary = Color(hex: "64748B")
+        static let textPrimary = Color(hex: "F8FAFC") // Slate 50
+        static let textSecondary = Color(hex: "94A3B8") // Slate 400
+        static let textTertiary = Color(hex: "64748B")  // Slate 500
 
         // Divider & overlay
         static let divider = Color.white.opacity(0.08)
-        static let overlay = Color.black.opacity(0.5)
+        static let overlay = Color.black.opacity(0.6)
 
-        // Complexity level colors
+        // Complexity level colors (keeping logic but refining palette)
         static let complexityLight = Color(hex: "10B981")
         static let complexityMediumLight = Color(hex: "84CC16")
         static let complexityMedium = Color(hex: "F59E0B")
@@ -70,28 +70,29 @@ struct Theme {
 
     // MARK: - Gradients
     struct Gradients {
+        // Subtle, professional gradients
         static let primary = LinearGradient(
-            colors: [Color(hex: "8B5CF6"), Color(hex: "EC4899")],
+            colors: [Color(hex: "3B82F6"), Color(hex: "2563EB")],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
 
         static let secondary = LinearGradient(
-            colors: [Color(hex: "F97316"), Color(hex: "F43F5E")],
+            colors: [Color(hex: "64748B"), Color(hex: "475569")],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
 
         static let accent = LinearGradient(
-            colors: [Color(hex: "06B6D4"), Color(hex: "8B5CF6")],
+            colors: [Color(hex: "14B8A6"), Color(hex: "0D9488")],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
 
         static let card = LinearGradient(
             colors: [
-                Color.white.opacity(0.06),
-                Color.white.opacity(0.02)
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.01)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -99,25 +100,26 @@ struct Theme {
 
         static let eventCard = LinearGradient(
             colors: [
-                Color(hex: "1E1B4B").opacity(0.8),
-                Color(hex: "1A1A2E").opacity(0.9)
+                Color(hex: "1C1D21"),
+                Color(hex: "121316")
             ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
+            startPoint: .top,
+            endPoint: .bottom
         )
     }
 
     // MARK: - Typography
+    // Using system fonts (SF Pro) with slightly tighter tracking for a technical feel
     struct Typography {
-        static let displayLarge = Font.system(size: 34, weight: .bold, design: .rounded)
-        static let displayMedium = Font.system(size: 28, weight: .bold, design: .rounded)
-        static let displaySmall = Font.system(size: 24, weight: .bold, design: .rounded)
+        static let displayLarge = Font.system(size: 32, weight: .bold, design: .default)
+        static let displayMedium = Font.system(size: 28, weight: .bold, design: .default)
+        static let displaySmall = Font.system(size: 24, weight: .semibold, design: .default)
 
-        static let headlineLarge = Font.system(size: 20, weight: .semibold, design: .rounded)
-        static let headlineMedium = Font.system(size: 18, weight: .semibold, design: .rounded)
+        static let headlineLarge = Font.system(size: 20, weight: .semibold, design: .default)
+        static let headlineMedium = Font.system(size: 18, weight: .semibold, design: .default)
 
-        static let titleLarge = Font.system(size: 17, weight: .semibold)
-        static let titleMedium = Font.system(size: 15, weight: .semibold)
+        static let titleLarge = Font.system(size: 16, weight: .medium)
+        static let titleMedium = Font.system(size: 14, weight: .medium)
 
         static let body = Font.system(size: 15, weight: .regular)
         static let bodyMedium = Font.system(size: 15, weight: .medium)
@@ -129,7 +131,7 @@ struct Theme {
         static let caption = Font.system(size: 12, weight: .regular)
         static let caption2 = Font.system(size: 11, weight: .medium)
 
-        static let label = Font.system(size: 13, weight: .semibold, design: .rounded)
+        static let label = Font.system(size: 13, weight: .semibold)
     }
 
     // MARK: - Spacing
@@ -138,33 +140,33 @@ struct Theme {
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
         static let lg: CGFloat = 16
-        static let xl: CGFloat = 20
-        static let xxl: CGFloat = 24
-        static let xxxl: CGFloat = 32
-        static let jumbo: CGFloat = 48
+        static let xl: CGFloat = 24  // Increased for more breathing room
+        static let xxl: CGFloat = 32
+        static let xxxl: CGFloat = 40
+        static let jumbo: CGFloat = 64
     }
 
     // MARK: - Corner Radius
     struct CornerRadius {
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 20
+        static let sm: CGFloat = 6   // Tighter corners (Linear style)
+        static let md: CGFloat = 10
+        static let lg: CGFloat = 14
+        static let xl: CGFloat = 18
         static let pill: CGFloat = 999
     }
 
     // MARK: - Shadows
     struct Shadows {
         static func card() -> some View {
-            Color.black.opacity(0.2)
+            Color.black.opacity(0.4)
         }
     }
 
     // MARK: - Animation
     struct Animation {
-        static let snappy = SwiftUI.Animation.spring(response: 0.3, dampingFraction: 0.8)
-        static let smooth = SwiftUI.Animation.easeInOut(duration: 0.25)
-        static let bouncy = SwiftUI.Animation.spring(response: 0.5, dampingFraction: 0.6)
+        static let snappy = SwiftUI.Animation.spring(response: 0.3, dampingFraction: 0.7) // Slightly snappier
+        static let smooth = SwiftUI.Animation.easeInOut(duration: 0.2)
+        static let bouncy = SwiftUI.Animation.spring(response: 0.4, dampingFraction: 0.6)
     }
 }
 
