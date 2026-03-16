@@ -289,22 +289,18 @@ final class CreateEventViewModel: ObservableObject {
     @Published var createdEvent: GameEvent?
     let eventToEdit: GameEvent?
 
-    // Game search
     @Published var gameSearchQuery = ""
     @Published var gameSearchResults: [BGGSearchResult] = []
     @Published var isSearchingGames = false
     @Published var manualGameName = ""
 
-    // Contacts
     @Published var suggestedContacts: [FrequentContact] = []
     @Published var isLoadingSuggestions = true
-
-    // Group collapse state
     @Published var collapsedGroups: Set<UUID> = []
 
-    // Steps
     @Published var currentStep: CreateStep = .details
     @Published var completedSteps: Set<CreateStep> = []
+
     enum CreateStep: Int, CaseIterable, Hashable {
         case details = 0
         case games
@@ -313,11 +309,24 @@ final class CreateEventViewModel: ObservableObject {
         case review
     }
 
-    private let supabase = SupabaseService.shared
-    private let bgg = BGGService.shared
+    enum PrimaryAction: Equatable {
+        case next
+        case submit
+        case saveChanges
+    }
 
-    init(eventToEdit: GameEvent? = nil) {
+    private let supabase: EventEditingProviding
+    private let bgg: BGGService
+
+    init(
+        eventToEdit: GameEvent? = nil,
+        initialInvites: [Invite] = [],
+        supabase: EventEditingProviding = SupabaseService.shared,
+        bgg: BGGService = .shared
+    ) {
         self.eventToEdit = eventToEdit
+        self.supabase = supabase
+        self.bgg = bgg
 
         if let eventToEdit {
             title = eventToEdit.title
@@ -328,12 +337,17 @@ final class CreateEventViewModel: ObservableObject {
             timeOptions = eventToEdit.timeOptions
             allowTimeSuggestions = eventToEdit.allowTimeSuggestions
             allowGameVoting = eventToEdit.allowGameVoting
+            scheduleMode = eventToEdit.scheduleMode
             inviteStrategy = eventToEdit.inviteStrategy
             minPlayers = eventToEdit.minPlayers
             maxPlayers = eventToEdit.maxPlayers
 
+            if eventToEdit.scheduleMode == .fixed, let fixedOption = eventToEdit.timeOptions.first {
+                fixedDate = fixedOption.date
+                fixedStartTime = fixedOption.startTime
+            }
+
             if eventToEdit.status == .draft {
-                // Resume draft: load draft invitees, start at first incomplete step
                 if let draftInvitees = eventToEdit.draftInvitees {
                     invitees = draftInvitees.map { draft in
                         InviteeEntry(
@@ -347,17 +361,16 @@ final class CreateEventViewModel: ObservableObject {
                         )
                     }
                 }
-                // Mark steps that have data as completed
+
                 if !title.isEmpty { completedSteps.insert(.details) }
                 if !selectedGames.isEmpty { completedSteps.insert(.games) }
                 if !timeOptions.isEmpty { completedSteps.insert(.schedule) }
                 if !invitees.isEmpty { completedSteps.insert(.invites) }
-                // Start at first incomplete step
                 currentStep = CreateStep.allCases.first { !completedSteps.contains($0) } ?? .review
             } else {
-                // Editing published event: all steps completed, start at review
+                invitees = Self.mapInvitesToEntries(initialInvites)
                 completedSteps = Set(CreateStep.allCases)
-                currentStep = .review
+                currentStep = .details
             }
         }
     }
@@ -366,13 +379,28 @@ final class CreateEventViewModel: ObservableObject {
 
     var isDraftEdit: Bool { eventToEdit?.status == .draft }
 
-    var nextButtonLabel: String {
-        if currentStep == .review {
-            if isDraftEdit { return "Send Invites" }
-            return isEditing ? "Save Changes" : "Send Invites"
+    var primaryAction: PrimaryAction {
+        if isEditing && !isDraftEdit {
+            return .saveChanges
         }
-        if currentStep == .games && selectedGames.isEmpty { return "Add Game Later" }
-        return "Next"
+        if currentStep == .review {
+            return .submit
+        }
+        return .next
+    }
+
+    var nextButtonLabel: String {
+        switch primaryAction {
+        case .saveChanges:
+            return "Save Changes"
+        case .submit:
+            return "Send Invites"
+        case .next:
+            if currentStep == .games && selectedGames.isEmpty {
+                return "Add Game Later"
+            }
+            return "Next"
+        }
     }
 
     var canProceed: Bool {
@@ -386,7 +414,11 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     func navigateToStep(_ step: CreateStep) {
-        // Can always go backward or to completed steps or to the next incomplete step
+        if isEditing && !isDraftEdit {
+            currentStep = step
+            return
+        }
+
         if step.rawValue <= currentStep.rawValue
             || completedSteps.contains(step)
             || step.rawValue == (completedSteps.map(\.rawValue).max() ?? -1) + 1 {
@@ -395,7 +427,11 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     func canNavigateToStep(_ step: CreateStep) -> Bool {
-        step.rawValue <= currentStep.rawValue
+        if isEditing && !isDraftEdit {
+            return true
+        }
+
+        return step.rawValue <= currentStep.rawValue
             || completedSteps.contains(step)
             || step.rawValue == (completedSteps.map(\.rawValue).max() ?? -1) + 1
     }
@@ -454,6 +490,7 @@ final class CreateEventViewModel: ObservableObject {
             categories: [],
             mechanics: []
         )
+
         do {
             let saved = try await supabase.upsertGame(game)
             let eventGame = EventGame(
@@ -529,15 +566,15 @@ final class CreateEventViewModel: ObservableObject {
         isLoadingSuggestions = false
     }
 
-    /// Top 3 suggested contacts not already in the invite list
     var topSuggestions: [FrequentContact] {
         suggestedContacts
-            .filter { fc in !invitees.contains(where: { $0.phoneNumber == fc.contactPhone }) }
+            .filter { contact in
+                !invitees.contains(where: { $0.phoneNumber == contact.contactPhone })
+            }
             .prefix(3)
             .map { $0 }
     }
 
-    /// Phones already in the invite list
     var invitedPhones: Set<String> {
         Set(invitees.map(\.phoneNumber))
     }
@@ -568,20 +605,17 @@ final class CreateEventViewModel: ObservableObject {
         }
     }
 
-    /// Returns grouped and ungrouped invitees for a tier.
-    /// Grouped: keyed by groupId with (emoji, name, entries).
-    /// Ungrouped: entries with no groupId.
     func groupedInvitees(forTier tier: Int) -> (groups: [(id: UUID, emoji: String, entries: [InviteeEntry])], ungrouped: [InviteeEntry]) {
         let tierInvitees = invitees.filter { $0.tier == tier }
         let ungrouped = tierInvitees.filter { $0.groupId == nil }
 
         var groupDict: [UUID: (emoji: String, entries: [InviteeEntry])] = [:]
         for invitee in tierInvitees {
-            guard let gid = invitee.groupId else { continue }
-            if groupDict[gid] == nil {
-                groupDict[gid] = (emoji: invitee.groupEmoji ?? "🎲", entries: [])
+            guard let groupId = invitee.groupId else { continue }
+            if groupDict[groupId] == nil {
+                groupDict[groupId] = (emoji: invitee.groupEmoji ?? "🎲", entries: [])
             }
-            groupDict[gid]!.entries.append(invitee)
+            groupDict[groupId]?.entries.append(invitee)
         }
 
         let groups = groupDict.map { (id: $0.key, emoji: $0.value.emoji, entries: $0.value.entries) }
@@ -594,7 +628,6 @@ final class CreateEventViewModel: ObservableObject {
         var tierItems = tier == 1 ? tier1Invitees : tier2Invitees
         tierItems.move(fromOffsets: source, toOffset: destination)
 
-        // Rebuild invitees preserving order: tier 1 first, then tier 2
         let otherTier = invitees.filter { $0.tier != tier }
         if tier == 1 {
             invitees = tierItems + otherTier
@@ -619,19 +652,116 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     func setInviteeTier(_ id: UUID, tier: Int) {
-        if let idx = invitees.firstIndex(where: { $0.id == id }) {
-            invitees[idx].tier = tier
-            if let groupId = invitees[idx].groupId {
+        if let index = invitees.firstIndex(where: { $0.id == id }) {
+            invitees[index].tier = tier
+            if let groupId = invitees[index].groupId {
                 collapsedGroups.remove(groupId)
             }
         }
     }
 
-    private func buildEvent(status: EventStatus, session: Supabase.Session) -> GameEvent {
+    func saveDraft() async {
+        isSaving = true
+        error = nil
+
+        do {
+            let hostId = try await supabase.currentUserId()
+            let event = buildEvent(status: .draft, hostId: hostId)
+
+            if isEditing {
+                try await supabase.updateEvent(event)
+                try await syncEventGames(eventId: event.id)
+                try await syncTimeOptions(eventId: event.id)
+            } else {
+                let _ = try await supabase.createEvent(event)
+                try await supabase.createEventGames(eventId: event.id, games: selectedGames)
+                try await supabase.createTimeOptions(resolvedTimeOptions(eventId: event.id))
+            }
+
+            createdEvent = try await supabase.fetchEvent(id: event.id)
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isSaving = false
+    }
+
+    func saveChanges() async {
+        guard isEditing else {
+            await createEvent()
+            return
+        }
+
+        isSaving = true
+        error = nil
+
+        do {
+            let hostId = try await supabase.currentUserId()
+            let status = eventToEdit?.status ?? .published
+            let event = buildEvent(status: status, hostId: hostId)
+
+            try await supabase.updateEvent(event)
+            try await syncEventGames(eventId: event.id)
+            try await syncTimeOptions(eventId: event.id)
+            try await syncInviteRecords(eventId: event.id, hostId: hostId)
+
+            createdEvent = try await supabase.fetchEvent(id: event.id)
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isSaving = false
+    }
+
+    func createEvent() async {
+        if isEditing {
+            isSaving = true
+            error = nil
+
+            do {
+                let hostId = try await supabase.currentUserId()
+                let status: EventStatus = isDraftEdit ? .published : (eventToEdit?.status ?? .published)
+                let event = buildEvent(status: status, hostId: hostId)
+
+                try await supabase.updateEvent(event)
+                try await syncEventGames(eventId: event.id)
+                try await syncTimeOptions(eventId: event.id)
+                try await syncInviteRecords(eventId: event.id, hostId: hostId)
+
+                createdEvent = try await supabase.fetchEvent(id: event.id)
+            } catch {
+                self.error = error.localizedDescription
+            }
+
+            isSaving = false
+            return
+        }
+
+        isSaving = true
+        error = nil
+
+        do {
+            let hostId = try await supabase.currentUserId()
+            let event = buildEvent(status: .published, hostId: hostId)
+            let created = try await supabase.createEvent(event)
+
+            try await supabase.createEventGames(eventId: created.id, games: selectedGames)
+            try await supabase.createTimeOptions(resolvedTimeOptions(eventId: created.id))
+            try await createInviteRecords(eventId: created.id, hostId: hostId)
+
+            createdEvent = created
+        } catch {
+            self.error = error.localizedDescription
+        }
+
+        isSaving = false
+    }
+
+    private func buildEvent(status: EventStatus, hostId: UUID) -> GameEvent {
         let existingEvent = eventToEdit
         return GameEvent(
             id: existingEvent?.id ?? UUID(),
-            hostId: existingEvent?.hostId ?? session.user.id,
+            hostId: existingEvent?.hostId ?? hostId,
             host: nil,
             title: title,
             description: description.isEmpty ? nil : description,
@@ -639,15 +769,15 @@ final class CreateEventViewModel: ObservableObject {
             locationAddress: locationAddress.isEmpty ? nil : locationAddress,
             status: status,
             games: selectedGames,
-            timeOptions: timeOptions,
-            confirmedTimeOptionId: nil,
+            timeOptions: resolvedTimeOptions(),
+            confirmedTimeOptionId: existingEvent?.confirmedTimeOptionId,
             allowTimeSuggestions: scheduleMode == .poll ? allowTimeSuggestions : false,
             scheduleMode: scheduleMode,
             inviteStrategy: inviteStrategy,
             minPlayers: minPlayers,
             maxPlayers: maxPlayers,
             allowGameVoting: allowGameVoting,
-            confirmedGameId: nil,
+            confirmedGameId: existingEvent?.confirmedGameId,
             coverImageUrl: existingEvent?.coverImageUrl,
             draftInvitees: status == .draft ? invitees.map { entry in
                 DraftInvitee(
@@ -667,13 +797,13 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     private func createInviteRecords(eventId: UUID, hostId: UUID) async throws {
-        let sortedInvitees = invitees.sorted { $0.tier < $1.tier }
+        let sortedInvitees = orderedInvitees()
         let firstTierSize = inviteStrategy.tierSize ?? sortedInvitees.count
 
         let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
             let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
             return Invite(
-                id: UUID(),
+                id: invitee.id,
                 eventId: eventId,
                 hostUserId: hostId,
                 userId: invitee.userId,
@@ -695,88 +825,171 @@ final class CreateEventViewModel: ObservableObject {
         try await supabase.createInvites(invites)
     }
 
-    func saveDraft() async {
-        isSaving = true
-        error = nil
+    private func syncInviteRecords(eventId: UUID, hostId: UUID) async throws {
+        let existingInvites = try await supabase.fetchInvites(eventId: eventId)
+        let existingById = Dictionary(uniqueKeysWithValues: existingInvites.map { ($0.id, $0) })
+        let currentEntries = orderedInvitees()
+        let currentIds = Set(currentEntries.map(\.id))
 
-        do {
-            let session = try await supabase.client.auth.session
-            let event = buildEvent(status: .draft, session: session)
+        let deletedIds = existingInvites
+            .map(\.id)
+            .filter { !currentIds.contains($0) }
+        try await supabase.deleteInvites(ids: deletedIds)
 
-            if isEditing {
-                try await supabase.deleteEventGames(eventId: event.id)
-                try await supabase.deleteTimeOptions(eventId: event.id)
-                try await supabase.updateEvent(event)
+        var newInvites: [Invite] = []
+        for (index, entry) in currentEntries.enumerated() {
+            let invite = buildInviteRecord(
+                from: entry,
+                existingInvite: existingById[entry.id],
+                eventId: eventId,
+                hostId: hostId,
+                tierPosition: index
+            )
+
+            if existingById[entry.id] == nil {
+                newInvites.append(invite)
             } else {
-                let _ = try await supabase.createEvent(event)
+                try await supabase.updateInvite(invite)
             }
-
-            // Persist games and time options separately
-            try await supabase.createEventGames(eventId: event.id, games: selectedGames)
-
-            let timeOptionsWithEventId = timeOptions.map { option in
-                var o = option
-                o.eventId = event.id
-                return o
-            }
-            try await supabase.createTimeOptions(timeOptionsWithEventId)
-
-            self.createdEvent = try await supabase.fetchEvent(id: event.id)
-        } catch {
-            self.error = error.localizedDescription
         }
 
-        isSaving = false
+        try await supabase.createInvites(newInvites)
     }
 
-    func createEvent() async {
-        isSaving = true
-        error = nil
+    private func syncEventGames(eventId: UUID) async throws {
+        let existingIds = Set(eventToEdit?.games.map(\.id) ?? [])
+        let currentGames = selectedGames.enumerated().map { index, game in
+            var updated = game
+            updated.sortOrder = index
+            return updated
+        }
+        let currentIds = Set(currentGames.map(\.id))
 
-        do {
-            let session = try await supabase.client.auth.session
+        try await supabase.upsertEventGames(eventId: eventId, games: currentGames)
+        try await supabase.deleteEventGames(ids: Array(existingIds.subtracting(currentIds)))
+    }
 
-            // If fixed mode, create a single time option from the date pickers
-            var finalTimeOptions = timeOptions
-            if scheduleMode == .fixed {
-                let option = TimeOption(
-                    id: UUID(),
-                    eventId: nil,
+    private func syncTimeOptions(eventId: UUID) async throws {
+        let existingIds = Set(eventToEdit?.timeOptions.map(\.id) ?? [])
+        let currentOptions = resolvedTimeOptions(eventId: eventId)
+        let currentIds = Set(currentOptions.map(\.id))
+
+        try await supabase.upsertTimeOptions(currentOptions)
+        try await supabase.deleteTimeOptions(ids: Array(existingIds.subtracting(currentIds)))
+    }
+
+    private func resolvedTimeOptions(eventId: UUID? = nil) -> [TimeOption] {
+        if scheduleMode == .fixed {
+            let existingFixed = eventToEdit?.timeOptions.first ?? timeOptions.first
+            return [
+                TimeOption(
+                    id: existingFixed?.id ?? UUID(),
+                    eventId: eventId,
                     date: fixedDate,
                     startTime: fixedStartTime,
-                    endTime: nil,
-                    label: nil,
+                    endTime: existingFixed?.endTime,
+                    label: existingFixed?.label,
                     isSuggested: false,
                     suggestedBy: nil,
-                    voteCount: 0,
-                    maybeCount: 0
+                    voteCount: existingFixed?.voteCount ?? 0,
+                    maybeCount: existingFixed?.maybeCount ?? 0
                 )
-                finalTimeOptions = [option]
-            }
-
-            let event = buildEvent(status: .published, session: session)
-            let created = try await supabase.createEvent(event)
-
-            // Persist event games separately
-            try await supabase.createEventGames(eventId: created.id, games: selectedGames)
-
-            // Persist time options separately with eventId set
-            let timeOptionsWithEventId = finalTimeOptions.map { option in
-                var o = option
-                o.eventId = created.id
-                return o
-            }
-            try await supabase.createTimeOptions(timeOptionsWithEventId)
-
-            // Create invites
-            try await createInviteRecords(eventId: created.id, hostId: session.user.id)
-
-            self.createdEvent = created
-        } catch {
-            self.error = error.localizedDescription
+            ]
         }
 
-        isSaving = false
+        return timeOptions.map { option in
+            var updated = option
+            updated.eventId = eventId
+            return updated
+        }
+    }
+
+    private func orderedInvitees() -> [InviteeEntry] {
+        invitees.enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.tier == rhs.element.tier {
+                    return lhs.offset < rhs.offset
+                }
+                return lhs.element.tier < rhs.element.tier
+            }
+            .map(\.element)
+    }
+
+    private func buildInviteRecord(
+        from entry: InviteeEntry,
+        existingInvite: Invite?,
+        eventId: UUID,
+        hostId: UUID,
+        tierPosition: Int
+    ) -> Invite {
+        let normalizedPhone = ContactPickerService.normalizePhone(entry.phoneNumber)
+        let isBenchInvite = entry.tier > 1
+
+        if var existingInvite {
+            existingInvite.eventId = eventId
+            existingInvite.hostUserId = existingInvite.hostUserId ?? hostId
+            existingInvite.userId = entry.userId
+            existingInvite.phoneNumber = normalizedPhone
+            existingInvite.displayName = entry.name
+            existingInvite.tier = entry.tier
+            existingInvite.tierPosition = tierPosition
+
+            if isBenchInvite {
+                existingInvite.status = .waitlisted
+                existingInvite.isActive = false
+                existingInvite.respondedAt = nil
+                existingInvite.selectedTimeOptionIds = []
+                existingInvite.suggestedTimes = nil
+            } else if existingInvite.status == .waitlisted || !existingInvite.isActive {
+                existingInvite.status = .pending
+                existingInvite.isActive = true
+                existingInvite.respondedAt = nil
+                existingInvite.selectedTimeOptionIds = []
+                existingInvite.suggestedTimes = nil
+            } else {
+                existingInvite.isActive = true
+            }
+
+            return existingInvite
+        }
+
+        return Invite(
+            id: entry.id,
+            eventId: eventId,
+            hostUserId: hostId,
+            userId: entry.userId,
+            phoneNumber: normalizedPhone,
+            displayName: entry.name,
+            status: isBenchInvite ? .waitlisted : .pending,
+            tier: entry.tier,
+            tierPosition: tierPosition,
+            isActive: !isBenchInvite,
+            respondedAt: nil,
+            selectedTimeOptionIds: [],
+            suggestedTimes: nil,
+            sentVia: .both,
+            smsDeliveryStatus: nil,
+            createdAt: Date()
+        )
+    }
+
+    private static func mapInvitesToEntries(_ invites: [Invite]) -> [InviteeEntry] {
+        invites
+            .sorted {
+                if $0.tier == $1.tier {
+                    return $0.tierPosition < $1.tierPosition
+                }
+                return $0.tier < $1.tier
+            }
+            .map { invite in
+                InviteeEntry(
+                    id: invite.id,
+                    name: invite.displayName ?? invite.phoneNumber,
+                    phoneNumber: invite.phoneNumber,
+                    userId: invite.userId,
+                    tier: invite.tier
+                )
+            }
     }
 }
 
