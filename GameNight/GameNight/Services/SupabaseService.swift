@@ -2,6 +2,27 @@ import Foundation
 import Supabase
 import Combine
 
+protocol EventEditingProviding: AnyObject {
+    func currentUserId() async throws -> UUID
+    func fetchEvent(id: UUID) async throws -> GameEvent
+    func createEvent(_ event: GameEvent) async throws -> GameEvent
+    func updateEvent(_ event: GameEvent) async throws
+    func createTimeOptions(_ timeOptions: [TimeOption]) async throws
+    func upsertTimeOptions(_ timeOptions: [TimeOption]) async throws
+    func deleteTimeOptions(eventId: UUID) async throws
+    func deleteTimeOptions(ids: [UUID]) async throws
+    func createEventGames(eventId: UUID, games: [EventGame]) async throws
+    func upsertEventGames(eventId: UUID, games: [EventGame]) async throws
+    func deleteEventGames(eventId: UUID) async throws
+    func deleteEventGames(ids: [UUID]) async throws
+    func fetchInvites(eventId: UUID) async throws -> [Invite]
+    func createInvites(_ invites: [Invite]) async throws
+    func updateInvite(_ invite: Invite) async throws
+    func deleteInvites(ids: [UUID]) async throws
+    func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact]
+    func upsertGame(_ game: Game) async throws -> Game
+}
+
 private struct EventSoftDeletePatch: Encodable {
     let deletedAt: Date
     let status: EventStatus
@@ -15,7 +36,7 @@ private struct EventSoftDeletePatch: Encodable {
 }
 
 @MainActor
-final class SupabaseService: ObservableObject, HomeDataProviding {
+final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingProviding {
     static let shared = SupabaseService()
 
     let client: SupabaseClient
@@ -28,6 +49,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding {
     }
 
     // MARK: - Auth
+
+    func currentUserId() async throws -> UUID {
+        let session = try await client.auth.session
+        return session.user.id
+    }
 
     func signInWithOTP(phoneNumber: String) async throws {
         try await client.auth.signInWithOTP(phone: phoneNumber)
@@ -185,6 +211,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding {
             .execute()
     }
 
+    func upsertTimeOptions(_ timeOptions: [TimeOption]) async throws {
+        guard !timeOptions.isEmpty else { return }
+        try await client
+            .from("time_options")
+            .upsert(timeOptions, onConflict: "id")
+            .execute()
+    }
+
     private struct EventGameInsert: Encodable {
         let id: UUID
         let eventId: UUID
@@ -218,6 +252,23 @@ final class SupabaseService: ObservableObject, HomeDataProviding {
             .execute()
     }
 
+    func upsertEventGames(eventId: UUID, games: [EventGame]) async throws {
+        guard !games.isEmpty else { return }
+        let inserts = games.map { game in
+            EventGameInsert(
+                id: game.id,
+                eventId: eventId,
+                gameId: game.gameId,
+                isPrimary: game.isPrimary,
+                sortOrder: game.sortOrder
+            )
+        }
+        try await client
+            .from("event_games")
+            .upsert(inserts, onConflict: "id")
+            .execute()
+    }
+
     func deleteTimeOptions(eventId: UUID) async throws {
         try await client
             .from("time_options")
@@ -226,11 +277,29 @@ final class SupabaseService: ObservableObject, HomeDataProviding {
             .execute()
     }
 
+    func deleteTimeOptions(ids: [UUID]) async throws {
+        guard !ids.isEmpty else { return }
+        try await client
+            .from("time_options")
+            .delete()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+    }
+
     func deleteEventGames(eventId: UUID) async throws {
         try await client
             .from("event_games")
             .delete()
             .eq("event_id", value: eventId.uuidString)
+            .execute()
+    }
+
+    func deleteEventGames(ids: [UUID]) async throws {
+        guard !ids.isEmpty else { return }
+        try await client
+            .from("event_games")
+            .delete()
+            .in("id", values: ids.map(\.uuidString))
             .execute()
     }
 
@@ -346,6 +415,25 @@ final class SupabaseService: ObservableObject, HomeDataProviding {
                 print("send-invite failed for \(invite.id): \(error.localizedDescription)")
             }
         }
+    }
+
+    func updateInvite(_ invite: Invite) async throws {
+        var normalizedInvite = invite
+        normalizedInvite.phoneNumber = ContactPickerService.normalizePhone(invite.phoneNumber)
+        try await client
+            .from("invites")
+            .update(normalizedInvite)
+            .eq("id", value: invite.id.uuidString)
+            .execute()
+    }
+
+    func deleteInvites(ids: [UUID]) async throws {
+        guard !ids.isEmpty else { return }
+        try await client
+            .from("invites")
+            .delete()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
     }
 
     // MARK: - Games

@@ -272,7 +272,8 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showEditSheet) {
             if let event = viewModel.event {
-                CreateEventView(eventToEdit: event) { _ in
+                CreateEventView(eventToEdit: event, initialInvites: viewModel.invites) { savedEvent in
+                    toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
                     Task { await viewModel.loadEvent(id: eventId) }
                 }
             }
@@ -326,6 +327,12 @@ struct EventDetailView: View {
         case .expired: return Theme.Colors.textTertiary
         case .waitlisted: return Theme.Colors.accent
         }
+    }
+}
+
+enum EventEditToastFactory {
+    static func makeSuccessToast(for event: GameEvent) -> ToastItem {
+        ToastItem(style: .success, message: "Saved changes to \(event.title)")
     }
 }
 

@@ -11,8 +11,13 @@ struct CreateEventView: View {
     @StateObject private var groupsViewModel = GroupsViewModel()
     let onSaved: ((GameEvent) -> Void)?
 
-    init(eventToEdit: GameEvent? = nil, onSaved: ((GameEvent) -> Void)? = nil) {
-        _viewModel = StateObject(wrappedValue: CreateEventViewModel(eventToEdit: eventToEdit))
+    init(eventToEdit: GameEvent? = nil, initialInvites: [Invite] = [], onSaved: ((GameEvent) -> Void)? = nil) {
+        _viewModel = StateObject(
+            wrappedValue: CreateEventViewModel(
+                eventToEdit: eventToEdit,
+                initialInvites: initialInvites
+            )
+        )
         self.onSaved = onSaved
     }
 
@@ -108,7 +113,16 @@ struct CreateEventView: View {
                         }
 
                         Button(viewModel.nextButtonLabel) {
-                            if viewModel.currentStep == .review {
+                            switch viewModel.primaryAction {
+                            case .saveChanges:
+                                Task {
+                                    await viewModel.saveChanges()
+                                    if let savedEvent = viewModel.createdEvent {
+                                        onSaved?(savedEvent)
+                                        dismiss()
+                                    }
+                                }
+                            case .submit:
                                 Task {
                                     await viewModel.createEvent()
                                     if let savedEvent = viewModel.createdEvent {
@@ -116,7 +130,7 @@ struct CreateEventView: View {
                                         dismiss()
                                     }
                                 }
-                            } else {
+                            case .next:
                                 withAnimation(Theme.Animation.snappy) {
                                     viewModel.markCurrentStepCompleted()
                                     let steps = visibleSteps
@@ -570,12 +584,6 @@ struct CreateEventView: View {
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
-            if viewModel.isEditing {
-                Text("Invite list editing is separate for now. This flow updates the event without changing existing invites.")
-                    .font(Theme.Typography.callout)
-                    .foregroundColor(Theme.Colors.textSecondary)
-            }
-
             // Quick-add: suggested contacts (top 3 frequent)
             if !viewModel.topSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -861,20 +869,14 @@ struct CreateEventView: View {
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textTertiary)
 
-                    if viewModel.isEditing {
-                        Text("Existing invitees stay unchanged in edit mode")
-                            .font(Theme.Typography.body)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                    } else {
-                        Text("\(viewModel.tier1Invitees.count) playing")
-                            .font(Theme.Typography.body)
-                            .foregroundColor(Theme.Colors.textPrimary)
+                    Text("\(viewModel.tier1Invitees.count) playing")
+                        .font(Theme.Typography.body)
+                        .foregroundColor(Theme.Colors.textPrimary)
 
-                        if !viewModel.tier2Invitees.isEmpty {
-                            Text("\(viewModel.tier2Invitees.count) on bench")
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.accent)
-                        }
+                    if !viewModel.tier2Invitees.isEmpty {
+                        Text("\(viewModel.tier2Invitees.count) on bench")
+                            .font(Theme.Typography.body)
+                            .foregroundColor(Theme.Colors.accent)
                     }
                 }
             }
