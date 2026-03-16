@@ -84,8 +84,8 @@ struct TimeOptionRow: View {
                     }
 
                     Text(option.displayTime)
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.textSecondary)
+                        .font(Theme.Typography.headlineMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
                 }
 
                 Spacer()
@@ -101,12 +101,12 @@ struct TimeOptionRow: View {
                     .foregroundColor(option.voteCount > 0 ? Theme.Colors.success : Theme.Colors.textTertiary)
                 }
             }
-            .padding(Theme.Spacing.md)
+            .padding(Theme.Spacing.lg)
             .background(
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                    .fill(isSelected ? Theme.Colors.primary.opacity(0.1) : Theme.Colors.backgroundElevated)
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .fill(isSelected ? Theme.Colors.primary.opacity(0.1) : Theme.Colors.cardBackground)
                     .overlay(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                             .stroke(isSelected ? Theme.Colors.primary.opacity(0.3) : Theme.Colors.divider, lineWidth: 1)
                     )
             )
@@ -126,12 +126,22 @@ struct PollVotingView: View {
                 HStack(spacing: Theme.Spacing.md) {
                     // Date and time
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(option.displayDate)
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
+                        HStack(spacing: 6) {
+                            Text(option.displayDate)
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            if let label = option.label {
+                                Text(label)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.primaryLight)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Theme.Colors.primary.opacity(0.15)))
+                            }
+                        }
                         Text(option.displayTime)
-                            .font(Theme.Typography.callout)
-                            .foregroundColor(Theme.Colors.textSecondary)
+                            .font(Theme.Typography.headlineMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
                     }
 
                     Spacer()
@@ -166,12 +176,12 @@ struct PollVotingView: View {
                         }
                     }
                 }
-                .padding(Theme.Spacing.md)
+                .padding(Theme.Spacing.lg)
                 .background(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                        .fill(Theme.Colors.backgroundElevated)
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                        .fill(Theme.Colors.cardBackground)
                         .overlay(
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                                 .stroke(Theme.Colors.divider, lineWidth: 1)
                         )
                 )

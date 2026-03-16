@@ -509,29 +509,42 @@ struct CreateEventView: View {
 
                 // Existing time options
                 ForEach(Array(viewModel.timeOptions.enumerated()), id: \.element.id) { index, option in
-                    HStack {
+                    HStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 20))
+                            .foregroundColor(Theme.Colors.primary)
+
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(option.displayDate)
-                                .font(Theme.Typography.bodyMedium)
-                                .foregroundColor(Theme.Colors.textPrimary)
-                            Text(option.displayTime)
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                            if let label = option.label {
-                                Text(label)
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.primaryLight)
+                            HStack(spacing: 6) {
+                                Text(option.displayDate)
+                                    .font(Theme.Typography.bodyMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                                if let label = option.label {
+                                    Text(label)
+                                        .font(Theme.Typography.caption)
+                                        .foregroundColor(Theme.Colors.primaryLight)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Capsule().fill(Theme.Colors.primary.opacity(0.15)))
+                                }
                             }
+                            Text(option.displayTime)
+                                .font(Theme.Typography.headlineMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
                         }
 
                         Spacer()
 
                         Button { viewModel.removeTimeOption(at: index) } label: {
                             Image(systemName: "trash")
-                                .foregroundColor(Theme.Colors.error.opacity(0.7))
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                     }
-                    .cardStyle()
+                    .padding(Theme.Spacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                            .fill(Theme.Colors.cardBackground)
+                    )
                 }
 
                 // Add time option via Partiful-style picker

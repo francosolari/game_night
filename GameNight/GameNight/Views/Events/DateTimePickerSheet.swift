@@ -115,10 +115,11 @@ struct DateTimePickerSheet: View {
                     }
                 )
                 .frame(width: 96)
+                .frame(maxHeight: .infinity)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, Theme.Spacing.lg)
-
-            Spacer(minLength: 0)
+            .padding(.bottom, Theme.Spacing.sm)
 
             // Footer with timezone
             HStack {

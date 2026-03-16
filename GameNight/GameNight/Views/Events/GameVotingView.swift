@@ -11,9 +11,9 @@ struct GameVotingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack {
-                SectionHeader(title: "Vote for Games")
+                SectionHeader(title: "Games")
                 Spacer()
-                Text("swipe · tap to vote")
+                Text("Tap to vote")
                     .font(Theme.Typography.caption2)
                     .foregroundColor(Theme.Colors.textTertiary)
             }

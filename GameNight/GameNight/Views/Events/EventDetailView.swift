@@ -84,23 +84,8 @@ struct EventDetailView: View {
                                 )
                             }
 
-                            // Primary Game Card with pills
-                            if let primaryGame = event.games.first(where: { $0.isPrimary }),
-                               let game = primaryGame.game {
-                                PrimaryGameCard(game: game, eventGame: primaryGame)
-                            }
-
-                            // Player Count Indicator
-                            if event.minPlayers > 0 {
-                                PlayerCountIndicator(
-                                    confirmedCount: viewModel.inviteSummary.accepted,
-                                    minPlayers: event.minPlayers,
-                                    maxPlayers: event.maxPlayers
-                                )
-                            }
-
-                            // Game Voting (if enabled)
-                            if event.allowGameVoting && !event.games.isEmpty {
+                            // Unified Games Section
+                            if event.allowGameVoting && event.games.count > 1 {
                                 GameVotingView(
                                     eventGames: event.games,
                                     myVotes: viewModel.myGameVotes,
@@ -113,20 +98,21 @@ struct EventDetailView: View {
                                         await viewModel.confirmGame(gameId: gameId)
                                     } : nil
                                 )
+                            } else if !event.games.isEmpty {
+                                if let primaryGame = event.games.first(where: { $0.isPrimary }) ?? event.games.first,
+                                   let game = primaryGame.game {
+                                    let otherEventGames = event.games.filter { $0.id != primaryGame.id }
+                                    PrimaryGameCard(game: game, eventGame: primaryGame, otherGames: otherEventGames)
+                                }
                             }
 
-                            // Other games (non-primary)
-                            let otherGames = event.games.filter { !$0.isPrimary }
-                            if !otherGames.isEmpty {
-                                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                                    SectionHeader(title: "Other Games")
-                                    ForEach(otherGames) { eventGame in
-                                        if let game = eventGame.game {
-                                            CompactGameCard(game: game, isPrimary: false)
-                                        }
-                                    }
-                                }
-                                .cardStyle()
+                            // Player Count Indicator
+                            if event.minPlayers > 0 {
+                                PlayerCountIndicator(
+                                    confirmedCount: viewModel.inviteSummary.accepted,
+                                    minPlayers: event.minPlayers,
+                                    maxPlayers: event.maxPlayers
+                                )
                             }
 
                             // Schedule Section (poll mode or add-to-calendar)
@@ -245,23 +231,33 @@ struct EventDetailView: View {
         .toolbar {
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Edit Event") {
-                            showEditSheet = true
-                        }
-
+                    HStack(spacing: Theme.Spacing.sm) {
                         Button {
-                            showCreateGroupFromEvent = true
+                            showEditSheet = true
                         } label: {
-                            Label("Create Group from Guests", systemImage: "person.3.fill")
+                            Text("Edit")
+                                .font(Theme.Typography.calloutMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Theme.Colors.secondary.opacity(0.15)))
                         }
 
-                        Button("Delete Event", role: .destructive) {
-                            showDeleteConfirmation = true
+                        Menu {
+                            Button {
+                                showCreateGroupFromEvent = true
+                            } label: {
+                                Label("Create Group from Guests", systemImage: "person.3.fill")
+                            }
+
+                            Button("Delete Event", role: .destructive) {
+                                showDeleteConfirmation = true
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundColor(Theme.Colors.textPrimary)
                     }
                 }
             }
@@ -386,29 +382,13 @@ struct EventHeroHeader: View {
 
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    // Title + Date/Time Row
-                    HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
-                        Text(event.title)
-                            .font(Theme.Typography.displayMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        
-                        if let timeOption = firstTimeOption {
-                            Text("•")
-                                .foregroundColor(Theme.Colors.textTertiary)
-                            Text("\(timeOption.displayDate) • \(timeOption.displayTime)")
-                                .font(Theme.Typography.headlineMedium)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                        }
-                    }
+                    // Title
+                    Text(event.title)
+                        .font(Theme.Typography.displayMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
 
-                    // Relative Time + Status Pill Row
+                    // Status Pill
                     HStack(spacing: Theme.Spacing.md) {
-                        if let timeOption = firstTimeOption {
-                            Text(timeOption.relativeTimeDisplay)
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.accent)
-                        }
-                        
                         Text(event.status.rawValue.capitalized)
                             .font(Theme.Typography.caption2)
                             .foregroundColor(Theme.Colors.primaryLight)
@@ -445,7 +425,11 @@ struct EventHeroHeader: View {
                 Spacer()
 
                 if let timeOption = firstTimeOption {
-                    DateBadge(date: timeOption.date)
+                    DateBadge(
+                        date: timeOption.date,
+                        timeString: timeOption.displayTime,
+                        relativeTime: timeOption.relativeTimeDisplay
+                    )
                 }
             }
             .padding(Theme.Spacing.xl)
@@ -456,6 +440,8 @@ struct EventHeroHeader: View {
 // MARK: - Date Badge
 struct DateBadge: View {
     let date: Date
+    var timeString: String? = nil
+    var relativeTime: String? = nil
 
     private var dayOfWeek: String {
         let formatter = DateFormatter()
@@ -476,27 +462,42 @@ struct DateBadge: View {
     }
 
     var body: some View {
-        VStack(spacing: 1) {
-            Text(dayOfWeek)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(Theme.Colors.error)
-            Text(dayNumber)
-                .font(.system(size: 26, weight: .heavy))
-                .foregroundColor(Theme.Colors.textPrimary)
-            Text(month)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(Theme.Colors.textSecondary)
+        VStack(spacing: Theme.Spacing.xs) {
+            if let relativeTime {
+                Text(relativeTime)
+                    .font(Theme.Typography.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(Theme.Colors.accent)
+            }
+            
+            VStack(spacing: 1) {
+                Text(dayOfWeek)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(Theme.Colors.error)
+                Text(dayNumber)
+                    .font(.system(size: 26, weight: .heavy))
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Text(month)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textSecondary)
+            }
+            .frame(width: 52)
+            .padding(.vertical, Theme.Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .fill(Theme.Colors.cardBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .stroke(Theme.Colors.divider, lineWidth: 1)
+                    )
+            )
+            
+            if let timeString {
+                Text(timeString)
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.textSecondary)
+            }
         }
-        .frame(width: 52)
-        .padding(.vertical, Theme.Spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .fill(Theme.Colors.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                        .stroke(Theme.Colors.divider, lineWidth: 1)
-                )
-        )
     }
 }
 
@@ -504,47 +505,88 @@ struct DateBadge: View {
 struct PrimaryGameCard: View {
     let game: Game
     let eventGame: EventGame
+    var otherGames: [EventGame] = []
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            // Thumbnail
-            if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
-                AsyncImage(url: imageUrl) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(spacing: Theme.Spacing.md) {
+                // Thumbnail
+                if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                    AsyncImage(url: imageUrl) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(Theme.Colors.backgroundElevated)
+                    }
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+                } else {
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                         .fill(Theme.Colors.backgroundElevated)
-                }
-                .frame(width: 52, height: 52)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
-            } else {
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                    .fill(Theme.Colors.backgroundElevated)
-                    .frame(width: 52, height: 52)
-                    .overlay(
-                        Image(systemName: "dice.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text(game.name)
-                    .font(Theme.Typography.titleLarge)
-                    .foregroundColor(Theme.Colors.textPrimary)
-
-                // Pills
-                HStack(spacing: 6) {
-                    GamePill(icon: "star.fill", text: "Primary", color: Theme.Colors.warning)
-                    GamePill(icon: "clock", text: game.playtimeDisplay, color: Theme.Colors.textSecondary)
-                    if game.complexity > 0 {
-                        GamePill(
-                            icon: "brain",
-                            text: String(format: "%.1f/5", game.complexity),
-                            color: Theme.Colors.complexity(game.complexity)
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Image(systemName: "dice.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(Theme.Colors.textTertiary)
                         )
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text(game.name)
+                        .font(Theme.Typography.titleLarge)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    // Pills
+                    HStack(spacing: 6) {
+                        GamePill(icon: "star.fill", text: "Primary", color: Theme.Colors.warning)
+                        GamePill(icon: "clock", text: game.playtimeDisplay, color: Theme.Colors.textSecondary)
+                        if game.complexity > 0 {
+                            GamePill(
+                                icon: "brain",
+                                text: String(format: "%.1f/5", game.complexity),
+                                color: Theme.Colors.complexity(game.complexity)
+                            )
+                        }
                     }
                 }
+            }
+
+            if !otherGames.isEmpty {
+                Divider().background(Theme.Colors.divider)
+                HStack {
+                    Text("Also playing")
+                        .font(Theme.Typography.caption2)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .padding(.trailing, 4)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Theme.Spacing.md) {
+                            ForEach(otherGames) { eGame in
+                                if let oGame = eGame.game {
+                                    HStack(spacing: 4) {
+                                        if let url = oGame.thumbnailUrl, let imageUrl = URL(string: url) {
+                                            AsyncImage(url: imageUrl) { image in
+                                                image.resizable().aspectRatio(contentMode: .fill)
+                                            } placeholder: {
+                                                Color.clear
+                                            }
+                                            .frame(width: 20, height: 20)
+                                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        } else {
+                                            Image(systemName: "dice")
+                                                .font(.system(size: 14))
+                                                .foregroundColor(Theme.Colors.textTertiary)
+                                        }
+                                        Text(oGame.name)
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(Theme.Colors.textSecondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 2)
             }
         }
         .cardStyle()
