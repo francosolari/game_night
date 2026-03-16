@@ -8,6 +8,8 @@ enum GuestListVisibilityMode: Equatable {
 struct GuestListTabsView: View {
     let summary: InviteSummary
     var visibilityMode: GuestListVisibilityMode = .fullList
+    var actionTitle: String? = nil
+    var onAction: (() -> Void)? = nil
     @State private var selectedTab = 0
 
     private var tabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
@@ -21,7 +23,15 @@ struct GuestListTabsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "Guest List")
+            HStack {
+                SectionHeader(title: "Guest List")
+                Spacer()
+                if let actionTitle, let onAction {
+                    Button(actionTitle, action: onAction)
+                        .font(Theme.Typography.calloutMedium)
+                        .foregroundColor(Theme.Colors.primary)
+                }
+            }
 
             // Pill tabs
             ScrollView(.horizontal, showsIndicators: false) {

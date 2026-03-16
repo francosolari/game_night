@@ -86,13 +86,15 @@ final class CreateEventViewModelTests: XCTestCase {
 
         XCTAssertEqual(sut.visibility, .private)
         XCTAssertNil(sut.rsvpDeadline)
+        XCTAssertFalse(sut.allowGuestInvites)
     }
 
     func testEditModePreloadsVisibilityAndRSVPDeadline() {
         let deadline = Date(timeIntervalSince1970: 1_730_000_000)
         let event = FixtureFactory.makeEvent(
             visibility: .public,
-            rsvpDeadline: deadline
+            rsvpDeadline: deadline,
+            allowGuestInvites: true
         )
         let sut = CreateEventViewModel(
             eventToEdit: event,
@@ -102,6 +104,7 @@ final class CreateEventViewModelTests: XCTestCase {
 
         XCTAssertEqual(sut.visibility, .public)
         XCTAssertEqual(sut.rsvpDeadline, deadline)
+        XCTAssertTrue(sut.allowGuestInvites)
     }
 
     func testSaveChangesPersistsVisibilityAndRSVPDeadline() async {
@@ -115,13 +118,16 @@ final class CreateEventViewModelTests: XCTestCase {
         )
         sut.visibility = .public
         sut.rsvpDeadline = deadline
+        sut.allowGuestInvites = true
 
         await sut.saveChanges()
 
         XCTAssertEqual(service.updatedEvents.last?.visibility, .public)
         XCTAssertEqual(service.updatedEvents.last?.rsvpDeadline, deadline)
+        XCTAssertEqual(service.updatedEvents.last?.allowGuestInvites, true)
         XCTAssertEqual(sut.createdEvent?.visibility, .public)
         XCTAssertEqual(sut.createdEvent?.rsvpDeadline, deadline)
+        XCTAssertEqual(sut.createdEvent?.allowGuestInvites, true)
     }
 
     func testPublishedEditSaveFromGamesPersistsGameChanges() async {
@@ -336,6 +342,19 @@ final class EventViewModelTests: XCTestCase {
 
         XCTAssertEqual(sut.event?.title, "Updated")
         XCTAssertEqual(sut.event?.timeOptions.first?.date, updated.timeOptions.first?.date)
+    }
+
+    func testInviteSummaryIncludesHostAsGoingWithoutInviteRow() {
+        let hostId = UUID()
+        let host = FixtureFactory.makeUser(id: hostId, displayName: "Franco")
+        let event = FixtureFactory.makeEvent(host: host)
+        let sut = EventViewModel()
+        sut.event = event
+        sut.invites = []
+
+        XCTAssertEqual(sut.inviteSummary.accepted, 1)
+        XCTAssertEqual(sut.inviteSummary.acceptedUsers.first?.id, hostId)
+        XCTAssertEqual(sut.inviteSummary.acceptedUsers.first?.name, "Franco")
     }
 }
 

@@ -42,7 +42,8 @@ final class EventVisibilityTests: XCTestCase {
         let deadline = Date(timeIntervalSince1970: 1_720_500_000)
         let event = FixtureFactory.makeEvent(
             visibility: .public,
-            rsvpDeadline: deadline
+            rsvpDeadline: deadline,
+            allowGuestInvites: true
         )
 
         let encoder = JSONEncoder()
@@ -55,5 +56,6 @@ final class EventVisibilityTests: XCTestCase {
 
         XCTAssertEqual(decoded.visibility, .public)
         XCTAssertEqual(decoded.rsvpDeadline, deadline)
+        XCTAssertTrue(decoded.allowGuestInvites)
     }
 }

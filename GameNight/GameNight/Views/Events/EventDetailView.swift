@@ -8,6 +8,7 @@ struct EventDetailView: View {
     @State private var selectedTimeIds = Set<UUID>()
     @State private var pollVotes: [UUID: TimeOptionVoteType] = [:]
     @State private var showTimeSuggestion = false
+    @State private var showInviteContacts = false
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
     @State private var showCreateGroupFromEvent = false
@@ -47,6 +48,7 @@ struct EventDetailView: View {
                             // RSVP Section (prominent, right after hero)
                             if let myInvite = viewModel.myInvite, myInvite.status == .pending {
                                 RSVPSection(
+                                    deadlineText: rsvpDeadlineText(for: event),
                                     onAccept: {
                                         let votes = buildTimeVotes(for: event)
                                         await viewModel.respondToInvite(
@@ -73,12 +75,20 @@ struct EventDetailView: View {
                                     isSending: viewModel.isSending
                                 )
                             } else if let myInvite = viewModel.myInvite {
-                                HStack {
-                                    Image(systemName: myInvite.status.icon)
-                                    Text("You're \(myInvite.status.displayLabel.lowercased())")
-                                        .font(Theme.Typography.bodyMedium)
+                                VStack(spacing: Theme.Spacing.xs) {
+                                    HStack {
+                                        Image(systemName: myInvite.status.icon)
+                                        Text("You're \(myInvite.status.displayLabel.lowercased())")
+                                            .font(Theme.Typography.bodyMedium)
+                                    }
+                                    .foregroundColor(statusColor(myInvite.status))
+
+                                    if let deadlineText = rsvpDeadlineText(for: event) {
+                                        Text(deadlineText)
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(Theme.Colors.textTertiary)
+                                    }
                                 }
-                                .foregroundColor(statusColor(myInvite.status))
                                 .frame(maxWidth: .infinity)
                                 .padding(Theme.Spacing.lg)
                                 .background(
@@ -160,41 +170,15 @@ struct EventDetailView: View {
                             // Guest List Tabs (inline, swipeable)
                             GuestListTabsView(
                                 summary: viewModel.inviteSummary,
-                                visibilityMode: guestListVisibilityMode
+                                visibilityMode: guestListVisibilityMode,
+                                actionTitle: viewModel.canInviteGuests ? "Invite" : nil,
+                                onAction: viewModel.canInviteGuests ? {
+                                    showInviteContacts = true
+                                } : nil
                             )
 
                             // Activity Feed
                             ActivityFeedView(viewModel: viewModel, isHost: isOwner)
-
-                            // Location
-                            if let locationPresentation = locationPresentation(for: event) {
-                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                    SectionHeader(title: "Location")
-
-                                    HStack(spacing: Theme.Spacing.md) {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                                .fill(Theme.Colors.secondary.opacity(0.15))
-                                                .frame(width: 44, height: 44)
-                                            Image(systemName: "mappin.circle.fill")
-                                                .font(.system(size: 24))
-                                                .foregroundColor(Theme.Colors.secondary)
-                                        }
-
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(locationPresentation.title)
-                                                .font(Theme.Typography.bodyMedium)
-                                                .foregroundColor(Theme.Colors.textPrimary)
-                                            if let subtitle = locationPresentation.subtitle {
-                                                Text(subtitle)
-                                                    .font(Theme.Typography.caption)
-                                                    .foregroundColor(Theme.Colors.textTertiary)
-                                            }
-                                        }
-                                    }
-                                }
-                                .cardStyle()
-                            }
 
                             // Description
                             if let desc = event.description, !desc.isEmpty {
@@ -272,6 +256,14 @@ struct EventDetailView: View {
             TimeSuggestionSheet { option in
                 // Handle time suggestion
             }
+        }
+        .sheet(isPresented: $showInviteContacts) {
+            ContactListSheet(
+                excludedPhones: Set(viewModel.invites.map(\.phoneNumber)),
+                onSelect: { contacts in
+                    Task { await viewModel.inviteContacts(contacts) }
+                }
+            )
         }
         .sheet(isPresented: $showEditSheet) {
             if let event = viewModel.event {
@@ -355,6 +347,11 @@ struct EventDetailView: View {
             canViewFullAddress: viewModel.accessPolicy?.canViewFullAddress ?? true
         )
     }
+
+    private func rsvpDeadlineText(for event: GameEvent) -> String? {
+        guard let deadline = event.rsvpDeadline else { return nil }
+        return RSVPDeadlineDisplay.label(for: deadline)
+    }
 }
 
 enum EventEditToastFactory {
@@ -423,14 +420,23 @@ struct EventHeroHeader: View {
 
                     // Location line (simplified)
                     if let locationPresentation {
-                        HStack(spacing: 6) {
+                        HStack(alignment: .top, spacing: 6) {
                             Image(systemName: "mappin.circle.fill")
                                 .font(.system(size: 14))
                                 .foregroundColor(Theme.Colors.textTertiary)
-                            Text(locationPresentation.title)
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                                .lineLimit(1)
+                                .padding(.top, 2)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(locationPresentation.title)
+                                    .font(Theme.Typography.callout)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .lineLimit(1)
+                                if let subtitle = locationPresentation.subtitle {
+                                    Text(subtitle)
+                                        .font(Theme.Typography.caption)
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                        .lineLimit(1)
+                                }
+                            }
                         }
                         .padding(.top, 4)
                     }
@@ -660,6 +666,7 @@ struct GamePill: View {
 
 // MARK: - RSVP Section
 struct RSVPSection: View {
+    var deadlineText: String? = nil
     let onAccept: () async -> Void
     let onDecline: () async -> Void
     let onMaybe: () async -> Void
@@ -667,6 +674,12 @@ struct RSVPSection: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
+            if let deadlineText {
+                Text(deadlineText)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+
             Text("Are you in?")
                 .font(Theme.Typography.headlineMedium)
                 .foregroundColor(Theme.Colors.textPrimary)

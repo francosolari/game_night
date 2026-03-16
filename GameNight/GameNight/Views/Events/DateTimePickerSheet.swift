@@ -3,6 +3,9 @@ import SwiftUI
 // MARK: - DateTimePickerSheet
 
 struct DateTimePickerSheet: View {
+    let title: String
+    let allowsEndTime: Bool
+    let onClear: (() -> Void)?
     @Binding var startDate: Date
     @Binding var startTime: Date
     @Binding var endDate: Date
@@ -16,14 +19,20 @@ struct DateTimePickerSheet: View {
     @State private var showTimezonePicker = false
 
     init(
+        title: String = "Date & Time",
+        allowsEndTime: Bool = true,
         date: Binding<Date>,
         startTime: Binding<Date>,
         endDate: Binding<Date>,
         endTime: Binding<Date>,
         hasEndTime: Binding<Bool>,
         hasDate: Binding<Bool> = .constant(true),
-        timezone: Binding<TimeZone> = .constant(.current)
+        timezone: Binding<TimeZone> = .constant(.current),
+        onClear: (() -> Void)? = nil
     ) {
+        self.title = title
+        self.allowsEndTime = allowsEndTime
+        self.onClear = onClear
         _startDate = date
         _startTime = startTime
         _endDate = endDate
@@ -34,11 +43,11 @@ struct DateTimePickerSheet: View {
     }
 
     private var activeDate: Binding<Date> {
-        isEditingEnd ? $endDate : $startDate
+        allowsEndTime && isEditingEnd ? $endDate : $startDate
     }
 
     private var activeTime: Binding<Date> {
-        isEditingEnd ? $endTime : $startTime
+        allowsEndTime && isEditingEnd ? $endTime : $startTime
     }
 
     var body: some View {
@@ -46,20 +55,24 @@ struct DateTimePickerSheet: View {
             // Header
             HStack {
                 Button("Clear") {
-                    hasDate = false
-                    hasEndTime = false
-                    isEditingEnd = false
-                    startDate = Date()
-                    endDate = Date()
-                    startTime = Self.defaultTime(hour: 19)
-                    endTime = Self.defaultTime(hour: 22)
+                    if let onClear {
+                        onClear()
+                    } else {
+                        hasDate = false
+                        hasEndTime = false
+                        isEditingEnd = false
+                        startDate = Date()
+                        endDate = Date()
+                        startTime = Self.defaultTime(hour: 19)
+                        endTime = Self.defaultTime(hour: 22)
+                    }
                 }
                 .font(Theme.Typography.bodyMedium)
                 .foregroundColor(Theme.Colors.textSecondary)
 
                 Spacer()
 
-                Text("Date & Time")
+                Text(title)
                     .font(Theme.Typography.headlineMedium)
                     .foregroundColor(Theme.Colors.textPrimary)
 
@@ -72,28 +85,38 @@ struct DateTimePickerSheet: View {
             .padding(.bottom, Theme.Spacing.xs)
 
             // Summary bar
-            DateTimeSummaryBar(
-                startDate: startDate,
-                startTime: startTime,
-                endDate: endDate,
-                endTime: endTime,
-                hasDate: hasDate,
-                hasEndTime: hasEndTime,
-                isEditingEnd: isEditingEnd,
-                onSelectStart: {
-                    withAnimation(Theme.Animation.snappy) { isEditingEnd = false }
-                },
-                onSelectEnd: {
-                    withAnimation(Theme.Animation.snappy) {
-                        isEditingEnd = true
-                        if !hasEndTime {
-                            hasEndTime = true
-                            endDate = startDate
-                            if !hasDate { hasDate = true }
+            Group {
+                if allowsEndTime {
+                    DateTimeSummaryBar(
+                        startDate: startDate,
+                        startTime: startTime,
+                        endDate: endDate,
+                        endTime: endTime,
+                        hasDate: hasDate,
+                        hasEndTime: hasEndTime,
+                        isEditingEnd: isEditingEnd,
+                        onSelectStart: {
+                            withAnimation(Theme.Animation.snappy) { isEditingEnd = false }
+                        },
+                        onSelectEnd: {
+                            withAnimation(Theme.Animation.snappy) {
+                                isEditingEnd = true
+                                if !hasEndTime {
+                                    hasEndTime = true
+                                    endDate = startDate
+                                    if !hasDate { hasDate = true }
+                                }
+                            }
                         }
-                    }
+                    )
+                } else {
+                    SingleDateTimeSummaryBar(
+                        date: startDate,
+                        time: startTime,
+                        hasDate: hasDate
+                    )
                 }
-            )
+            }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.bottom, Theme.Spacing.sm)
 
@@ -169,6 +192,51 @@ struct DateTimePickerSheet: View {
         c.hour = hour
         c.minute = 0
         return cal.date(from: c) ?? Date()
+    }
+}
+
+// MARK: - DateTimeSummaryBar (Reusable)
+
+struct SingleDateTimeSummaryBar: View {
+    let date: Date
+    let time: Date
+    let hasDate: Bool
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d"
+        return f
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    var body: some View {
+        HStack {
+            VStack(spacing: 1) {
+                if hasDate {
+                    Text(Self.dateFormatter.string(from: date))
+                        .font(Theme.Typography.caption)
+                    Text(Self.timeFormatter.string(from: time))
+                        .font(Theme.Typography.headlineMedium)
+                } else {
+                    Text("Date")
+                        .font(Theme.Typography.caption)
+                    Text("Not set")
+                        .font(Theme.Typography.headlineMedium)
+                }
+            }
+            .foregroundColor(Theme.Colors.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.sm)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                .fill(Theme.Colors.cardBackground)
+        )
     }
 }
 

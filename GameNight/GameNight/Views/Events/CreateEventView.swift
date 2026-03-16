@@ -9,6 +9,7 @@ struct CreateEventView: View {
     @State private var showCancelConfirmation = false
     @State private var showGroupPicker = false
     @State private var showDateTimePicker = false
+    @State private var showRSVPDeadlinePicker = false
     @State private var locationSheetMode: LocationSheetMode? = nil
     @State private var pollEditorItem: PollEditorItem? = nil
     @StateObject private var groupsViewModel = GroupsViewModel()
@@ -271,6 +272,8 @@ struct CreateEventView: View {
 
             scheduleSection
 
+            rsvpDeadlineSection
+
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Location")
                     .font(Theme.Typography.label)
@@ -299,9 +302,9 @@ struct CreateEventView: View {
                                 }
                             }
                         }
-                        
+
                         Spacer()
-                        
+
                         Image(systemName: "mappin.circle.fill")
                             .foregroundColor(Theme.Colors.textTertiary)
                     }
@@ -517,47 +520,17 @@ struct CreateEventView: View {
                     .foregroundColor(Theme.Colors.textTertiary)
             }
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("RSVP Deadline")
-                    .font(Theme.Typography.label)
-                    .foregroundColor(Theme.Colors.textSecondary)
-
-                if viewModel.rsvpDeadline != nil {
-                    DatePicker(
-                        "Deadline",
-                        selection: rsvpDeadlineBinding,
-                        in: Date()...,
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
-                    .font(Theme.Typography.bodyMedium)
-                    .tint(Theme.Colors.primary)
-
-                    Button("Clear deadline") {
-                        viewModel.rsvpDeadline = nil
-                    }
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.error)
-                } else {
-                    Button {
-                        viewModel.rsvpDeadline = defaultRSVPDeadline
-                    } label: {
-                        HStack {
-                            Image(systemName: "clock.badge.plus")
-                                .foregroundColor(Theme.Colors.primary)
-                            Text("Add RSVP deadline")
-                                .font(Theme.Typography.bodyMedium)
-                                .foregroundColor(Theme.Colors.textPrimary)
-                            Spacer()
-                        }
-                        .padding(Theme.Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.backgroundElevated)
-                        )
-                    }
-                    .buttonStyle(.plain)
+            Toggle(isOn: $viewModel.allowGuestInvites) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Allow guests to invite others")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Text("Guests who RSVP can invite their friends from the event page.")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
+            .tint(Theme.Colors.primary)
         }
     }
 
@@ -571,15 +544,139 @@ struct CreateEventView: View {
     }
 
     private var defaultRSVPDeadline: Date {
+        if viewModel.scheduleMode == .fixed, viewModel.hasDate {
+            return endOfDay(from: viewModel.fixedDate)
+        }
+
         let fallback = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-        return max(viewModel.fixedDate, fallback)
+        return endOfDay(from: fallback)
     }
 
     private var rsvpDeadlineBinding: Binding<Date> {
         Binding(
             get: { viewModel.rsvpDeadline ?? defaultRSVPDeadline },
-            set: { viewModel.rsvpDeadline = $0 }
+            set: { newDate in
+                let currentTime = viewModel.rsvpDeadline ?? defaultRSVPDeadline
+                viewModel.rsvpDeadline = combine(date: newDate, time: currentTime)
+            }
         )
+    }
+
+    private var rsvpDeadlineHasDateBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.rsvpDeadline != nil },
+            set: { hasDate in
+                if hasDate {
+                    if viewModel.rsvpDeadline == nil {
+                        viewModel.rsvpDeadline = defaultRSVPDeadline
+                    }
+                } else {
+                    viewModel.rsvpDeadline = nil
+                }
+            }
+        )
+    }
+
+    private var rsvpDeadlineTimeBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.rsvpDeadline ?? defaultRSVPDeadline },
+            set: { newTime in
+                let baseDate = viewModel.rsvpDeadline ?? defaultRSVPDeadline
+                viewModel.rsvpDeadline = combine(date: baseDate, time: newTime)
+            }
+        )
+    }
+
+    private var rsvpDeadlineEndDateBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.rsvpDeadline ?? defaultRSVPDeadline },
+            set: { _ in }
+        )
+    }
+
+    private var rsvpDeadlineEndTimeBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.rsvpDeadline ?? defaultRSVPDeadline },
+            set: { _ in }
+        )
+    }
+
+    private var rsvpDeadlineHasEndTimeBinding: Binding<Bool> {
+        Binding(
+            get: { false },
+            set: { _ in }
+        )
+    }
+
+    private func combine(date: Date, time: Date) -> Date {
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+
+        var mergedComponents = DateComponents()
+        mergedComponents.year = dateComponents.year
+        mergedComponents.month = dateComponents.month
+        mergedComponents.day = dateComponents.day
+        mergedComponents.hour = timeComponents.hour
+        mergedComponents.minute = timeComponents.minute
+
+        return calendar.date(from: mergedComponents) ?? date
+    }
+
+    private func endOfDay(from date: Date) -> Date {
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        components.hour = 23
+        components.minute = 59
+        return Calendar.current.date(from: components) ?? date
+    }
+
+    private var rsvpDeadlineSection: some View {
+        Button {
+            if viewModel.rsvpDeadline == nil {
+                viewModel.rsvpDeadline = defaultRSVPDeadline
+            }
+            showRSVPDeadlinePicker = true
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Text(rsvpDeadlineRowText)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(viewModel.rsvpDeadline == nil ? Theme.Colors.textSecondary : Theme.Colors.textPrimary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            .padding(Theme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .fill(Theme.Colors.cardBackground)
+            )
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showRSVPDeadlinePicker) {
+            DateTimePickerSheet(
+                title: "RSVP Deadline",
+                allowsEndTime: false,
+                date: rsvpDeadlineBinding,
+                startTime: rsvpDeadlineTimeBinding,
+                endDate: rsvpDeadlineEndDateBinding,
+                endTime: rsvpDeadlineEndTimeBinding,
+                hasEndTime: rsvpDeadlineHasEndTimeBinding,
+                hasDate: rsvpDeadlineHasDateBinding,
+                timezone: $viewModel.selectedTimezone,
+                onClear: {
+                    viewModel.rsvpDeadline = nil
+                    showRSVPDeadlinePicker = false
+                }
+            )
+        }
+    }
+
+    private var rsvpDeadlineRowText: String {
+        guard let deadline = viewModel.rsvpDeadline else { return "RSVP deadline" }
+        return RSVPDeadlineDisplay.label(for: deadline)
     }
 
     // MARK: - Schedule Section (Inside Details)

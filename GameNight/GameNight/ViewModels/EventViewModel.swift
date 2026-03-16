@@ -58,12 +58,17 @@ final class EventViewModel: ObservableObject {
             visibility: event.visibility,
             viewerRole: viewerRole,
             rsvpDeadline: event.rsvpDeadline,
+            allowGuestInvites: event.allowGuestInvites,
             now: Date()
         )
     }
 
     var canSeeActivityFeed: Bool {
         hasRSVPd || isOwner
+    }
+
+    var canInviteGuests: Bool {
+        accessPolicy?.canInviteGuests ?? false
     }
 
     var confirmedPlayerCount: Int {
@@ -81,14 +86,24 @@ final class EventViewModel: ObservableObject {
             list.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) }
         }
 
+        let hostIncludedInAccepted = accepted.contains(where: { $0.userId == event?.hostId })
+        let hostUser: InviteSummary.InviteUser? = {
+            guard let event, !hostIncludedInAccepted else { return nil }
+            let name = event.host?.displayName ?? "Host"
+            let avatarUrl = event.host?.avatarUrl
+            return .init(id: event.hostId, name: name, avatarUrl: avatarUrl, status: .accepted, tier: 1)
+        }()
+
+        let acceptedUsers = mapUsers(accepted) + (hostUser.map { [$0] } ?? [])
+
         return InviteSummary(
-            total: invites.count,
-            accepted: accepted.count,
+            total: invites.count + (hostUser == nil ? 0 : 1),
+            accepted: accepted.count + (hostUser == nil ? 0 : 1),
             declined: declined.count,
             pending: pending.count,
             maybe: maybe.count,
             waitlisted: waitlisted.count,
-            acceptedUsers: mapUsers(accepted),
+            acceptedUsers: acceptedUsers,
             pendingUsers: mapUsers(pending),
             maybeUsers: mapUsers(maybe),
             declinedUsers: mapUsers(declined),
@@ -252,6 +267,43 @@ final class EventViewModel: ObservableObject {
         isSending = false
     }
 
+    func inviteContacts(_ contacts: [UserContact]) async {
+        guard canInviteGuests, let event else { return }
+
+        do {
+            let existingPhones = Set(invites.map(\.phoneNumber))
+            let newContacts = contacts.filter { !existingPhones.contains($0.phoneNumber) }
+            guard !newContacts.isEmpty else { return }
+
+            let nextTierPosition = (invites.map(\.tierPosition).max() ?? -1) + 1
+            let newInvites = newContacts.enumerated().map { index, contact in
+                Invite(
+                    id: UUID(),
+                    eventId: event.id,
+                    hostUserId: event.hostId,
+                    userId: nil,
+                    phoneNumber: contact.phoneNumber,
+                    displayName: contact.name,
+                    status: .pending,
+                    tier: 1,
+                    tierPosition: nextTierPosition + index,
+                    isActive: true,
+                    respondedAt: nil,
+                    selectedTimeOptionIds: [],
+                    suggestedTimes: nil,
+                    sentVia: .both,
+                    smsDeliveryStatus: nil,
+                    createdAt: Date()
+                )
+            }
+
+            try await supabase.createInvites(newInvites)
+            invites.append(contentsOf: newInvites)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     func deleteEvent() async -> Bool {
         guard let event else { return false }
         error = nil
@@ -302,6 +354,7 @@ final class CreateEventViewModel: ObservableObject {
     @Published var description = ""
     @Published var visibility: EventVisibility = .private
     @Published var rsvpDeadline: Date?
+    @Published var allowGuestInvites = false
     @Published var location = ""
     @Published var locationAddress = ""
     @Published var selectedGames: [EventGame] = []
@@ -369,6 +422,7 @@ final class CreateEventViewModel: ObservableObject {
             description = eventToEdit.description ?? ""
             visibility = eventToEdit.visibility
             rsvpDeadline = eventToEdit.rsvpDeadline
+            allowGuestInvites = eventToEdit.allowGuestInvites
             location = eventToEdit.location ?? ""
             locationAddress = eventToEdit.locationAddress ?? ""
             selectedGames = eventToEdit.games
@@ -848,6 +902,7 @@ final class CreateEventViewModel: ObservableObject {
             description: description.isEmpty ? nil : description,
             visibility: visibility,
             rsvpDeadline: rsvpDeadline,
+            allowGuestInvites: allowGuestInvites,
             location: location.isEmpty ? nil : location,
             locationAddress: locationAddress.isEmpty ? nil : locationAddress,
             status: status,

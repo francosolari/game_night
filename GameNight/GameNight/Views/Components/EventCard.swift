@@ -27,6 +27,7 @@ struct EventCard: View {
             visibility: event.visibility,
             viewerRole: viewerRole,
             rsvpDeadline: event.rsvpDeadline,
+            allowGuestInvites: event.allowGuestInvites,
             now: Date()
         )
     }

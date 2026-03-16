@@ -7,6 +7,7 @@ final class EventAccessPolicyTests: XCTestCase {
             visibility: .private,
             viewerRole: .publicViewer,
             rsvpDeadline: nil,
+            allowGuestInvites: false,
             now: Date(timeIntervalSince1970: 1_720_000_000)
         )
 
@@ -31,6 +32,7 @@ final class EventAccessPolicyTests: XCTestCase {
             visibility: .public,
             viewerRole: .publicViewer,
             rsvpDeadline: nil,
+            allowGuestInvites: false,
             now: Date(timeIntervalSince1970: 1_720_000_000)
         )
 
@@ -44,6 +46,7 @@ final class EventAccessPolicyTests: XCTestCase {
             visibility: .private,
             viewerRole: .host,
             rsvpDeadline: Date(timeIntervalSince1970: 1_710_000_000),
+            allowGuestInvites: false,
             now: Date(timeIntervalSince1970: 1_720_000_000)
         )
 
@@ -62,5 +65,37 @@ final class EventAccessPolicyTests: XCTestCase {
         XCTAssertEqual(presentation.title, "Washington, DC")
         XCTAssertNil(presentation.subtitle)
         XCTAssertFalse(presentation.title.contains("1545"))
+    }
+
+    func testHostCanAlwaysInviteGuests() {
+        let policy = EventAccessPolicy(
+            visibility: .private,
+            viewerRole: .host,
+            rsvpDeadline: nil,
+            allowGuestInvites: false,
+            now: Date(timeIntervalSince1970: 1_720_000_000)
+        )
+
+        XCTAssertTrue(policy.canInviteGuests)
+    }
+
+    func testRSVPdGuestCanInviteOnlyWhenAllowed() {
+        let allowed = EventAccessPolicy(
+            visibility: .private,
+            viewerRole: .rsvpd,
+            rsvpDeadline: nil,
+            allowGuestInvites: true,
+            now: Date(timeIntervalSince1970: 1_720_000_000)
+        )
+        let blocked = EventAccessPolicy(
+            visibility: .private,
+            viewerRole: .rsvpd,
+            rsvpDeadline: nil,
+            allowGuestInvites: false,
+            now: Date(timeIntervalSince1970: 1_720_000_000)
+        )
+
+        XCTAssertTrue(allowed.canInviteGuests)
+        XCTAssertFalse(blocked.canInviteGuests)
     }
 }

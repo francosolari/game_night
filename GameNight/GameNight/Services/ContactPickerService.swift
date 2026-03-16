@@ -57,6 +57,38 @@ actor ContactPickerService {
         return contacts
     }
 
+    func fetchContacts(withIdentifiers identifiers: [String]) async throws -> [UserContact] {
+        guard !identifiers.isEmpty else { return [] }
+
+        let keys: [CNKeyDescriptor] = [
+            CNContactGivenNameKey as CNKeyDescriptor,
+            CNContactFamilyNameKey as CNKeyDescriptor,
+            CNContactPhoneNumbersKey as CNKeyDescriptor,
+            CNContactThumbnailImageDataKey as CNKeyDescriptor
+        ]
+
+        let predicate = CNContact.predicateForContacts(withIdentifiers: identifiers)
+        let rawContacts = try store.unifiedContacts(matching: predicate, keysToFetch: keys)
+
+        return rawContacts.compactMap { contact in
+            guard let phone = contact.phoneNumbers.first?.value.stringValue else { return nil }
+
+            let name = [contact.givenName, contact.familyName]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+
+            guard !name.isEmpty else { return nil }
+
+            return UserContact(
+                id: UUID(),
+                name: name,
+                phoneNumber: Self.normalizePhone(phone),
+                avatarUrl: nil,
+                isAppUser: false
+            )
+        }
+    }
+
     /// Checks which of the SELECTED contacts (not all) are already app users.
     /// Only the phone numbers the user chose to invite are sent to the server.
     func checkAppUsers(for selectedContacts: [UserContact]) async -> [UserContact] {

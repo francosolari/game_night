@@ -8,6 +8,7 @@ struct GameEvent: Identifiable, Codable {
     var description: String?
     var visibility: EventVisibility
     var rsvpDeadline: Date?
+    var allowGuestInvites: Bool
     var location: String?
     var locationAddress: String?
     var status: EventStatus
@@ -35,6 +36,7 @@ struct GameEvent: Identifiable, Codable {
         case description
         case visibility
         case rsvpDeadline = "rsvp_deadline"
+        case allowGuestInvites = "allow_guest_invites"
         case location
         case locationAddress = "location_address"
         case status
@@ -63,6 +65,7 @@ struct GameEvent: Identifiable, Codable {
         description: String? = nil,
         visibility: EventVisibility = .private,
         rsvpDeadline: Date? = nil,
+        allowGuestInvites: Bool = false,
         location: String? = nil,
         locationAddress: String? = nil,
         status: EventStatus,
@@ -89,6 +92,7 @@ struct GameEvent: Identifiable, Codable {
         self.description = description
         self.visibility = visibility
         self.rsvpDeadline = rsvpDeadline
+        self.allowGuestInvites = allowGuestInvites
         self.location = location
         self.locationAddress = locationAddress
         self.status = status
@@ -118,6 +122,7 @@ struct GameEvent: Identifiable, Codable {
         description = try container.decodeIfPresent(String.self, forKey: .description)
         visibility = try container.decodeIfPresent(EventVisibility.self, forKey: .visibility) ?? .private
         rsvpDeadline = try container.decodeIfPresent(Date.self, forKey: .rsvpDeadline)
+        allowGuestInvites = try container.decodeIfPresent(Bool.self, forKey: .allowGuestInvites) ?? false
         location = try container.decodeIfPresent(String.self, forKey: .location)
         locationAddress = try container.decodeIfPresent(String.self, forKey: .locationAddress)
         status = try container.decode(EventStatus.self, forKey: .status)
@@ -148,6 +153,7 @@ struct GameEvent: Identifiable, Codable {
         try container.encodeIfPresent(description, forKey: .description)
         try container.encode(visibility, forKey: .visibility)
         try container.encodeIfPresent(rsvpDeadline, forKey: .rsvpDeadline)
+        try container.encode(allowGuestInvites, forKey: .allowGuestInvites)
         try container.encodeIfPresent(location, forKey: .location)
         try container.encodeIfPresent(locationAddress, forKey: .locationAddress)
         try container.encode(status, forKey: .status)
@@ -442,6 +448,7 @@ extension GameEvent {
         description: "Let's play some Dune! Bringing snacks and drinks.",
         visibility: .private,
         rsvpDeadline: nil,
+        allowGuestInvites: false,
         location: "Alex's Place",
         locationAddress: "123 Main St",
         status: .published,

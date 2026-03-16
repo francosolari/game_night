@@ -1,5 +1,6 @@
 import SwiftUI
 import Contacts
+import ContactsUI
 
 // MARK: - Reusable Contact Row (shared by all contact sheets)
 struct ContactRow: View {
@@ -64,6 +65,7 @@ struct ContactPickerSheet: View {
     @State private var isLoading = true
     @State private var permissionDenied = false
     @State private var isLimited = false
+    @State private var showLimitedAccessPicker = false
     @State private var error: String?
 
     let onSelect: ([UserContact]) -> Void
@@ -77,6 +79,16 @@ struct ContactPickerSheet: View {
     }
 
     var body: some View {
+        baseView
+            .modifier(LimitedContactAccessPickerModifier(
+                isPresented: $showLimitedAccessPicker,
+                onSelection: { identifiers in
+                    Task { await handleLimitedAccessSelection(identifiers: identifiers) }
+                }
+            ))
+    }
+
+    private var baseView: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Privacy banner
@@ -101,8 +113,7 @@ struct ContactPickerSheet: View {
                     // Limited access banner
                     if isLimited {
                         Button {
-                            // Re-trigger the limited contacts picker
-                            Task { await requestMoreAccess() }
+                            requestMoreAccess()
                         } label: {
                             HStack(spacing: Theme.Spacing.sm) {
                                 Image(systemName: "person.badge.plus")
@@ -233,15 +244,51 @@ struct ContactPickerSheet: View {
         isLoading = false
     }
 
-    private func requestMoreAccess() async {
+    private func requestMoreAccess() {
+        if #available(iOS 18, *) {
+            showLimitedAccessPicker = true
+        } else if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private func handleLimitedAccessSelection(identifiers: [String]) async {
         let picker = ContactPickerService.shared
-        // On iOS 18+, calling requestAccess when limited re-shows the system picker
-        _ = try? await picker.requestAccess()
-        // Reload contacts after user potentially added more
-        do {
-            contacts = try await picker.fetchLocalContacts()
-        } catch {
-            // ignore
+
+        if identifiers.isEmpty {
+            contacts = (try? await picker.fetchLocalContacts()) ?? contacts
+            return
+        }
+
+        let addedContacts = (try? await picker.fetchContacts(withIdentifiers: identifiers)) ?? []
+        guard !addedContacts.isEmpty else {
+            contacts = (try? await picker.fetchLocalContacts()) ?? contacts
+            return
+        }
+
+        let existingPhones = Set(contacts.map(\.phoneNumber))
+        let uniqueNewContacts = addedContacts.filter { !existingPhones.contains($0.phoneNumber) }
+
+        if uniqueNewContacts.isEmpty {
+            contacts = (try? await picker.fetchLocalContacts()) ?? contacts
+        } else {
+            contacts.append(contentsOf: uniqueNewContacts)
+        }
+    }
+}
+
+private struct LimitedContactAccessPickerModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    let onSelection: ([String]) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content.contactAccessPicker(isPresented: $isPresented) { identifiers in
+                onSelection(identifiers)
+            }
+        } else {
+            content
         }
     }
 }

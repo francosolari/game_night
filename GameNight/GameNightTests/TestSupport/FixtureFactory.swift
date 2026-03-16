@@ -10,7 +10,8 @@ enum FixtureFactory {
         timeOptions: [TimeOption] = [makeTimeOption()],
         host: User? = makeUser(),
         visibility: EventVisibility = .private,
-        rsvpDeadline: Date? = nil
+        rsvpDeadline: Date? = nil,
+        allowGuestInvites: Bool = false
     ) -> GameEvent {
         GameEvent(
             id: id,
@@ -20,6 +21,7 @@ enum FixtureFactory {
             description: "Bring snacks",
             visibility: visibility,
             rsvpDeadline: rsvpDeadline,
+            allowGuestInvites: allowGuestInvites,
             location: "Alex's House",
             locationAddress: "123 Main St",
             status: status,
