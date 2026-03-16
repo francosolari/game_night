@@ -241,6 +241,10 @@ final class EventViewModel: ObservableObject {
         }
     }
 
+    func applyEditedEvent(_ updatedEvent: GameEvent) {
+        event = updatedEvent
+    }
+
     private func subscribeToUpdates(eventId: UUID) {
         realtimeChannel = supabase.subscribeToEventUpdates(eventId: eventId) { [weak self] updatedEvent in
             Task { @MainActor in
