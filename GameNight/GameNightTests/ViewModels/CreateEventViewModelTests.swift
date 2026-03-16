@@ -111,7 +111,7 @@ final class CreateEventViewModelTests: XCTestCase {
             initialInvites: [],
             supabase: service
         )
-        sut.currentStep = .schedule
+        sut.currentStep = .details
         sut.fixedDate = Date(timeIntervalSince1970: 1_720_000_000)
         sut.fixedStartTime = Date(timeIntervalSince1970: 1_720_003_600)
 
@@ -185,7 +185,7 @@ final class CreateEventViewModelTests: XCTestCase {
             initialInvites: service.existingInvites,
             supabase: service
         )
-        sut.currentStep = .schedule
+        sut.currentStep = .details
         sut.title = "Updated Title"
         sut.fixedDate = Date(timeIntervalSince1970: 1_730_000_000)
         sut.fixedStartTime = Date(timeIntervalSince1970: 1_730_003_600)
@@ -211,6 +211,56 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(sut.createdEvent?.games.map(\.gameId), [primaryGame.gameId, addedGame.gameId])
         XCTAssertEqual(sut.createdEvent?.timeOptions.first?.date, sut.fixedDate)
         XCTAssertEqual(service.createdInvites.map(\.displayName), ["Casey"])
+    }
+
+    func testUpdateTimeOptionByIdUpdatesMatchingOptionAndResortsByDate() {
+        let original = FixtureFactory.makeTimeOption(id: UUID())
+        var later = FixtureFactory.makeTimeOption(id: UUID())
+        later.date = Date(timeIntervalSince1970: 1_720_000_000)
+        later.startTime = Date(timeIntervalSince1970: 1_720_003_600)
+        later.label = "Later"
+
+        var event = FixtureFactory.makeEvent(timeOptions: [later, original])
+        event.scheduleMode = .poll
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        let updatedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let updatedStart = Date(timeIntervalSince1970: 1_700_003_600)
+        let updatedEnd = Date(timeIntervalSince1970: 1_700_007_200)
+
+        sut.updateTimeOption(
+            id: later.id,
+            date: updatedDate,
+            startTime: updatedStart,
+            endTime: updatedEnd,
+            label: "Earlier"
+        )
+
+        XCTAssertEqual(sut.timeOptions.map(\.id), [later.id, original.id])
+        XCTAssertEqual(sut.timeOptions.first?.date, updatedDate)
+        XCTAssertEqual(sut.timeOptions.first?.startTime, updatedStart)
+        XCTAssertEqual(sut.timeOptions.first?.endTime, updatedEnd)
+        XCTAssertEqual(sut.timeOptions.first?.label, "Earlier")
+    }
+
+    func testRemoveTimeOptionByIdRemovesOnlyMatchingOption() {
+        let first = FixtureFactory.makeTimeOption(id: UUID())
+        let second = FixtureFactory.makeTimeOption(id: UUID())
+        var event = FixtureFactory.makeEvent(timeOptions: [first, second])
+        event.scheduleMode = .poll
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        sut.removeTimeOption(id: first.id)
+
+        XCTAssertEqual(sut.timeOptions.map(\.id), [second.id])
     }
 }
 

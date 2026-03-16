@@ -547,19 +547,36 @@ final class CreateEventViewModel: ObservableObject {
             maybeCount: 0
         )
         timeOptions.append(option)
+        sortTimeOptions()
     }
 
     func removeTimeOption(at index: Int) {
-        timeOptions.remove(at: index)
+        guard index >= 0 && index < timeOptions.count else { return }
+        removeTimeOption(id: timeOptions[index].id)
+    }
+
+    func removeTimeOption(id: UUID) {
+        timeOptions.removeAll { $0.id == id }
     }
 
     func updateTimeOption(at index: Int, date: Date, startTime: Date, endTime: Date?, label: String?) {
         guard index >= 0 && index < timeOptions.count else { return }
+        updateTimeOption(
+            id: timeOptions[index].id,
+            date: date,
+            startTime: startTime,
+            endTime: endTime,
+            label: label
+        )
+    }
+
+    func updateTimeOption(id: UUID, date: Date, startTime: Date, endTime: Date?, label: String?) {
+        guard let index = timeOptions.firstIndex(where: { $0.id == id }) else { return }
         timeOptions[index].date = date
         timeOptions[index].startTime = startTime
         timeOptions[index].endTime = endTime
         timeOptions[index].label = label
-        timeOptions.sort { $0.date < $1.date }
+        sortTimeOptions()
     }
 
     func loadGroupMembers(_ group: GameGroup) {
@@ -598,6 +615,15 @@ final class CreateEventViewModel: ObservableObject {
             }
             .prefix(3)
             .map { $0 }
+    }
+
+    private func sortTimeOptions() {
+        timeOptions.sort {
+            if $0.date != $1.date {
+                return $0.date < $1.date
+            }
+            return $0.startTime < $1.startTime
+        }
     }
 
     var invitedPhones: Set<String> {

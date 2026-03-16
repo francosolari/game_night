@@ -9,10 +9,8 @@ struct CreateEventView: View {
     @State private var showCancelConfirmation = false
     @State private var showGroupPicker = false
     @State private var showDateTimePicker = false
-    @State private var showPollDateTimePicker = false
-    @State private var showLocationPicker = false
-    @State private var showLocationEditForm = false
-    @State private var editPollIndex: Int? = nil
+    @State private var locationSheetMode: LocationSheetMode? = nil
+    @State private var pollEditorItem: PollEditorItem? = nil
     @StateObject private var groupsViewModel = GroupsViewModel()
     let onSaved: ((GameEvent) -> Void)?
 
@@ -223,10 +221,15 @@ struct CreateEventView: View {
             } message: {
                 Text(viewModel.error ?? "Please try again.")
             }
-            .sheet(isPresented: $showLocationPicker) {
-                LocationPickerSheet(
+            .sheet(item: $locationSheetMode) { mode in
+                LocationFlowSheet(
+                    initialMode: mode,
                     locationName: $viewModel.location,
-                    locationAddress: $viewModel.locationAddress
+                    locationAddress: $viewModel.locationAddress,
+                    onRemove: {
+                        viewModel.location = ""
+                        viewModel.locationAddress = ""
+                    }
                 )
             }
         }
@@ -275,9 +278,9 @@ struct CreateEventView: View {
 
                 Button {
                     if viewModel.location.isEmpty {
-                        showLocationPicker = true
+                        locationSheetMode = .picker
                     } else {
-                        showLocationEditForm = true
+                        locationSheetMode = .edit
                     }
                 } label: {
                     HStack {
@@ -539,9 +542,9 @@ struct CreateEventView: View {
                     .foregroundColor(Theme.Colors.textSecondary)
 
                 // Existing time options
-                ForEach(Array(viewModel.timeOptions.enumerated()), id: \.element.id) { index, option in
+                ForEach(viewModel.timeOptions) { option in
                     Button {
-                        editPollIndex = index
+                        pollEditorItem = .edit(option.id)
                     } label: {
                         FixedDateSummaryCard(
                             hasDate: true,
@@ -551,16 +554,16 @@ struct CreateEventView: View {
                             hasEndTime: option.endTime != nil,
                             label: option.label,
                             onDelete: {
-                                viewModel.removeTimeOption(at: index)
+                                viewModel.removeTimeOption(id: option.id)
                             }
                         )
                     }
+                    .buttonStyle(.plain)
                 }
 
-                // Add time option via Partiful-style picker
-                PollAddTimeButton(onAdd: { date, start, end in
-                    viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: nil)
-                })
+                PollAddTimeButton {
+                    pollEditorItem = .add
+                }
 
                 // Allow suggestions toggle (poll mode only)
                 Toggle(isOn: $viewModel.allowTimeSuggestions) {
@@ -576,26 +579,59 @@ struct CreateEventView: View {
                 .tint(Theme.Colors.primary)
             }
         }
-        .sheet(item: Binding(
-            get: { editPollIndex.map { PollEditItem(index: $0) } },
-            set: { editPollIndex = $0?.index }
-        )) { item in
-            let option = viewModel.timeOptions[item.index]
-            PollEditSheet(
-                initialDate: option.date,
-                initialStartTime: option.startTime,
-                initialEndTime: option.endTime,
-                initialLabel: option.label,
-                onSave: { date, start, end, label in
-                    viewModel.updateTimeOption(at: item.index, date: date, startTime: start, endTime: end, label: label)
+        .sheet(item: $pollEditorItem) { item in
+            switch item {
+            case .add:
+                PollEditSheet(
+                    title: "Add Time Option",
+                    saveTitle: "Add",
+                    initialDate: Date(),
+                    initialStartTime: DateTimePickerSheet.defaultTime(hour: 19),
+                    initialEndTime: nil,
+                    initialLabel: nil,
+                    onSave: { date, start, end, label in
+                        viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: label)
+                    }
+                )
+            case .edit(let optionId):
+                if let option = viewModel.timeOptions.first(where: { $0.id == optionId }) {
+                    PollEditSheet(
+                        title: "Edit Time Option",
+                        saveTitle: "Save",
+                        initialDate: option.date,
+                        initialStartTime: option.startTime,
+                        initialEndTime: option.endTime,
+                        initialLabel: option.label,
+                        onSave: { date, start, end, label in
+                            viewModel.updateTimeOption(
+                                id: optionId,
+                                date: date,
+                                startTime: start,
+                                endTime: end,
+                                label: label
+                            )
+                        },
+                        onDelete: {
+                            viewModel.removeTimeOption(id: optionId)
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 
-    struct PollEditItem: Identifiable {
-        let index: Int
-        var id: Int { index }
+    enum PollEditorItem: Identifiable {
+        case add
+        case edit(UUID)
+
+        var id: String {
+            switch self {
+            case .add:
+                return "add"
+            case .edit(let optionId):
+                return optionId.uuidString
+            }
+        }
     }
 
     // MARK: - Step 4: Invites
@@ -1195,10 +1231,17 @@ struct FixedDateSummaryCard: View {
             }
 
             Spacer()
-            
+
             if let deleteAction = onDelete {
-                Button(action: deleteAction) {
-                    Image(systemName: "trash")
+                HStack(spacing: Theme.Spacing.xl) {
+                    Button(action: deleteAction) {
+                        Image(systemName: "trash")
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .buttonStyle(.borderless)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Theme.Colors.textTertiary)
                 }
             } else {
@@ -1217,23 +1260,11 @@ struct FixedDateSummaryCard: View {
 
 // MARK: - Poll Add Time Button (uses DateTimePickerSheet)
 struct PollAddTimeButton: View {
-    let onAdd: (Date, Date, Date?) -> Void
-
-    @State private var showPicker = false
-    @State private var pickerDate = Date()
-    @State private var pickerEndDate = Date()
-    @State private var pickerStartTime = DateTimePickerSheet.defaultTime(hour: 19)
-    @State private var pickerEndTime = DateTimePickerSheet.defaultTime(hour: 22)
-    @State private var pickerHasEndTime = false
+    let onTap: () -> Void
 
     var body: some View {
         Button {
-            pickerDate = Date()
-            pickerEndDate = Date()
-            pickerStartTime = DateTimePickerSheet.defaultTime(hour: 19)
-            pickerEndTime = DateTimePickerSheet.defaultTime(hour: 22)
-            pickerHasEndTime = false
-            showPicker = true
+            onTap()
         } label: {
             HStack {
                 Image(systemName: "plus.circle.fill")
@@ -1244,17 +1275,7 @@ struct PollAddTimeButton: View {
                 Spacer()
             }
         }
-        .sheet(isPresented: $showPicker, onDismiss: {
-            onAdd(pickerDate, pickerStartTime, pickerHasEndTime ? pickerEndTime : nil)
-        }) {
-            DateTimePickerSheet(
-                date: $pickerDate,
-                startTime: $pickerStartTime,
-                endDate: $pickerEndDate,
-                endTime: $pickerEndTime,
-                hasEndTime: $pickerHasEndTime
-            )
-        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1402,5 +1423,123 @@ struct InviteeRow: View {
             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
                 .fill(Theme.Colors.backgroundElevated)
         )
+    }
+}
+
+// MARK: - Poll Edit Sheet
+struct PollEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let title: String
+    let saveTitle: String
+    @State private var date: Date
+    @State private var startTime: Date
+    @State private var endTime: Date
+    @State private var hasEndTime: Bool
+    @State private var label: String
+
+    let onSave: (Date, Date, Date?, String?) -> Void
+    var onDelete: (() -> Void)? = nil
+
+    init(
+        title: String,
+        saveTitle: String,
+        initialDate: Date,
+        initialStartTime: Date,
+        initialEndTime: Date?,
+        initialLabel: String?,
+        onSave: @escaping (Date, Date, Date?, String?) -> Void,
+        onDelete: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.saveTitle = saveTitle
+        _date = State(initialValue: initialDate)
+        _startTime = State(initialValue: initialStartTime)
+        _endTime = State(initialValue: initialEndTime ?? DateTimePickerSheet.defaultTime(hour: 22))
+        _hasEndTime = State(initialValue: initialEndTime != nil)
+        _label = State(initialValue: initialLabel ?? "")
+        self.onSave = onSave
+        self.onDelete = onDelete
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: Theme.Spacing.xl) {
+                    VStack(spacing: Theme.Spacing.md) {
+                        DatePicker("Date", selection: $date, displayedComponents: .date)
+                            .tint(Theme.Colors.primary)
+
+                        DatePicker("Start Time", selection: $startTime, displayedComponents: .hourAndMinute)
+                            .tint(Theme.Colors.primary)
+
+                        Toggle("End Time", isOn: $hasEndTime.animation(Theme.Animation.snappy))
+                            .tint(Theme.Colors.primary)
+
+                        if hasEndTime {
+                            DatePicker("End Time", selection: $endTime, displayedComponents: .hourAndMinute)
+                                .tint(Theme.Colors.primary)
+                        }
+                    }
+                    .padding(Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                            .fill(Theme.Colors.backgroundElevated)
+                    )
+
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Label (optional)")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+
+                        TextField("e.g. Dinner Time", text: $label)
+                            .padding(Theme.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                    .fill(Theme.Colors.backgroundElevated)
+                            )
+                        Text("A label to identify this option")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+
+                    if let onDelete {
+                        Button(role: .destructive) {
+                            onDelete()
+                            dismiss()
+                        } label: {
+                            HStack(spacing: Theme.Spacing.sm) {
+                                Image(systemName: "trash")
+                                Text("Delete this option")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.Spacing.md)
+                        }
+                        .foregroundColor(Theme.Colors.error)
+                    }
+                }
+                .padding(Theme.Spacing.xl)
+            }
+            .background(Theme.Colors.background.ignoresSafeArea())
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(Theme.Colors.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(saveTitle) {
+                        onSave(date, startTime, hasEndTime ? endTime : nil, label.isEmpty ? nil : label)
+                        dismiss()
+                    }
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.Colors.secondary.opacity(0.2)))
+                }
+            }
+        }
     }
 }

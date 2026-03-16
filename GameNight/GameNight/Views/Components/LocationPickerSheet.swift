@@ -145,15 +145,25 @@ struct LocationDetailsView: View {
     
     @State private var displayName: String = ""
     @State private var aptSuite: String = ""
-    
+
+    private var streetLine: String {
+        [placemark.subThoroughfare, placemark.thoroughfare]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private var cityStateLine: String {
+        [placemark.locality, placemark.administrativeArea]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
+    }
+
     private var fullAddressString: String {
-        let parts = [
-            placemark.subThoroughfare, // street number
-            placemark.thoroughfare,    // street name
-            placemark.locality,        // city
-            placemark.administrativeArea // state
-        ].compactMap { $0 }
-        
+        let trimmedUnit = aptSuite.trimmingCharacters(in: .whitespacesAndNewlines)
+        let primaryLine = trimmedUnit.isEmpty ? streetLine : "\(streetLine) \(trimmedUnit)"
+        let parts = [primaryLine, cityStateLine].filter { !$0.isEmpty }
         return parts.joined(separator: ", ")
     }
     
@@ -169,9 +179,10 @@ struct LocationDetailsView: View {
                     Image(systemName: "pencil")
                         .foregroundColor(Theme.Colors.textTertiary)
                 }
-                Text(fullAddressString)
+                Text([streetLine, cityStateLine].filter { !$0.isEmpty }.joined(separator: "\n"))
                     .font(Theme.Typography.bodyMedium)
                     .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.leading)
             }
             .padding(Theme.Spacing.lg)
             .background(
@@ -229,11 +240,7 @@ struct LocationDetailsView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") {
                     let finalName = displayName.isEmpty ? (placemark.name ?? "") : displayName
-                    var finalAddress = fullAddressString
-                    if !aptSuite.isEmpty {
-                        finalAddress += " " + aptSuite 
-                    }
-                    onSave(finalName, finalAddress)
+                    onSave(finalName, fullAddressString)
                 }
                 .font(Theme.Typography.calloutMedium)
                 .foregroundColor(Theme.Colors.textPrimary)
@@ -250,6 +257,79 @@ struct LocationDetailsView: View {
     }
 }
 
+enum LocationSheetMode: Identifiable {
+    case picker
+    case edit
+
+    var id: String {
+        switch self {
+        case .picker:
+            return "picker"
+        case .edit:
+            return "edit"
+        }
+    }
+}
+
+struct LocationFlowSheet: View {
+    @State private var mode: LocationSheetMode
+    @Binding var locationName: String
+    @Binding var locationAddress: String
+    let onRemove: () -> Void
+
+    private let pickerTransition = AnyTransition.asymmetric(
+        insertion: .move(edge: .trailing).combined(with: .opacity),
+        removal: .move(edge: .leading).combined(with: .opacity)
+    )
+
+    private let editTransition = AnyTransition.asymmetric(
+        insertion: .move(edge: .leading).combined(with: .opacity),
+        removal: .move(edge: .trailing).combined(with: .opacity)
+    )
+
+    init(
+        initialMode: LocationSheetMode,
+        locationName: Binding<String>,
+        locationAddress: Binding<String>,
+        onRemove: @escaping () -> Void
+    ) {
+        _mode = State(initialValue: initialMode)
+        _locationName = locationName
+        _locationAddress = locationAddress
+        self.onRemove = onRemove
+    }
+
+    var body: some View {
+        ZStack {
+            if mode == .picker {
+                LocationPickerSheet(
+                    locationName: $locationName,
+                    locationAddress: $locationAddress
+                )
+                .transition(pickerTransition)
+                .zIndex(1)
+            }
+
+            if mode == .edit {
+                CustomLocationEditSheet(
+                    locationName: $locationName,
+                    locationAddress: $locationAddress,
+                    onEditAddress: {
+                        withAnimation(Theme.Animation.snappy) {
+                            mode = .picker
+                        }
+                    },
+                    onRemove: onRemove
+                )
+                .transition(editTransition)
+                .zIndex(2)
+            }
+        }
+        .clipped()
+        .animation(Theme.Animation.snappy, value: mode)
+    }
+}
+
 // MARK: - Selected Location Edit Sheet
 struct CustomLocationEditSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -257,107 +337,216 @@ struct CustomLocationEditSheet: View {
     @Binding var locationName: String
     @Binding var locationAddress: String
     
-    let onSearchAgain: () -> Void
+    let onEditAddress: () -> Void
     let onRemove: () -> Void
     
     @State private var draftName: String = ""
-    @State private var draftAddress: String = ""
+    @State private var draftAddressLine: String = ""
+    @State private var draftCityStateLine: String = ""
+    @State private var draftUnit: String = ""
+
+    private var displayNamePlaceholder: String {
+        let trimmed = draftAddressLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Name this location" : trimmed
+    }
+
+    private var addressCardTitle: String {
+        let trimmed = draftAddressLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Address" : trimmed
+    }
+
+    private var addressCardSubtitle: String {
+        let trimmed = draftCityStateLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Search for a location" : trimmed
+    }
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: Theme.Spacing.xl) {
-                // Edit Fields
-                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Display name")
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        
-                        TextField("Name this location", text: $draftName)
-                            .padding(Theme.Spacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                    .fill(Theme.Colors.cardBackgroundHover)
-                            )
-                    }
-                    
-                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Address (optional)")
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        
-                        TextField("ex: 123 Main St, Apt 4B", text: $draftAddress)
-                            .padding(Theme.Spacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                    .fill(Theme.Colors.cardBackgroundHover)
-                            )
-                    }
+        VStack(spacing: Theme.Spacing.xl) {
+            Capsule()
+                .fill(Theme.Colors.textTertiary.opacity(0.35))
+                .frame(width: 44, height: 5)
+                .padding(.top, Theme.Spacing.sm)
+
+            HStack {
+                Button("Clear") {
+                    onRemove()
+                    dismiss()
                 }
-                .padding(.horizontal, Theme.Spacing.xl)
-                
-                // Action Buttons
-                VStack(spacing: Theme.Spacing.md) {
-                    Button {
-                        dismiss()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            onSearchAgain()
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                            Text("Search new address")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(Capsule().stroke(Theme.Colors.secondary.opacity(0.3), lineWidth: 1))
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    }
-                    
-                    Button {
-                        onRemove()
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("Remove location")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .foregroundColor(Theme.Colors.error)
-                    }
-                }
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.lg)
+                .font(Theme.Typography.bodyMedium)
+                .foregroundColor(Theme.Colors.error)
 
                 Spacer()
-            }
-            .padding(.top, Theme.Spacing.xl)
-            .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationTitle("Edit Location")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(Theme.Colors.textSecondary)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        locationName = draftName
-                        locationAddress = draftAddress
-                        dismiss()
+
+                Button("Save") {
+                    let trimmedName = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let addressParts = [draftAddressLine, draftCityStateLine]
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                    var finalAddress = addressParts.joined(separator: ", ")
+                    let trimmedUnit = draftUnit.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmedUnit.isEmpty {
+                        finalAddress += finalAddress.isEmpty ? trimmedUnit : " \(trimmedUnit)"
                     }
-                    .font(Theme.Typography.calloutMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.Colors.secondary.opacity(0.2)))
+
+                    locationName = trimmedName.isEmpty ? displayNamePlaceholder : trimmedName
+                    locationAddress = finalAddress
+                    dismiss()
+                }
+                .font(Theme.Typography.calloutMedium)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Theme.Colors.secondary.opacity(0.2)))
+            }
+            .padding(.horizontal, Theme.Spacing.xl)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(addressCardTitle)
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Text(addressCardSubtitle)
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        onEditAddress()
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(Theme.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                        .fill(Theme.Colors.cardBackground)
+                )
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text("Display name")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    TextField(displayNamePlaceholder, text: $draftName)
+                        .padding(Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.cardBackgroundHover)
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text("Apt / Suite / Floor")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    TextField("ex: Unit 4", text: $draftUnit)
+                        .padding(Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.cardBackgroundHover)
+                        )
                 }
             }
-            .onAppear {
-                draftName = locationName
-                draftAddress = locationAddress
+            .padding(.horizontal, Theme.Spacing.xl)
+
+            Spacer(minLength: Theme.Spacing.xl)
+        }
+        .background(Theme.Colors.background.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            let parsed = ParsedLocation(address: locationAddress)
+            draftAddressLine = parsed.addressLine
+            draftCityStateLine = parsed.cityStateLine
+            draftUnit = parsed.unit
+
+            let currentName = locationName.trimmingCharacters(in: .whitespacesAndNewlines)
+            draftName = currentName == parsed.defaultDisplayName ? "" : currentName
+        }
+    }
+}
+
+private struct ParsedLocation {
+    let addressLine: String
+    let cityStateLine: String
+    let unit: String
+
+    var defaultDisplayName: String {
+        addressLine.isEmpty ? "Name this location" : addressLine
+    }
+
+    init(address: String) {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            addressLine = ""
+            cityStateLine = ""
+            unit = ""
+            return
+        }
+
+        let unitMarkers = [" apt ", " apartment ", " unit ", " suite ", " ste ", " floor ", " fl ", " #"]
+        let lowercased = trimmed.lowercased()
+
+        var baseAddress = trimmed
+        var trailingUnit = ""
+
+        for marker in unitMarkers {
+            if let range = lowercased.range(of: marker, options: .backwards) {
+                let distance = lowercased.distance(from: lowercased.startIndex, to: range.lowerBound)
+                baseAddress = String(trimmed.prefix(distance)).trimmingCharacters(in: .whitespacesAndNewlines)
+                trailingUnit = String(trimmed.suffix(trimmed.count - distance)).trimmingCharacters(in: .whitespacesAndNewlines)
+                break
             }
         }
+
+        let components = baseAddress
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        if components.count >= 4 {
+            let lastComponent = components.last ?? ""
+            let lastWords = lastComponent.split(separator: " ").map(String.init)
+            let stateToken = lastWords.first ?? lastComponent
+            let inlineUnit = lastWords.dropFirst().joined(separator: " ")
+
+            addressLine = [components[0], components[1], trailingUnit.isEmpty ? inlineUnit : trailingUnit]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            cityStateLine = [components[2], stateToken]
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+            unit = ""
+            return
+        }
+
+        if components.count == 3 {
+            let lastComponent = components[2]
+            let lastWords = lastComponent.split(separator: " ").map(String.init)
+            if lastWords.count > 1 {
+                let stateToken = lastWords.first ?? lastComponent
+                let inlineUnit = lastWords.dropFirst().joined(separator: " ")
+                addressLine = [components[0], trailingUnit.isEmpty ? inlineUnit : trailingUnit]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+                cityStateLine = [components[1], stateToken]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ", ")
+                unit = ""
+                return
+            }
+        }
+
+        addressLine = [components.first ?? baseAddress, trailingUnit]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        cityStateLine = components.dropFirst().joined(separator: ", ")
+        unit = ""
     }
 }
