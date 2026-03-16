@@ -464,10 +464,12 @@ struct DateBadge: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.xs) {
             if let relativeTime {
-                Text(relativeTime)
-                    .font(Theme.Typography.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(Theme.Colors.accent)
+                Text(relativeTime.uppercased())
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundColor(Theme.Colors.background)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.Colors.accent))
             }
             
             VStack(spacing: 1) {
@@ -481,7 +483,7 @@ struct DateBadge: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(Theme.Colors.textSecondary)
             }
-            .frame(width: 52)
+            .frame(width: 58)
             .padding(.vertical, Theme.Spacing.sm)
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
@@ -490,12 +492,18 @@ struct DateBadge: View {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                             .stroke(Theme.Colors.divider, lineWidth: 1)
                     )
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
             )
             
             if let timeString {
-                Text(timeString)
-                    .font(Theme.Typography.caption2)
-                    .foregroundColor(Theme.Colors.textSecondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 12))
+                    Text(timeString)
+                        .font(.system(size: 14, weight: .heavy))
+                }
+                .foregroundColor(Theme.Colors.textPrimary)
+                .padding(.top, 2)
             }
         }
     }
@@ -509,6 +517,14 @@ struct PrimaryGameCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack {
+                Image(systemName: "dice.fill")
+                Text("We are playing")
+            }
+            .font(.system(size: 11, weight: .heavy))
+            .foregroundColor(Theme.Colors.accent)
+            .textCase(.uppercase)
+
             HStack(spacing: Theme.Spacing.md) {
                 // Thumbnail
                 if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
@@ -518,12 +534,12 @@ struct PrimaryGameCard: View {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                             .fill(Theme.Colors.backgroundElevated)
                     }
-                    .frame(width: 52, height: 52)
+                    .frame(width: 56, height: 56)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
                 } else {
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                         .fill(Theme.Colors.backgroundElevated)
-                        .frame(width: 52, height: 52)
+                        .frame(width: 56, height: 56)
                         .overlay(
                             Image(systemName: "dice.fill")
                                 .font(.system(size: 22))
@@ -538,7 +554,6 @@ struct PrimaryGameCard: View {
 
                     // Pills
                     HStack(spacing: 6) {
-                        GamePill(icon: "star.fill", text: "Primary", color: Theme.Colors.warning)
                         GamePill(icon: "clock", text: game.playtimeDisplay, color: Theme.Colors.textSecondary)
                         if game.complexity > 0 {
                             GamePill(
@@ -590,6 +605,10 @@ struct PrimaryGameCard: View {
             }
         }
         .cardStyle()
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                .stroke(Theme.Colors.accent.opacity(0.3), lineWidth: 2)
+        )
     }
 }
 
