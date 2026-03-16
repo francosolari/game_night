@@ -7,6 +7,8 @@ struct CreateEventView: View {
     @State private var showContactPicker = false
     @State private var showContactList = false
     @State private var showCancelConfirmation = false
+    @State private var showGroupPicker = false
+    @StateObject private var groupsViewModel = GroupsViewModel()
     let onSaved: ((GameEvent) -> Void)?
 
     init(eventToEdit: GameEvent? = nil, onSaved: ((GameEvent) -> Void)? = nil) {
@@ -470,6 +472,60 @@ struct CreateEventView: View {
     }
 
     // MARK: - Step 4: Invites
+    @ViewBuilder
+    private func tierInviteeList(tier: Int, benchTier: Int) -> some View {
+        let grouped = viewModel.groupedInvitees(forTier: tier)
+
+        // Grouped invitees
+        ForEach(grouped.groups, id: \.id) { group in
+            let isCollapsed = viewModel.collapsedGroups.contains(group.id)
+
+            GroupInviteeHeader(
+                emoji: group.emoji,
+                groupId: group.id,
+                memberCount: group.entries.count,
+                isCollapsed: isCollapsed,
+                onToggle: {
+                    withAnimation(Theme.Animation.snappy) {
+                        viewModel.toggleGroupCollapse(group.id)
+                    }
+                }
+            )
+
+            if !isCollapsed {
+                ForEach(group.entries) { invitee in
+                    InviteeRow(
+                        invitee: invitee,
+                        groupEmoji: invitee.groupEmoji,
+                        onBench: {
+                            viewModel.setInviteeTier(invitee.id, tier: benchTier)
+                        },
+                        onRemove: {
+                            if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
+                                viewModel.removeInvitee(at: idx)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        // Ungrouped invitees
+        ForEach(grouped.ungrouped) { invitee in
+            InviteeRow(
+                invitee: invitee,
+                onBench: {
+                    viewModel.setInviteeTier(invitee.id, tier: benchTier)
+                },
+                onRemove: {
+                    if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
+                        viewModel.removeInvitee(at: idx)
+                    }
+                }
+            )
+        }
+    }
+
     private var invitesStep: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
             Text("Who's playing?")
@@ -521,44 +577,64 @@ struct CreateEventView: View {
             }
 
             // Add people row
-            HStack(spacing: Theme.Spacing.md) {
-                Button {
-                    showContactList = true
-                } label: {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 14))
-                        Text("All Contacts")
-                            .font(Theme.Typography.calloutMedium)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.Spacing.md) {
+                    if !groupsViewModel.groups.isEmpty {
+                        Button {
+                            showGroupPicker = true
+                        } label: {
+                            HStack(spacing: Theme.Spacing.sm) {
+                                Image(systemName: "person.3.fill")
+                                    .font(.system(size: 14))
+                                Text("Groups")
+                                    .font(Theme.Typography.calloutMedium)
+                            }
+                            .foregroundColor(Theme.Colors.secondary)
+                            .padding(.horizontal, Theme.Spacing.lg)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                    .fill(Theme.Colors.secondary.opacity(0.1))
+                            )
+                        }
                     }
-                    .foregroundColor(Theme.Colors.primary)
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.primary.opacity(0.1))
-                    )
-                }
 
-                Button {
-                    showContactPicker = true
-                } label: {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "person.badge.plus")
-                            .font(.system(size: 14))
-                        Text("Phone")
-                            .font(Theme.Typography.calloutMedium)
+                    Button {
+                        showContactList = true
+                    } label: {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            Image(systemName: "person.2.fill")
+                                .font(.system(size: 14))
+                            Text("All Contacts")
+                                .font(Theme.Typography.calloutMedium)
+                        }
+                        .foregroundColor(Theme.Colors.primary)
+                        .padding(.horizontal, Theme.Spacing.lg)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.primary.opacity(0.1))
+                        )
                     }
-                    .foregroundColor(Theme.Colors.accent)
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.accent.opacity(0.1))
-                    )
-                }
 
-                Spacer()
+                    Button {
+                        showContactPicker = true
+                    } label: {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 14))
+                            Text("Phone")
+                                .font(Theme.Typography.calloutMedium)
+                        }
+                        .foregroundColor(Theme.Colors.accent)
+                        .padding(.horizontal, Theme.Spacing.lg)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.accent.opacity(0.1))
+                        )
+                    }
+                }
             }
 
             // Manual entry
@@ -594,22 +670,7 @@ struct CreateEventView: View {
                             .foregroundColor(Theme.Colors.textTertiary)
                     }
 
-                    ForEach(viewModel.tier1Invitees) { invitee in
-                        InviteeRow(
-                            invitee: invitee,
-                            onBench: {
-                                viewModel.setInviteeTier(invitee.id, tier: 2)
-                            },
-                            onRemove: {
-                                if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
-                                    viewModel.removeInvitee(at: idx)
-                                }
-                            }
-                        )
-                    }
-                    .onMove { from, to in
-                        viewModel.moveInvitee(from: from, to: to, inTier: 1)
-                    }
+                    tierInviteeList(tier: 1, benchTier: 2)
 
                     // Bench section (Tier 2 / Waitlist)
                     HStack {
@@ -634,22 +695,7 @@ struct CreateEventView: View {
                                     .foregroundColor(Theme.Colors.divider)
                             )
                     } else {
-                        ForEach(viewModel.tier2Invitees) { invitee in
-                            InviteeRow(
-                                invitee: invitee,
-                                onBench: {
-                                    viewModel.setInviteeTier(invitee.id, tier: 1)
-                                },
-                                onRemove: {
-                                    if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
-                                        viewModel.removeInvitee(at: idx)
-                                    }
-                                }
-                            )
-                        }
-                        .onMove { from, to in
-                            viewModel.moveInvitee(from: from, to: to, inTier: 2)
-                        }
+                        tierInviteeList(tier: 2, benchTier: 1)
                     }
 
                     // Auto-promote toggle
@@ -670,6 +716,12 @@ struct CreateEventView: View {
         }
         .task {
             await viewModel.loadSuggestedContacts()
+            await groupsViewModel.loadGroups()
+        }
+        .sheet(isPresented: $showGroupPicker) {
+            GroupPickerSheet(groups: groupsViewModel.groups) { group in
+                viewModel.loadGroupMembers(group)
+            }
         }
     }
 
@@ -963,9 +1015,53 @@ struct AddInviteeField: View {
     }
 }
 
+// MARK: - Group Invitee Header
+struct GroupInviteeHeader: View {
+    let emoji: String
+    let groupId: UUID
+    let memberCount: Int
+    let isCollapsed: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: Theme.Spacing.sm) {
+                ZStack {
+                    Circle()
+                        .fill(Theme.Colors.primary.opacity(0.15))
+                        .frame(width: 28, height: 28)
+                    Text(emoji)
+                        .font(.system(size: 14))
+                }
+
+                Text("\(memberCount) members")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Theme.Colors.backgroundElevated))
+
+                Spacer()
+
+                Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            .padding(.vertical, Theme.Spacing.xs)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(Theme.Colors.primary.opacity(0.05))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Invitee Row
 struct InviteeRow: View {
     let invitee: InviteeEntry
+    var groupEmoji: String? = nil
     let onBench: () -> Void
     let onRemove: () -> Void
 
@@ -978,9 +1074,15 @@ struct InviteeRow: View {
             AvatarView(url: nil, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(invitee.name)
-                    .font(Theme.Typography.bodyMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
+                HStack(spacing: 4) {
+                    Text(invitee.name)
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    if let emoji = groupEmoji {
+                        Text(emoji)
+                            .font(.system(size: 12))
+                    }
+                }
                 Text(invitee.phoneNumber)
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.textTertiary)

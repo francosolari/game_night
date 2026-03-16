@@ -123,6 +123,8 @@ struct DraftInvitee: Codable, Identifiable {
     var phoneNumber: String
     var userId: UUID?
     var tier: Int
+    var groupId: UUID?
+    var groupEmoji: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -130,6 +132,29 @@ struct DraftInvitee: Codable, Identifiable {
         case phoneNumber = "phone_number"
         case userId = "user_id"
         case tier
+        case groupId = "group_id"
+        case groupEmoji = "group_emoji"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        phoneNumber = try container.decode(String.self, forKey: .phoneNumber)
+        userId = try container.decodeIfPresent(UUID.self, forKey: .userId)
+        tier = try container.decode(Int.self, forKey: .tier)
+        groupId = try container.decodeIfPresent(UUID.self, forKey: .groupId)
+        groupEmoji = try container.decodeIfPresent(String.self, forKey: .groupEmoji)
+    }
+
+    init(id: UUID, name: String, phoneNumber: String, userId: UUID?, tier: Int, groupId: UUID? = nil, groupEmoji: String? = nil) {
+        self.id = id
+        self.name = name
+        self.phoneNumber = phoneNumber
+        self.userId = userId
+        self.tier = tier
+        self.groupId = groupId
+        self.groupEmoji = groupEmoji
     }
 }
 

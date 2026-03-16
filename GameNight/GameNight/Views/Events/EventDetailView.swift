@@ -10,6 +10,8 @@ struct EventDetailView: View {
     @State private var showInviteList = false
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
+    @State private var showCreateGroupFromEvent = false
+    @State private var toast: ToastItem?
 
     private var isOwner: Bool {
         guard let event = viewModel.event else { return false }
@@ -235,6 +237,12 @@ struct EventDetailView: View {
                             showEditSheet = true
                         }
 
+                        Button {
+                            showCreateGroupFromEvent = true
+                        } label: {
+                            Label("Create Group from Guests", systemImage: "person.3.fill")
+                        }
+
                         Button("Delete Event", role: .destructive) {
                             showDeleteConfirmation = true
                         }
@@ -281,6 +289,12 @@ struct EventDetailView: View {
         } message: {
             Text(viewModel.error ?? "Please try again.")
         }
+        .sheet(isPresented: $showCreateGroupFromEvent) {
+            CreateGroupFromAttendeesSheet(invites: viewModel.invites, onResult: { resultToast in
+                toast = resultToast
+            })
+        }
+        .toast($toast)
         .task {
             await viewModel.loadEvent(id: eventId)
         }

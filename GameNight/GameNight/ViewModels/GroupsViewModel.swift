@@ -75,6 +75,34 @@ final class GroupsViewModel: ObservableObject {
         }
     }
 
+    func addMembers(to groupId: UUID, contacts: [UserContact]) async {
+        guard let idx = groups.firstIndex(where: { $0.id == groupId }) else { return }
+        let existingPhones = Set(groups[idx].members.map(\.phoneNumber))
+
+        for contact in contacts {
+            let normalized = ContactPickerService.normalizePhone(contact.phoneNumber)
+            guard !existingPhones.contains(normalized) else { continue }
+
+            let member = GroupMember(
+                id: UUID(),
+                groupId: groupId,
+                userId: nil,
+                phoneNumber: normalized,
+                displayName: contact.name,
+                tier: 1,
+                sortOrder: groups[idx].members.count,
+                addedAt: Date()
+            )
+
+            do {
+                try await supabase.addGroupMember(member)
+                groups[idx].members.append(member)
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
     func removeMember(id: UUID, from groupId: UUID) async {
         guard let groupIdx = groups.firstIndex(where: { $0.id == groupId }) else { return }
 

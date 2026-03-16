@@ -4,6 +4,7 @@ struct GroupsView: View {
     @StateObject private var viewModel = GroupsViewModel()
     @State private var showCreateGroup = false
     @State private var selectedGroup: GameGroup?
+    @State private var toast: ToastItem?
 
     var body: some View {
         NavigationStack {
@@ -63,11 +64,16 @@ struct GroupsView: View {
             }
             .background(Theme.Colors.background.ignoresSafeArea())
             .sheet(isPresented: $showCreateGroup) {
-                CreateGroupSheet(viewModel: viewModel)
+                CreateGroupSheet(viewModel: viewModel, onResult: { resultToast in
+                    toast = resultToast
+                })
             }
             .sheet(item: $selectedGroup) { group in
-                GroupDetailSheet(group: group, viewModel: viewModel)
+                GroupDetailSheet(group: group, viewModel: viewModel, onResult: { resultToast in
+                    toast = resultToast
+                })
             }
+            .toast($toast)
         }
         .task {
             await viewModel.loadGroups()
@@ -149,88 +155,134 @@ struct CreateGroupSheet: View {
     @State private var name = ""
     @State private var emoji = "🎲"
     @State private var description = ""
+    @State private var step = 1
+    @State private var createdGroup: GameGroup?
+    @State private var isCreating = false
+    var onResult: ((ToastItem) -> Void)?
 
     private let emojiOptions = ["🎲", "🏜️", "🐉", "🧙", "⚔️", "🎯", "🃏", "♟️", "🎮", "🌌", "🏰", "🚀"]
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xxl) {
-                    // Emoji picker
-                    VStack(spacing: Theme.Spacing.md) {
-                        ZStack {
-                            Circle()
-                                .fill(Theme.Gradients.primary)
-                                .frame(width: 80, height: 80)
-                            Text(emoji)
-                                .font(.system(size: 40))
-                        }
+            if step == 1 {
+                ScrollView {
+                    VStack(spacing: Theme.Spacing.xxl) {
+                        // Emoji picker
+                        VStack(spacing: Theme.Spacing.md) {
+                            ZStack {
+                                Circle()
+                                    .fill(Theme.Gradients.primary)
+                                    .frame(width: 80, height: 80)
+                                Text(emoji)
+                                    .font(.system(size: 40))
+                            }
 
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: Theme.Spacing.sm) {
-                                ForEach(emojiOptions, id: \.self) { e in
-                                    Button { emoji = e } label: {
-                                        Text(e)
-                                            .font(.system(size: 28))
-                                            .padding(Theme.Spacing.sm)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                                    .fill(emoji == e ? Theme.Colors.primary.opacity(0.2) : .clear)
-                                            )
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Theme.Spacing.sm) {
+                                    ForEach(emojiOptions, id: \.self) { e in
+                                        Button { emoji = e } label: {
+                                            Text(e)
+                                                .font(.system(size: 28))
+                                                .padding(Theme.Spacing.sm)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                                        .fill(emoji == e ? Theme.Colors.primary.opacity(0.2) : .clear)
+                                                )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("Group Name")
-                            .font(Theme.Typography.label)
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Group Name")
+                                .font(Theme.Typography.label)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                            TextField("e.g. Dune Crew", text: $name)
+                                .font(Theme.Typography.body)
+                                .padding(Theme.Spacing.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                        .fill(Theme.Colors.backgroundElevated)
+                                )
+                        }
+
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Description (optional)")
+                                .font(Theme.Typography.label)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                            TextField("What does this group play?", text: $description)
+                                .font(Theme.Typography.body)
+                                .padding(Theme.Spacing.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                        .fill(Theme.Colors.backgroundElevated)
+                                )
+                        }
+
+                        if let errorMsg = viewModel.error {
+                            Text(errorMsg)
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.error)
+                                .padding(Theme.Spacing.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                        .fill(Theme.Colors.error.opacity(0.1))
+                                )
+                        }
+
+                        Button(isCreating ? "Creating..." : "Create Group") {
+                            guard !isCreating else { return }
+                            isCreating = true
+                            viewModel.error = nil
+                            Task {
+                                if let group = await viewModel.createGroup(
+                                    name: name,
+                                    emoji: emoji,
+                                    description: description.isEmpty ? nil : description
+                                ) {
+                                    createdGroup = group
+                                    withAnimation { step = 2 }
+                                } else {
+                                    onResult?(ToastItem(style: .error, message: viewModel.error ?? "Couldn't create group"))
+                                    dismiss()
+                                }
+                                isCreating = false
+                            }
+                        }
+                        .buttonStyle(PrimaryButtonStyle(isEnabled: !name.isEmpty && !isCreating))
+                        .disabled(name.isEmpty || isCreating)
+                    }
+                    .padding(Theme.Spacing.xl)
+                }
+                .background(Theme.Colors.background.ignoresSafeArea())
+                .navigationTitle("New Group")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Cancel") { dismiss() }
                             .foregroundColor(Theme.Colors.textSecondary)
-                        TextField("e.g. Dune Crew", text: $name)
-                            .font(Theme.Typography.body)
-                            .padding(Theme.Spacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                    .fill(Theme.Colors.backgroundElevated)
-                            )
                     }
-
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("Description (optional)")
-                            .font(Theme.Typography.label)
-                            .foregroundColor(Theme.Colors.textSecondary)
-                        TextField("What does this group play?", text: $description)
-                            .font(Theme.Typography.body)
-                            .padding(Theme.Spacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                    .fill(Theme.Colors.backgroundElevated)
-                            )
-                    }
-
-                    Button("Create Group") {
+                }
+            } else if let group = createdGroup {
+                ContactListSheet(
+                    excludedPhones: Set<String>(),
+                    onSelect: { contacts in
                         Task {
-                            _ = await viewModel.createGroup(
-                                name: name,
-                                emoji: emoji,
-                                description: description.isEmpty ? nil : description
-                            )
+                            await viewModel.addMembers(to: group.id, contacts: contacts)
+                            onResult?(ToastItem(style: .success, message: "\(group.emoji ?? "🎲") \(group.name) created with \(contacts.count) members"))
+                        }
+                        dismiss()
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Skip") {
+                            onResult?(ToastItem(style: .success, message: "\(group.emoji ?? "🎲") \(group.name) created"))
                             dismiss()
                         }
-                    }
-                    .buttonStyle(PrimaryButtonStyle(isEnabled: !name.isEmpty))
-                    .disabled(name.isEmpty)
-                }
-                .padding(Theme.Spacing.xl)
-            }
-            .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationTitle("New Group")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") { dismiss() }
                         .foregroundColor(Theme.Colors.textSecondary)
+                    }
                 }
             }
         }
@@ -242,8 +294,8 @@ struct GroupDetailSheet: View {
     let group: GameGroup
     @ObservedObject var viewModel: GroupsViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var newMemberName = ""
-    @State private var newMemberPhone = ""
+    @State private var showAddMembers = false
+    var onResult: ((ToastItem) -> Void)?
 
     var body: some View {
         NavigationStack {
@@ -270,47 +322,23 @@ struct GroupDetailSheet: View {
                         }
                     }
 
-                    // Add member
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("Add Member")
-                            .font(Theme.Typography.headlineMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-
+                    // Add members button
+                    Button {
+                        showAddMembers = true
+                    } label: {
                         HStack(spacing: Theme.Spacing.sm) {
-                            TextField("Name", text: $newMemberName)
-                                .font(Theme.Typography.body)
-                                .padding(Theme.Spacing.md)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                        .fill(Theme.Colors.backgroundElevated)
-                                )
-
-                            TextField("Phone", text: $newMemberPhone)
-                                .font(Theme.Typography.body)
-                                .keyboardType(.phonePad)
-                                .padding(Theme.Spacing.md)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                        .fill(Theme.Colors.backgroundElevated)
-                                )
-
-                            Button {
-                                guard !newMemberName.isEmpty, !newMemberPhone.isEmpty else { return }
-                                Task {
-                                    await viewModel.addMember(
-                                        to: group.id,
-                                        name: newMemberName,
-                                        phoneNumber: newMemberPhone
-                                    )
-                                    newMemberName = ""
-                                    newMemberPhone = ""
-                                }
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(Theme.Gradients.primary)
-                            }
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 14))
+                            Text("Add Members")
+                                .font(Theme.Typography.calloutMedium)
                         }
+                        .foregroundColor(Theme.Colors.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.primary.opacity(0.1))
+                        )
                     }
 
                     // Members list
@@ -357,6 +385,17 @@ struct GroupDetailSheet: View {
                     Button("Done") { dismiss() }
                         .foregroundColor(Theme.Colors.primary)
                 }
+            }
+            .sheet(isPresented: $showAddMembers) {
+                ContactListSheet(
+                    excludedPhones: Set(group.members.map(\.phoneNumber)),
+                    onSelect: { contacts in
+                        Task {
+                            await viewModel.addMembers(to: group.id, contacts: contacts)
+                            onResult?(ToastItem(style: .success, message: "Added \(contacts.count) member\(contacts.count == 1 ? "" : "s")"))
+                        }
+                    }
+                )
             }
         }
     }

@@ -133,6 +133,9 @@ final class CreateEventViewModel: ObservableObject {
     @Published var suggestedContacts: [FrequentContact] = []
     @Published var isLoadingSuggestions = true
 
+    // Group collapse state
+    @Published var collapsedGroups: Set<UUID> = []
+
     // Steps
     @Published var currentStep: CreateStep = .details
     @Published var completedSteps: Set<CreateStep> = []
@@ -171,7 +174,9 @@ final class CreateEventViewModel: ObservableObject {
                             name: draft.name,
                             phoneNumber: draft.phoneNumber,
                             userId: draft.userId,
-                            tier: draft.tier
+                            tier: draft.tier,
+                            groupId: draft.groupId,
+                            groupEmoji: draft.groupEmoji
                         )
                     }
                 }
@@ -329,15 +334,21 @@ final class CreateEventViewModel: ObservableObject {
 
     func loadGroupMembers(_ group: GameGroup) {
         selectedGroup = group
-        invitees = group.members.map { member in
-            InviteeEntry(
-                id: member.id,
-                name: member.displayName ?? member.phoneNumber,
-                phoneNumber: member.phoneNumber,
-                userId: member.userId,
-                tier: member.tier
-            )
-        }
+        let existingPhones = Set(invitees.map(\.phoneNumber))
+        let newMembers = group.members
+            .filter { !existingPhones.contains($0.phoneNumber) }
+            .map { member in
+                InviteeEntry(
+                    id: UUID(),
+                    name: member.displayName ?? member.phoneNumber,
+                    phoneNumber: member.phoneNumber,
+                    userId: member.userId,
+                    tier: member.tier,
+                    groupId: group.id,
+                    groupEmoji: group.emoji
+                )
+            }
+        invitees.append(contentsOf: newMembers)
     }
 
     func loadSuggestedContacts() async {
@@ -381,6 +392,36 @@ final class CreateEventViewModel: ObservableObject {
         invitees.filter { $0.tier == 2 }
     }
 
+    func toggleGroupCollapse(_ groupId: UUID) {
+        if collapsedGroups.contains(groupId) {
+            collapsedGroups.remove(groupId)
+        } else {
+            collapsedGroups.insert(groupId)
+        }
+    }
+
+    /// Returns grouped and ungrouped invitees for a tier.
+    /// Grouped: keyed by groupId with (emoji, name, entries).
+    /// Ungrouped: entries with no groupId.
+    func groupedInvitees(forTier tier: Int) -> (groups: [(id: UUID, emoji: String, entries: [InviteeEntry])], ungrouped: [InviteeEntry]) {
+        let tierInvitees = invitees.filter { $0.tier == tier }
+        let ungrouped = tierInvitees.filter { $0.groupId == nil }
+
+        var groupDict: [UUID: (emoji: String, entries: [InviteeEntry])] = [:]
+        for invitee in tierInvitees {
+            guard let gid = invitee.groupId else { continue }
+            if groupDict[gid] == nil {
+                groupDict[gid] = (emoji: invitee.groupEmoji ?? "🎲", entries: [])
+            }
+            groupDict[gid]!.entries.append(invitee)
+        }
+
+        let groups = groupDict.map { (id: $0.key, emoji: $0.value.emoji, entries: $0.value.entries) }
+            .sorted { $0.entries.first?.name ?? "" < $1.entries.first?.name ?? "" }
+
+        return (groups: groups, ungrouped: ungrouped)
+    }
+
     func moveInvitee(from source: IndexSet, to destination: Int, inTier tier: Int) {
         var tierItems = tier == 1 ? tier1Invitees : tier2Invitees
         tierItems.move(fromOffsets: source, toOffset: destination)
@@ -412,6 +453,9 @@ final class CreateEventViewModel: ObservableObject {
     func setInviteeTier(_ id: UUID, tier: Int) {
         if let idx = invitees.firstIndex(where: { $0.id == id }) {
             invitees[idx].tier = tier
+            if let groupId = invitees[idx].groupId {
+                collapsedGroups.remove(groupId)
+            }
         }
     }
 
@@ -440,7 +484,9 @@ final class CreateEventViewModel: ObservableObject {
                     name: entry.name,
                     phoneNumber: entry.phoneNumber,
                     userId: entry.userId,
-                    tier: entry.tier
+                    tier: entry.tier,
+                    groupId: entry.groupId,
+                    groupEmoji: entry.groupEmoji
                 )
             } : nil,
             deletedAt: existingEvent?.deletedAt,
@@ -537,6 +583,8 @@ struct InviteeEntry: Identifiable {
     var phoneNumber: String
     var userId: UUID?
     var tier: Int
+    var groupId: UUID?
+    var groupEmoji: String?
 }
 
 import Supabase

@@ -26,6 +26,7 @@
 		9B68501F3F9105CF25668A3A /* ContactPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D392FFBFA41DB94F99E14E09 /* ContactPicker.swift */; };
 		9E72702398FD0A62ABC50C5B /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EDAABF8B93412395C477350 /* ViewModifiers.swift */; };
 		A145154DBEE35DEBC0B93B9D /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B0C917F3210D3DEE57EA0F /* SupabaseService.swift */; };
+		A830ED73A705ED199878F0A6 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F39EDF744F365C61B43544 /* ToastView.swift */; };
 		AAEBF5B0D069816F69AEA013 /* GroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C545563F575388D3D5C55CE1 /* GroupsView.swift */; };
 		AAF2A54602E475E661783223 /* GroupsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC84F6FC769179A0CD26F1F /* GroupsViewModel.swift */; };
 		AB7731B722DD26CABD4F1FBA /* TimeOptionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */; };
@@ -39,16 +40,20 @@
 		CE3591329288EDA893958F12 /* GameNightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04110B31ED9823F8D8CB1290 /* GameNightApp.swift */; };
 		CEDCDEA3B706763399C908FC /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C8D2CD62321FDE27933183 /* HomeViewModel.swift */; };
 		D64C5C08692476E0E5786CB9 /* Secrets.swift.example in Resources */ = {isa = PBXBuildFile; fileRef = BFCE44DB7F63902750892756 /* Secrets.swift.example */; };
+		DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */; };
 		DCD8FCC8417847C108C154F7 /* GameCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FFF8F8644B3D6C09B3D23E5 /* GameCard.swift */; };
 		E4229164F87DF49778D2BAFF /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 828D232229F9583147DE35B5 /* User.swift */; };
 		E94EDB0E593B5C1084DCEE6B /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D24417A59A465E98C69019 /* Secrets.swift */; };
 		EC928EA881FC49F3BC324924 /* EventViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2469983DA1CC14996701E0FE /* EventViewModel.swift */; };
 		F94FB46D73A94B95CAAB4410 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DCC388CDAC127BEDD64307 /* AppState.swift */; };
 		FAC20CF4D3CB4EA6B19E8772 /* GameLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A8894EED32ECCDD900B4DE /* GameLibraryView.swift */; };
+		FDECD26096E37C1D41EAEDE2 /* CreateGroupFromAttendeesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38CD0AF08CE4B5CEF7E0D505 /* CreateGroupFromAttendeesSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		04110B31ED9823F8D8CB1290 /* GameNightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameNightApp.swift; sourceTree = "<group>"; };
+		06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupPickerSheet.swift; sourceTree = "<group>"; };
+		07F39EDF744F365C61B43544 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 		0F9FED0A38BCA3ED89457F18 /* Invite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Invite.swift; sourceTree = "<group>"; };
 		15DEB0951CE98339F2E2354C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2469983DA1CC14996701E0FE /* EventViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventViewModel.swift; sourceTree = "<group>"; };
@@ -56,6 +61,7 @@
 		33A8894EED32ECCDD900B4DE /* GameLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLibraryView.swift; sourceTree = "<group>"; };
 		3493414C1EA4EA910807E03E /* SearchBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBar.swift; sourceTree = "<group>"; };
 		35ACFC5CF2D84146F1B0E5B2 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		38CD0AF08CE4B5CEF7E0D505 /* CreateGroupFromAttendeesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupFromAttendeesSheet.swift; sourceTree = "<group>"; };
 		46C66541A70C31BA98A29D18 /* Group.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Group.swift; sourceTree = "<group>"; };
 		491C5BC61EA3E94B1EA73171 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		496016CC950DC5C5F6E75729 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
@@ -151,6 +157,7 @@
 				7FFF8F8644B3D6C09B3D23E5 /* GameCard.swift */,
 				3493414C1EA4EA910807E03E /* SearchBar.swift */,
 				DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */,
+				07F39EDF744F365C61B43544 /* ToastView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -196,6 +203,8 @@
 		6F69DB24125C46AEF3BDD3F8 /* Groups */ = {
 			isa = PBXGroup;
 			children = (
+				38CD0AF08CE4B5CEF7E0D505 /* CreateGroupFromAttendeesSheet.swift */,
+				06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */,
 				C545563F575388D3D5C55CE1 /* GroupsView.swift */,
 			);
 			path = Groups;
@@ -344,6 +353,7 @@
 				767F1544BB3B4EF53FECFD0D /* ContactPickerService.swift in Sources */,
 				03DE6C5AC84BC4458D2EE750 /* ContentView.swift in Sources */,
 				133E52FC137BE4A2BBF26C08 /* CreateEventView.swift in Sources */,
+				FDECD26096E37C1D41EAEDE2 /* CreateGroupFromAttendeesSheet.swift in Sources */,
 				B9C83FE17B46B9822C47006F /* EventCard.swift in Sources */,
 				0B1B53A086B2D5C634FB2153 /* EventDetailView.swift in Sources */,
 				EC928EA881FC49F3BC324924 /* EventViewModel.swift in Sources */,
@@ -354,6 +364,7 @@
 				C5C23C7667D8666450441FA7 /* GameLibraryViewModel.swift in Sources */,
 				CE3591329288EDA893958F12 /* GameNightApp.swift in Sources */,
 				3A8663CFA3DA830ABB3E1EBC /* Group.swift in Sources */,
+				DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */,
 				AAEBF5B0D069816F69AEA013 /* GroupsView.swift in Sources */,
 				AAF2A54602E475E661783223 /* GroupsViewModel.swift in Sources */,
 				349E5742ECBCD05BAE8BCEBA /* HomeView.swift in Sources */,
@@ -370,6 +381,7 @@
 				A145154DBEE35DEBC0B93B9D /* SupabaseService.swift in Sources */,
 				C490E51116FD132D9BDE3239 /* Theme.swift in Sources */,
 				AB7731B722DD26CABD4F1FBA /* TimeOptionPicker.swift in Sources */,
+				A830ED73A705ED199878F0A6 /* ToastView.swift in Sources */,
 				E4229164F87DF49778D2BAFF /* User.swift in Sources */,
 				9E72702398FD0A62ABC50C5B /* ViewModifiers.swift in Sources */,
 			);

@@ -21,6 +21,19 @@ struct GameGroup: Identifiable, Codable {
         case updatedAt = "updated_at"
     }
 
+    // Only encode columns that exist on the groups table (skip joined relations)
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(ownerId, forKey: .ownerId)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(emoji, forKey: .emoji)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        // Intentionally skip: members — it's a joined relation via group_members, not a column
+    }
+
     var memberCount: Int { members.count }
 
     static let preview = GameGroup(
