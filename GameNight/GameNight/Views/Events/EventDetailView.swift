@@ -273,6 +273,7 @@ struct EventDetailView: View {
         .sheet(isPresented: $showEditSheet) {
             if let event = viewModel.event {
                 CreateEventView(eventToEdit: event, initialInvites: viewModel.invites) { savedEvent in
+                    viewModel.applyEditedEvent(savedEvent)
                     toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
                     Task { await viewModel.loadEvent(id: eventId) }
                 }
