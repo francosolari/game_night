@@ -10,6 +10,9 @@ struct CreateEventView: View {
     @State private var showGroupPicker = false
     @State private var showDateTimePicker = false
     @State private var showPollDateTimePicker = false
+    @State private var showLocationPicker = false
+    @State private var showLocationEditForm = false
+    @State private var editPollIndex: Int? = nil
     @StateObject private var groupsViewModel = GroupsViewModel()
     let onSaved: ((GameEvent) -> Void)?
 
@@ -220,6 +223,12 @@ struct CreateEventView: View {
             } message: {
                 Text(viewModel.error ?? "Please try again.")
             }
+            .sheet(isPresented: $showLocationPicker) {
+                LocationPickerSheet(
+                    locationName: $viewModel.location,
+                    locationAddress: $viewModel.locationAddress
+                )
+            }
         }
     }
 
@@ -263,20 +272,42 @@ struct CreateEventView: View {
                 Text("Location")
                     .font(Theme.Typography.label)
                     .foregroundColor(Theme.Colors.textSecondary)
-                TextField("e.g. Alex's Place", text: $viewModel.location)
-                    .font(Theme.Typography.body)
+
+                Button {
+                    if viewModel.location.isEmpty {
+                        showLocationPicker = true
+                    } else {
+                        showLocationEditForm = true
+                    }
+                } label: {
+                    HStack {
+                        if viewModel.location.isEmpty {
+                            Text("e.g. Alex's Place")
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        } else {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(viewModel.location)
+                                    .font(Theme.Typography.bodyMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                                if !viewModel.locationAddress.isEmpty {
+                                    Text(viewModel.locationAddress)
+                                        .font(Theme.Typography.caption)
+                                        .foregroundColor(Theme.Colors.textSecondary)
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
                             .fill(Theme.Colors.backgroundElevated)
                     )
-                TextField("Address (optional)", text: $viewModel.locationAddress)
-                    .font(Theme.Typography.body)
-                    .padding(Theme.Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
-                    )
+                }
             }
 
             // Player count
@@ -509,42 +540,21 @@ struct CreateEventView: View {
 
                 // Existing time options
                 ForEach(Array(viewModel.timeOptions.enumerated()), id: \.element.id) { index, option in
-                    HStack(spacing: Theme.Spacing.md) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 20))
-                            .foregroundColor(Theme.Colors.primary)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text(option.displayDate)
-                                    .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
-                                if let label = option.label {
-                                    Text(label)
-                                        .font(Theme.Typography.caption)
-                                        .foregroundColor(Theme.Colors.primaryLight)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Capsule().fill(Theme.Colors.primary.opacity(0.15)))
-                                }
+                    Button {
+                        editPollIndex = index
+                    } label: {
+                        FixedDateSummaryCard(
+                            hasDate: true,
+                            date: option.date,
+                            startTime: option.startTime,
+                            endTime: option.endTime,
+                            hasEndTime: option.endTime != nil,
+                            label: option.label,
+                            onDelete: {
+                                viewModel.removeTimeOption(at: index)
                             }
-                            Text(option.displayTime)
-                                .font(Theme.Typography.headlineMedium)
-                                .foregroundColor(Theme.Colors.textPrimary)
-                        }
-
-                        Spacer()
-
-                        Button { viewModel.removeTimeOption(at: index) } label: {
-                            Image(systemName: "trash")
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        }
+                        )
                     }
-                    .padding(Theme.Spacing.lg)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                            .fill(Theme.Colors.cardBackground)
-                    )
                 }
 
                 // Add time option via Partiful-style picker
@@ -566,6 +576,26 @@ struct CreateEventView: View {
                 .tint(Theme.Colors.primary)
             }
         }
+        .sheet(item: Binding(
+            get: { editPollIndex.map { PollEditItem(index: $0) } },
+            set: { editPollIndex = $0?.index }
+        )) { item in
+            let option = viewModel.timeOptions[item.index]
+            PollEditSheet(
+                initialDate: option.date,
+                initialStartTime: option.startTime,
+                initialEndTime: option.endTime,
+                initialLabel: option.label,
+                onSave: { date, start, end, label in
+                    viewModel.updateTimeOption(at: item.index, date: date, startTime: start, endTime: end, label: label)
+                }
+            )
+        }
+    }
+
+    struct PollEditItem: Identifiable {
+        let index: Int
+        var id: Int { index }
     }
 
     // MARK: - Step 4: Invites
@@ -1097,8 +1127,12 @@ struct FixedDateSummaryCard: View {
     let hasDate: Bool
     let date: Date
     let startTime: Date
-    let endTime: Date
+    let endTime: Date?
     let hasEndTime: Bool
+    
+    // Optional props for poll mode features
+    var label: String? = nil
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
@@ -1107,34 +1141,46 @@ struct FixedDateSummaryCard: View {
                 .foregroundColor(Theme.Colors.primary)
 
             if hasDate {
-                VStack(alignment: .leading, spacing: 2) {
-                    let dateF: DateFormatter = {
-                        let f = DateFormatter()
-                        f.dateFormat = "EEE, MMM d"
-                        return f
-                    }()
-                    let timeF: DateFormatter = {
-                        let f = DateFormatter()
-                        f.dateFormat = "h:mm a"
-                        return f
-                    }()
+                let dateF: DateFormatter = {
+                    let f = DateFormatter()
+                    f.dateFormat = "EEE, MMM d"
+                    return f
+                }()
+                let timeF: DateFormatter = {
+                    let f = DateFormatter()
+                    f.dateFormat = "h:mm a"
+                    return f
+                }()
 
+                HStack(spacing: Theme.Spacing.sm) {
                     Text(dateF.string(from: date))
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
+                        
+                    Text("•")
+                        .foregroundColor(Theme.Colors.textTertiary)
 
-                    HStack(spacing: Theme.Spacing.xs) {
+                    HStack(spacing: 2) {
                         Text(timeF.string(from: startTime))
-                            .font(Theme.Typography.headlineMedium)
+                            .font(Theme.Typography.bodyMedium)
                             .foregroundColor(Theme.Colors.textPrimary)
 
-                        if hasEndTime {
+                        if hasEndTime, let end = endTime {
                             Text("-")
                                 .foregroundColor(Theme.Colors.textTertiary)
-                            Text(timeF.string(from: endTime))
-                                .font(Theme.Typography.headlineMedium)
+                            Text(timeF.string(from: end))
+                                .font(Theme.Typography.bodyMedium)
                                 .foregroundColor(Theme.Colors.textPrimary)
                         }
+                    }
+                    
+                    if let customLabel = label {
+                        Text(customLabel)
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.primaryLight)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.15)))
                     }
                 }
             } else {
@@ -1149,12 +1195,19 @@ struct FixedDateSummaryCard: View {
             }
 
             Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Theme.Colors.textTertiary)
+            
+            if let deleteAction = onDelete {
+                Button(action: deleteAction) {
+                    Image(systemName: "trash")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
         }
-        .padding(Theme.Spacing.lg)
+        .padding(Theme.Spacing.md)
         .background(
             RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                 .fill(Theme.Colors.cardBackground)

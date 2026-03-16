@@ -329,11 +329,11 @@ final class CreateEventViewModel: ObservableObject {
     init(
         eventToEdit: GameEvent? = nil,
         initialInvites: [Invite] = [],
-        supabase: EventEditingProviding = SupabaseService.shared,
+        supabase: EventEditingProviding? = nil,
         bgg: BGGService = .shared
     ) {
         self.eventToEdit = eventToEdit
-        self.supabase = supabase
+        self.supabase = supabase ?? SupabaseService.shared
         self.bgg = bgg
 
         if let eventToEdit {
@@ -551,6 +551,15 @@ final class CreateEventViewModel: ObservableObject {
 
     func removeTimeOption(at index: Int) {
         timeOptions.remove(at: index)
+    }
+
+    func updateTimeOption(at index: Int, date: Date, startTime: Date, endTime: Date?, label: String?) {
+        guard index >= 0 && index < timeOptions.count else { return }
+        timeOptions[index].date = date
+        timeOptions[index].startTime = startTime
+        timeOptions[index].endTime = endTime
+        timeOptions[index].label = label
+        timeOptions.sort { $0.date < $1.date }
     }
 
     func loadGroupMembers(_ group: GameGroup) {
