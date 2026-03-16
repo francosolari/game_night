@@ -50,21 +50,27 @@ struct EventCard: View {
                         .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(1)
 
-                    // Time options preview
+                    // Time display
                     if let firstTime = event.timeOptions.first {
                         HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 13))
-                                .foregroundColor(Theme.Colors.primary)
+                            if event.scheduleMode == .fixed || event.timeOptions.count <= 1 {
+                                // Fixed: show date + time directly
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Theme.Colors.primary)
 
-                            Text(firstTime.displayDate)
-                                .font(Theme.Typography.calloutMedium)
-                                .foregroundColor(Theme.Colors.textSecondary)
+                                Text("\(firstTime.displayDate) \u{00B7} \(firstTime.displayTime)")
+                                    .font(Theme.Typography.calloutMedium)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                            } else {
+                                // Poll: show option count
+                                Image(systemName: "chart.bar.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Theme.Colors.accent)
 
-                            if event.timeOptions.count > 1 {
-                                Text("+\(event.timeOptions.count - 1) more")
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.primaryLight)
+                                Text("\(event.timeOptions.count) time options")
+                                    .font(Theme.Typography.calloutMedium)
+                                    .foregroundColor(Theme.Colors.textSecondary)
                             }
                         }
                     }

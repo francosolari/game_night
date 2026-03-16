@@ -13,6 +13,7 @@ struct GameEvent: Identifiable, Codable {
     var timeOptions: [TimeOption]
     var confirmedTimeOptionId: UUID?
     var allowTimeSuggestions: Bool
+    var scheduleMode: ScheduleMode
     var inviteStrategy: InviteStrategy
     var minPlayers: Int
     var maxPlayers: Int?
@@ -35,6 +36,7 @@ struct GameEvent: Identifiable, Codable {
         case timeOptions = "time_options"
         case confirmedTimeOptionId = "confirmed_time_option_id"
         case allowTimeSuggestions = "allow_time_suggestions"
+        case scheduleMode = "schedule_mode"
         case inviteStrategy = "invite_strategy"
         case minPlayers = "min_players"
         case maxPlayers = "max_players"
@@ -45,7 +47,8 @@ struct GameEvent: Identifiable, Codable {
         case updatedAt = "updated_at"
     }
 
-    // Only encode columns that exist on the events table (skip related objects)
+    // Custom encode to skip nested relations (games, timeOptions, host)
+    // which are separate tables and would break PostgREST inserts
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -57,16 +60,21 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(status, forKey: .status)
         try container.encodeIfPresent(confirmedTimeOptionId, forKey: .confirmedTimeOptionId)
         try container.encode(allowTimeSuggestions, forKey: .allowTimeSuggestions)
+        try container.encode(scheduleMode, forKey: .scheduleMode)
         try container.encode(inviteStrategy, forKey: .inviteStrategy)
         try container.encode(minPlayers, forKey: .minPlayers)
         try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
-        try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)
-        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
-        // Intentionally skip: host, games, timeOptions — these are related tables, not columns
+        // Intentionally skip: host, games, timeOptions (separate tables)
     }
+}
+
+// MARK: - Schedule Mode
+enum ScheduleMode: String, Codable {
+    case fixed
+    case poll
 }
 
 enum EventStatus: String, Codable {
@@ -169,6 +177,7 @@ struct TimeOption: Identifiable, Codable, Hashable {
     var isSuggested: Bool  // true if suggested by invitee
     var suggestedBy: UUID?
     var voteCount: Int
+    var maybeCount: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -180,6 +189,7 @@ struct TimeOption: Identifiable, Codable, Hashable {
         case isSuggested = "is_suggested"
         case suggestedBy = "suggested_by"
         case voteCount = "vote_count"
+        case maybeCount = "maybe_count"
     }
 
     var displayDate: String {
@@ -196,6 +206,23 @@ struct TimeOption: Identifiable, Codable, Hashable {
             return "\(start) - \(formatter.string(from: endTime))"
         }
         return start
+    }
+}
+
+// MARK: - Time Option Vote Types
+enum TimeOptionVoteType: String, Codable {
+    case yes
+    case maybe
+    case no
+}
+
+struct TimeOptionVote: Codable {
+    var timeOptionId: UUID
+    var voteType: TimeOptionVoteType
+
+    enum CodingKeys: String, CodingKey {
+        case timeOptionId = "time_option_id"
+        case voteType = "vote_type"
     }
 }
 
@@ -217,6 +244,7 @@ extension GameEvent {
         timeOptions: [],
         confirmedTimeOptionId: nil,
         allowTimeSuggestions: true,
+        scheduleMode: .fixed,
         inviteStrategy: InviteStrategy(type: .tiered, tierSize: 3, autoPromote: true),
         minPlayers: 3,
         maxPlayers: 4,

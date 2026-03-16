@@ -115,12 +115,98 @@ struct TimeOptionRow: View {
     }
 }
 
+// MARK: - Poll Voting View
+struct PollVotingView: View {
+    let timeOptions: [TimeOption]
+    @Binding var votes: [UUID: TimeOptionVoteType]
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            ForEach(timeOptions) { option in
+                HStack(spacing: Theme.Spacing.md) {
+                    // Date and time
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(option.displayDate)
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Text(option.displayTime)
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    // Vote buttons
+                    HStack(spacing: Theme.Spacing.sm) {
+                        PollVoteButton(
+                            icon: "checkmark",
+                            label: "Yes",
+                            color: Theme.Colors.success,
+                            isSelected: votes[option.id] == .yes
+                        ) {
+                            votes[option.id] = votes[option.id] == .yes ? nil : .yes
+                        }
+
+                        PollVoteButton(
+                            icon: "questionmark",
+                            label: "Maybe",
+                            color: Theme.Colors.warning,
+                            isSelected: votes[option.id] == .maybe
+                        ) {
+                            votes[option.id] = votes[option.id] == .maybe ? nil : .maybe
+                        }
+
+                        PollVoteButton(
+                            icon: "xmark",
+                            label: "No",
+                            color: Theme.Colors.error,
+                            isSelected: votes[option.id] == .no
+                        ) {
+                            votes[option.id] = votes[option.id] == .no ? nil : .no
+                        }
+                    }
+                }
+                .padding(Theme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .fill(Theme.Colors.backgroundElevated)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .stroke(Theme.Colors.divider, lineWidth: 1)
+                        )
+                )
+            }
+        }
+    }
+}
+
+struct PollVoteButton: View {
+    let icon: String
+    let label: String
+    let color: Color
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(isSelected ? .white : color)
+                .frame(width: 32, height: 32)
+                .background(
+                    Circle()
+                        .fill(isSelected ? color : color.opacity(0.15))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Time Suggestion Sheet
 struct TimeSuggestionSheet: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedDate = Date()
     @State private var startTime = Date()
-    @State private var endTime = Date()
     @State private var label = ""
 
     var onSuggest: (TimeOption) -> Void
@@ -145,24 +231,13 @@ struct TimeSuggestionSheet: View {
                             .datePickerStyle(.graphical)
                             .tint(Theme.Colors.primary)
 
-                        HStack(spacing: Theme.Spacing.lg) {
-                            VStack(alignment: .leading) {
-                                Text("Start")
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.textTertiary)
-                                DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute)
-                                    .labelsHidden()
-                                    .tint(Theme.Colors.primary)
-                            }
-
-                            VStack(alignment: .leading) {
-                                Text("End (optional)")
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.textTertiary)
-                                DatePicker("", selection: $endTime, displayedComponents: .hourAndMinute)
-                                    .labelsHidden()
-                                    .tint(Theme.Colors.primary)
-                            }
+                        VStack(alignment: .leading) {
+                            Text("Start Time")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                            DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                                .tint(Theme.Colors.primary)
                         }
 
                         TextField("Label (e.g. 'Friday Evening')", text: $label)
@@ -181,11 +256,12 @@ struct TimeSuggestionSheet: View {
                             eventId: nil,
                             date: selectedDate,
                             startTime: startTime,
-                            endTime: endTime,
+                            endTime: nil,
                             label: label.isEmpty ? nil : label,
                             isSuggested: true,
                             suggestedBy: nil,
-                            voteCount: 0
+                            voteCount: 0,
+                            maybeCount: 0
                         )
                         onSuggest(option)
                         dismiss()
