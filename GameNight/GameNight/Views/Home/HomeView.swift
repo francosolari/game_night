@@ -13,9 +13,17 @@ struct HomeView: View {
                     // Header
                     HStack {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text("Game Night")
-                                .font(Theme.Typography.displayLarge)
-                                .foregroundColor(Theme.Colors.textPrimary)
+                            HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+                                Text("Game Night")
+                                    .font(Theme.Typography.displayLarge)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                                
+                                Image("MeepleLogo")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 24, height: 24)
+                                    .opacity(0.6)
+                            }
 
                             Text("Your upcoming sessions")
                                 .font(Theme.Typography.body)

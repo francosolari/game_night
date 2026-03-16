@@ -29,8 +29,9 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - gamenight
-        NSContactsUsageDescription: "Game Night uses your contacts to help you invite friends to game nights. Only the contacts you select are stored."
-        CFBundleDisplayName: Game Night
+        NSContactsUsageDescription: "CardboardWithMe uses your contacts to help you invite friends to game nights. Only the contacts you select are stored."
+        CFBundleDisplayName: CWM
+        CFBundleName: CardboardWithMe
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.gamenight.app
