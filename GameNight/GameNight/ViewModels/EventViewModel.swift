@@ -313,7 +313,6 @@ final class CreateEventViewModel: ObservableObject {
     enum CreateStep: Int, CaseIterable, Hashable {
         case details = 0
         case games
-        case schedule
         case invites
         case review
     }
@@ -381,9 +380,8 @@ final class CreateEventViewModel: ObservableObject {
                     }
                 }
 
-                if !title.isEmpty { completedSteps.insert(.details) }
+                if !title.isEmpty && (scheduleMode == .fixed || !timeOptions.isEmpty) { completedSteps.insert(.details) }
                 if !selectedGames.isEmpty { completedSteps.insert(.games) }
-                if !timeOptions.isEmpty { completedSteps.insert(.schedule) }
                 if !invitees.isEmpty { completedSteps.insert(.invites) }
                 currentStep = CreateStep.allCases.first { !completedSteps.contains($0) } ?? .review
             } else {
@@ -424,9 +422,8 @@ final class CreateEventViewModel: ObservableObject {
 
     var canProceed: Bool {
         switch currentStep {
-        case .details: return !title.isEmpty
+        case .details: return !title.isEmpty && (scheduleMode == .fixed || !timeOptions.isEmpty)
         case .games: return !selectedGames.isEmpty
-        case .schedule: return scheduleMode == .fixed || !timeOptions.isEmpty
         case .invites: return !invitees.isEmpty
         case .review: return true
         }

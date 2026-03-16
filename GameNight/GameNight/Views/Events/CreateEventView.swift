@@ -54,7 +54,6 @@ struct CreateEventView: View {
                                 switch step {
                                 case .details: return "Details"
                                 case .games: return "Games"
-                                case .schedule: return "Schedule"
                                 case .invites: return "Invites"
                                 case .review: return "Review"
                                 }
@@ -79,7 +78,6 @@ struct CreateEventView: View {
                             switch viewModel.currentStep {
                             case .details: detailsStep
                             case .games: gamesStep
-                            case .schedule: scheduleStep
                             case .invites: invitesStep
                             case .review: reviewStep
                             }
@@ -258,6 +256,8 @@ struct CreateEventView: View {
                             .fill(Theme.Colors.backgroundElevated)
                     )
             }
+
+            scheduleSection
 
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Location")
@@ -463,12 +463,12 @@ struct CreateEventView: View {
         }
     }
 
-    // MARK: - Step 3: Schedule
-    private var scheduleStep: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-            Text("When works?")
-                .font(Theme.Typography.displaySmall)
-                .foregroundColor(Theme.Colors.textPrimary)
+    // MARK: - Schedule Section (Inside Details)
+    private var scheduleSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("When is it?")
+                .font(Theme.Typography.label)
+                .foregroundColor(Theme.Colors.textSecondary)
 
             // Mode picker
             Picker("", selection: $viewModel.scheduleMode) {
