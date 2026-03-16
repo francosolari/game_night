@@ -482,56 +482,24 @@ struct CreateEventView: View {
                 Button {
                     showDateTimePicker = true
                 } label: {
-                    HStack(spacing: Theme.Spacing.md) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 20))
-                            .foregroundColor(Theme.Colors.primary)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            let dateF = DateFormatter()
-                            let _ = dateF.dateFormat = "EEE, MMM d"
-                            let timeF = DateFormatter()
-                            let _ = timeF.dateFormat = "h:mm a"
-
-                            Text(dateF.string(from: viewModel.fixedDate))
-                                .font(Theme.Typography.bodyMedium)
-                                .foregroundColor(Theme.Colors.textPrimary)
-
-                            HStack(spacing: Theme.Spacing.xs) {
-                                Text(timeF.string(from: viewModel.fixedStartTime))
-                                    .font(Theme.Typography.headlineMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
-
-                                if viewModel.hasEndTime {
-                                    Text("-")
-                                        .foregroundColor(Theme.Colors.textTertiary)
-                                    Text(timeF.string(from: viewModel.fixedEndTime))
-                                        .font(Theme.Typography.headlineMedium)
-                                        .foregroundColor(Theme.Colors.textPrimary)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    }
-                    .padding(Theme.Spacing.lg)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                            .fill(Theme.Colors.cardBackground)
+                    FixedDateSummaryCard(
+                        hasDate: viewModel.hasDate,
+                        date: viewModel.fixedDate,
+                        startTime: viewModel.fixedStartTime,
+                        endTime: viewModel.fixedEndTime,
+                        hasEndTime: viewModel.hasEndTime
                     )
                 }
                 .sheet(isPresented: $showDateTimePicker) {
                     DateTimePickerSheet(
                         date: $viewModel.fixedDate,
                         startTime: $viewModel.fixedStartTime,
+                        endDate: $viewModel.fixedEndDate,
                         endTime: $viewModel.fixedEndTime,
-                        hasEndTime: $viewModel.hasEndTime
+                        hasEndTime: $viewModel.hasEndTime,
+                        hasDate: $viewModel.hasDate,
+                        timezone: $viewModel.selectedTimezone
                     )
-                    .presentationDetents([.large])
                 }
             } else {
                 // Poll mode: multiple time options
@@ -891,24 +859,30 @@ struct CreateEventView: View {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: "calendar")
                                 .foregroundColor(Theme.Colors.primary)
-                            let dateF: DateFormatter = {
-                                let f = DateFormatter()
-                                f.dateFormat = "EEE, MMM d"
-                                return f
-                            }()
-                            let timeF: DateFormatter = {
-                                let f = DateFormatter()
-                                f.dateFormat = "h:mm a"
-                                return f
-                            }()
-                            if viewModel.hasEndTime {
-                                Text("\(dateF.string(from: viewModel.fixedDate)) at \(timeF.string(from: viewModel.fixedStartTime)) - \(timeF.string(from: viewModel.fixedEndTime))")
-                                    .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
+                            if viewModel.hasDate {
+                                let dateF: DateFormatter = {
+                                    let f = DateFormatter()
+                                    f.dateFormat = "EEE, MMM d"
+                                    return f
+                                }()
+                                let timeF: DateFormatter = {
+                                    let f = DateFormatter()
+                                    f.dateFormat = "h:mm a"
+                                    return f
+                                }()
+                                if viewModel.hasEndTime {
+                                    Text("\(dateF.string(from: viewModel.fixedDate)) at \(timeF.string(from: viewModel.fixedStartTime)) - \(timeF.string(from: viewModel.fixedEndTime))")
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                } else {
+                                    Text("\(dateF.string(from: viewModel.fixedDate)) at \(timeF.string(from: viewModel.fixedStartTime))")
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                }
                             } else {
-                                Text("\(dateF.string(from: viewModel.fixedDate)) at \(timeF.string(from: viewModel.fixedStartTime))")
+                                Text("Date not set")
                                     .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
+                                    .foregroundColor(Theme.Colors.textTertiary)
                             }
                         }
                     } else {
@@ -1105,36 +1079,93 @@ struct AddTimeOptionView: View {
     }
 }
 
+// MARK: - Fixed Date Summary Card
+struct FixedDateSummaryCard: View {
+    let hasDate: Bool
+    let date: Date
+    let startTime: Date
+    let endTime: Date
+    let hasEndTime: Bool
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "calendar")
+                .font(.system(size: 20))
+                .foregroundColor(Theme.Colors.primary)
+
+            if hasDate {
+                VStack(alignment: .leading, spacing: 2) {
+                    let dateF: DateFormatter = {
+                        let f = DateFormatter()
+                        f.dateFormat = "EEE, MMM d"
+                        return f
+                    }()
+                    let timeF: DateFormatter = {
+                        let f = DateFormatter()
+                        f.dateFormat = "h:mm a"
+                        return f
+                    }()
+
+                    Text(dateF.string(from: date))
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Text(timeF.string(from: startTime))
+                            .font(Theme.Typography.headlineMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+
+                        if hasEndTime {
+                            Text("-")
+                                .foregroundColor(Theme.Colors.textTertiary)
+                            Text(timeF.string(from: endTime))
+                                .font(Theme.Typography.headlineMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                        }
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Set Date & Time")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                    Text("Optional")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Theme.Colors.textTertiary)
+        }
+        .padding(Theme.Spacing.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                .fill(Theme.Colors.cardBackground)
+        )
+    }
+}
+
 // MARK: - Poll Add Time Button (uses DateTimePickerSheet)
 struct PollAddTimeButton: View {
     let onAdd: (Date, Date, Date?) -> Void
 
     @State private var showPicker = false
     @State private var pickerDate = Date()
-    @State private var pickerStartTime: Date = {
-        let cal = Calendar.current
-        var c = cal.dateComponents([.year, .month, .day], from: Date())
-        c.hour = 19; c.minute = 0
-        return cal.date(from: c) ?? Date()
-    }()
-    @State private var pickerEndTime: Date = {
-        let cal = Calendar.current
-        var c = cal.dateComponents([.year, .month, .day], from: Date())
-        c.hour = 22; c.minute = 0
-        return cal.date(from: c) ?? Date()
-    }()
+    @State private var pickerEndDate = Date()
+    @State private var pickerStartTime = DateTimePickerSheet.defaultTime(hour: 19)
+    @State private var pickerEndTime = DateTimePickerSheet.defaultTime(hour: 22)
     @State private var pickerHasEndTime = false
 
     var body: some View {
         Button {
-            // Reset to defaults before opening
             pickerDate = Date()
-            let cal = Calendar.current
-            var c = cal.dateComponents([.year, .month, .day], from: Date())
-            c.hour = 19; c.minute = 0
-            pickerStartTime = cal.date(from: c) ?? Date()
-            c.hour = 22
-            pickerEndTime = cal.date(from: c) ?? Date()
+            pickerEndDate = Date()
+            pickerStartTime = DateTimePickerSheet.defaultTime(hour: 19)
+            pickerEndTime = DateTimePickerSheet.defaultTime(hour: 22)
             pickerHasEndTime = false
             showPicker = true
         } label: {
@@ -1153,10 +1184,10 @@ struct PollAddTimeButton: View {
             DateTimePickerSheet(
                 date: $pickerDate,
                 startTime: $pickerStartTime,
+                endDate: $pickerEndDate,
                 endTime: $pickerEndTime,
                 hasEndTime: $pickerHasEndTime
             )
-            .presentationDetents([.large])
         }
     }
 }

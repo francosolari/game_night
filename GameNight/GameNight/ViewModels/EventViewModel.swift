@@ -283,8 +283,11 @@ final class CreateEventViewModel: ObservableObject {
     @Published var scheduleMode: ScheduleMode = .fixed
     @Published var fixedDate: Date = Date()
     @Published var fixedStartTime: Date = Date()
+    @Published var fixedEndDate: Date = Date()
     @Published var fixedEndTime: Date = Calendar.current.date(byAdding: .hour, value: 3, to: Date())!
     @Published var hasEndTime: Bool = false
+    @Published var hasDate: Bool = true
+    @Published var selectedTimezone: TimeZone = .current
     @Published var inviteStrategy = InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true)
     @Published var minPlayers = 3
     @Published var maxPlayers: Int? = nil
@@ -348,12 +351,18 @@ final class CreateEventViewModel: ObservableObject {
             minPlayers = eventToEdit.minPlayers
             maxPlayers = eventToEdit.maxPlayers
 
-            if eventToEdit.scheduleMode == .fixed, let fixedOption = eventToEdit.timeOptions.first {
-                fixedDate = fixedOption.date
-                fixedStartTime = fixedOption.startTime
-                if let end = fixedOption.endTime {
-                    fixedEndTime = end
-                    hasEndTime = true
+            if eventToEdit.scheduleMode == .fixed {
+                if let fixedOption = eventToEdit.timeOptions.first {
+                    fixedDate = fixedOption.date
+                    fixedStartTime = fixedOption.startTime
+                    hasDate = true
+                    if let end = fixedOption.endTime {
+                        fixedEndDate = Calendar.current.startOfDay(for: end)
+                        fixedEndTime = end
+                        hasEndTime = true
+                    }
+                } else {
+                    hasDate = false
                 }
             }
 
@@ -890,6 +899,9 @@ final class CreateEventViewModel: ObservableObject {
 
     private func resolvedTimeOptions(eventId: UUID? = nil) -> [TimeOption] {
         if scheduleMode == .fixed {
+            // No date set — return empty (event saved without a date)
+            guard hasDate else { return [] }
+
             let existingFixed = eventToEdit?.timeOptions.first ?? timeOptions.first
             let calendar = Calendar.current
 
@@ -906,13 +918,14 @@ final class CreateEventViewModel: ObservableObject {
 
             var resolvedEndTime: Date? = nil
             if hasEndTime {
-                let endComponents = calendar.dateComponents([.hour, .minute], from: fixedEndTime)
+                let endDateComponents = calendar.dateComponents([.year, .month, .day], from: fixedEndDate)
+                let endTimeComponents = calendar.dateComponents([.hour, .minute], from: fixedEndTime)
                 var combinedEnd = DateComponents()
-                combinedEnd.year = dateComponents.year
-                combinedEnd.month = dateComponents.month
-                combinedEnd.day = dateComponents.day
-                combinedEnd.hour = endComponents.hour
-                combinedEnd.minute = endComponents.minute
+                combinedEnd.year = endDateComponents.year
+                combinedEnd.month = endDateComponents.month
+                combinedEnd.day = endDateComponents.day
+                combinedEnd.hour = endTimeComponents.hour
+                combinedEnd.minute = endTimeComponents.minute
                 resolvedEndTime = calendar.date(from: combinedEnd) ?? fixedEndTime
             }
 

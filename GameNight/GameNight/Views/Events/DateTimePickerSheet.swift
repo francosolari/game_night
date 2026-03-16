@@ -1,137 +1,247 @@
 import SwiftUI
 
+// MARK: - DateTimePickerSheet
+
 struct DateTimePickerSheet: View {
-    @Binding var date: Date
+    @Binding var startDate: Date
     @Binding var startTime: Date
+    @Binding var endDate: Date
     @Binding var endTime: Date
     @Binding var hasEndTime: Bool
+    @Binding var hasDate: Bool
+    @Binding var timezone: TimeZone
     @Environment(\.dismiss) private var dismiss
 
-    /// When true, the picker is editing the end date/time
     @State private var isEditingEnd = false
-    @State private var displayedMonth: Date
+    @State private var showTimezonePicker = false
 
-    init(date: Binding<Date>, startTime: Binding<Date>, endTime: Binding<Date>, hasEndTime: Binding<Bool>) {
-        _date = date
+    init(
+        date: Binding<Date>,
+        startTime: Binding<Date>,
+        endDate: Binding<Date>,
+        endTime: Binding<Date>,
+        hasEndTime: Binding<Bool>,
+        hasDate: Binding<Bool> = .constant(true),
+        timezone: Binding<TimeZone> = .constant(.current)
+    ) {
+        _startDate = date
         _startTime = startTime
+        _endDate = endDate
         _endTime = endTime
         _hasEndTime = hasEndTime
-        _displayedMonth = State(initialValue: date.wrappedValue)
+        _hasDate = hasDate
+        _timezone = timezone
     }
 
-    private var selectedDate: Date {
-        isEditingEnd ? date : date
+    private var activeDate: Binding<Date> {
+        isEditingEnd ? $endDate : $startDate
     }
 
-    private var selectedTime: Date {
-        isEditingEnd ? endTime : startTime
+    private var activeTime: Binding<Date> {
+        isEditingEnd ? $endTime : $startTime
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // A. Header bar
-            headerBar
-
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xl) {
-                    // B. Summary bar
-                    summaryBar
-
-                    // C. Calendar grid
-                    calendarGrid
-
-                    // D. Time scroll carousel
-                    timeCarousel
+            // Header
+            HStack {
+                Button("Clear") {
+                    hasDate = false
+                    hasEndTime = false
+                    isEditingEnd = false
+                    startDate = Date()
+                    endDate = Date()
+                    startTime = Self.defaultTime(hour: 19)
+                    endTime = Self.defaultTime(hour: 22)
                 }
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.md)
-                .padding(.bottom, Theme.Spacing.jumbo)
-            }
+                .font(Theme.Typography.bodyMedium)
+                .foregroundColor(Theme.Colors.textSecondary)
 
-            // E. Footer bar
-            footerBar
+                Spacer()
+
+                Text("Date & Time")
+                    .font(Theme.Typography.headlineMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Spacer()
+
+                Color.clear.frame(width: 44)
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.xs)
+
+            // Summary bar
+            DateTimeSummaryBar(
+                startDate: startDate,
+                startTime: startTime,
+                endDate: endDate,
+                endTime: endTime,
+                hasDate: hasDate,
+                hasEndTime: hasEndTime,
+                isEditingEnd: isEditingEnd,
+                onSelectStart: {
+                    withAnimation(Theme.Animation.snappy) { isEditingEnd = false }
+                },
+                onSelectEnd: {
+                    withAnimation(Theme.Animation.snappy) {
+                        isEditingEnd = true
+                        if !hasEndTime {
+                            hasEndTime = true
+                            endDate = startDate
+                            if !hasDate { hasDate = true }
+                        }
+                    }
+                }
+            )
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.bottom, Theme.Spacing.sm)
+
+            // Calendar + Time side by side
+            HStack(alignment: .top, spacing: Theme.Spacing.xs) {
+                CalendarGridView(
+                    selectedDate: activeDate,
+                    hasSelection: $hasDate,
+                    onDateSelected: {
+                        if !hasDate { hasDate = true }
+                    }
+                )
+
+                TimeSlotPicker(
+                    selectedTime: activeTime,
+                    label: isEditingEnd ? "End" : "Start",
+                    onTimeSelected: {
+                        if !hasDate { hasDate = true }
+                    }
+                )
+                .frame(width: 96)
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+
+            Spacer(minLength: 0)
+
+            // Footer with timezone
+            HStack {
+                Button {
+                    showTimezonePicker = true
+                } label: {
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 12))
+                        Text(timezone.shortDisplayName)
+                            .font(Theme.Typography.caption)
+                    }
+                    .foregroundColor(Theme.Colors.textTertiary)
+                }
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Done")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.background)
+                        .padding(.horizontal, Theme.Spacing.xl)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .fill(Theme.Colors.textPrimary)
+                        )
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.sm)
+            .background(Theme.Colors.cardBackground)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
-    }
-
-    // MARK: - Header
-
-    private var headerBar: some View {
-        HStack {
-            Button("Clear") {
-                date = Date()
-                startTime = defaultStartTime
-                endTime = Calendar.current.date(byAdding: .hour, value: 3, to: defaultStartTime)!
-                hasEndTime = false
-                isEditingEnd = false
-                displayedMonth = Date()
-            }
-            .font(Theme.Typography.bodyMedium)
-            .foregroundColor(Theme.Colors.textSecondary)
-
-            Spacer()
-
-            Text("Date & Time")
-                .font(Theme.Typography.headlineMedium)
-                .foregroundColor(Theme.Colors.textPrimary)
-
-            Spacer()
-
-            // Balance the Clear button width
-            Color.clear.frame(width: 44)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .sheet(isPresented: $showTimezonePicker) {
+            TimezonePicker(selectedTimezone: $timezone)
         }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .padding(.vertical, Theme.Spacing.lg)
     }
 
-    // MARK: - Summary Bar
+    static func defaultTime(hour: Int) -> Date {
+        let cal = Calendar.current
+        var c = cal.dateComponents([.year, .month, .day], from: Date())
+        c.hour = hour
+        c.minute = 0
+        return cal.date(from: c) ?? Date()
+    }
+}
 
-    private var summaryBar: some View {
+// MARK: - DateTimeSummaryBar (Reusable)
+
+struct DateTimeSummaryBar: View {
+    let startDate: Date
+    let startTime: Date
+    let endDate: Date
+    let endTime: Date
+    let hasDate: Bool
+    let hasEndTime: Bool
+    let isEditingEnd: Bool
+    let onSelectStart: () -> Void
+    let onSelectEnd: () -> Void
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d"
+        return f
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    var body: some View {
         HStack(spacing: 0) {
-            // Left: start date/time
-            Button {
-                withAnimation(Theme.Animation.snappy) { isEditingEnd = false }
-            } label: {
-                VStack(spacing: 2) {
-                    Text(shortDateString(date))
-                        .font(Theme.Typography.calloutMedium)
-                    Text(shortTimeString(startTime))
-                        .font(Theme.Typography.headlineMedium)
+            // Start side
+            Button(action: onSelectStart) {
+                VStack(spacing: 1) {
+                    if hasDate {
+                        Text(Self.dateFormatter.string(from: startDate))
+                            .font(Theme.Typography.caption)
+                        Text(Self.timeFormatter.string(from: startTime))
+                            .font(Theme.Typography.headlineMedium)
+                    } else {
+                        Text("Date")
+                            .font(Theme.Typography.caption)
+                        Text("Not set")
+                            .font(Theme.Typography.headlineMedium)
+                    }
                 }
                 .foregroundColor(isEditingEnd ? Theme.Colors.textTertiary : Theme.Colors.textPrimary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.md)
+                .padding(.vertical, Theme.Spacing.sm)
             }
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(Theme.Colors.textTertiary)
+                .padding(.horizontal, 2)
 
-            // Right: end date/time
-            Button {
-                withAnimation(Theme.Animation.snappy) {
-                    isEditingEnd = true
-                    if !hasEndTime {
-                        hasEndTime = true
-                    }
-                }
-            } label: {
-                VStack(spacing: 2) {
+            // End side
+            Button(action: onSelectEnd) {
+                VStack(spacing: 1) {
                     if hasEndTime {
-                        Text(shortDateString(date))
-                            .font(Theme.Typography.calloutMedium)
-                        Text(shortTimeString(endTime))
+                        let sameDay = Calendar.current.isDate(startDate, inSameDayAs: endDate)
+                        Text(sameDay ? "End Time" : Self.dateFormatter.string(from: endDate))
+                            .font(Theme.Typography.caption)
+                        Text(Self.timeFormatter.string(from: endTime))
                             .font(Theme.Typography.headlineMedium)
                     } else {
                         Text("End Time")
-                            .font(Theme.Typography.calloutMedium)
+                            .font(Theme.Typography.caption)
                         Text("Optional")
                             .font(Theme.Typography.headlineMedium)
                     }
                 }
                 .foregroundColor(isEditingEnd ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.md)
+                .padding(.vertical, Theme.Spacing.sm)
             }
         }
         .background(
@@ -139,184 +249,137 @@ struct DateTimePickerSheet: View {
                 .fill(Theme.Colors.cardBackground)
         )
     }
+}
 
-    // MARK: - Calendar Grid
+// MARK: - CalendarGridView (Reusable)
 
-    private var calendarGrid: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            // Month header with navigation
+struct CalendarGridView: View {
+    @Binding var selectedDate: Date
+    @Binding var hasSelection: Bool
+    var onDateSelected: (() -> Void)? = nil
+
+    @State private var displayedMonth: Date
+    @State private var showMonthYearPicker = false
+
+    init(selectedDate: Binding<Date>, hasSelection: Binding<Bool>, onDateSelected: (() -> Void)? = nil) {
+        _selectedDate = selectedDate
+        _hasSelection = hasSelection
+        self.onDateSelected = onDateSelected
+        _displayedMonth = State(initialValue: selectedDate.wrappedValue)
+    }
+
+    private static let weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]
+    // Always 6 rows (42 cells) to prevent resizing
+    private static let totalCells = 42
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            // Month/Year header — tappable for quick navigation
             HStack {
-                Text(monthYearString(displayedMonth))
-                    .font(Theme.Typography.headlineMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
+                Button {
+                    withAnimation(Theme.Animation.snappy) {
+                        showMonthYearPicker.toggle()
+                    }
+                } label: {
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Text(monthYearString(displayedMonth))
+                            .font(Theme.Typography.titleMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Image(systemName: showMonthYearPicker ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                }
 
                 Spacer()
 
-                HStack(spacing: Theme.Spacing.lg) {
-                    Button {
-                        withAnimation(Theme.Animation.smooth) { changeMonth(by: -1) }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Theme.Colors.textSecondary)
-                    }
-                    Button {
-                        withAnimation(Theme.Animation.smooth) { changeMonth(by: 1) }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Theme.Colors.textSecondary)
-                    }
-                }
-            }
-
-            // Day-of-week row
-            let weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
-            HStack(spacing: 0) {
-                ForEach(weekdays, id: \.self) { day in
-                    Text(day)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.Colors.textTertiary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-
-            // Date grid
-            let days = calendarDays(for: displayedMonth)
-            let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
-
-            LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-                ForEach(days, id: \.self) { day in
-                    if let day {
-                        let isSelected = Calendar.current.isDate(day, inSameDayAs: date)
-                        let isToday = Calendar.current.isDateInToday(day)
-                        let isPast = day < Calendar.current.startOfDay(for: Date()) && !isToday
-
+                if !showMonthYearPicker {
+                    HStack(spacing: Theme.Spacing.md) {
                         Button {
-                            withAnimation(Theme.Animation.snappy) {
-                                date = day
-                            }
+                            withAnimation(Theme.Animation.smooth) { changeMonth(by: -1) }
                         } label: {
-                            Text("\(Calendar.current.component(.day, from: day))")
-                                .font(.system(size: 16, weight: isSelected ? .bold : .regular))
-                                .foregroundColor(
-                                    isSelected ? Theme.Colors.background
-                                    : isPast ? Theme.Colors.textTertiary.opacity(0.4)
-                                    : isToday ? Theme.Colors.primary
-                                    : Theme.Colors.textPrimary
-                                )
-                                .frame(width: 38, height: 38)
-                                .background(
-                                    Circle()
-                                        .fill(isSelected ? Theme.Colors.primary : Color.clear)
-                                )
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textSecondary)
+                                .frame(width: 28, height: 28)
                         }
-                        .disabled(isPast)
-                    } else {
-                        Color.clear
-                            .frame(width: 38, height: 38)
+                        Button {
+                            withAnimation(Theme.Animation.smooth) { changeMonth(by: 1) }
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textSecondary)
+                                .frame(width: 28, height: 28)
+                        }
+                    }
+                }
+            }
+
+            if showMonthYearPicker {
+                MonthYearPickerView(
+                    displayedMonth: $displayedMonth,
+                    onDismiss: {
+                        withAnimation(Theme.Animation.snappy) {
+                            showMonthYearPicker = false
+                        }
+                    }
+                )
+            } else {
+                // Weekday headers
+                HStack(spacing: 0) {
+                    ForEach(Array(Self.weekdayLabels.enumerated()), id: \.offset) { _, day in
+                        Text(day)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                // Date grid — always 6 rows
+                let days = calendarDays(for: displayedMonth)
+                let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+
+                LazyVGrid(columns: columns, spacing: 1) {
+                    ForEach(0..<Self.totalCells, id: \.self) { index in
+                        if index < days.count, let day = days[index] {
+                            let isSelected = hasSelection && Calendar.current.isDate(day, inSameDayAs: selectedDate)
+                            let isToday = Calendar.current.isDateInToday(day)
+                            let isPast = day < Calendar.current.startOfDay(for: Date()) && !isToday
+
+                            Button {
+                                withAnimation(Theme.Animation.snappy) {
+                                    selectedDate = day
+                                    hasSelection = true
+                                    onDateSelected?()
+                                }
+                            } label: {
+                                Text("\(Calendar.current.component(.day, from: day))")
+                                    .font(.system(size: 14, weight: isSelected ? .bold : .regular))
+                                    .foregroundColor(
+                                        isSelected ? Theme.Colors.background
+                                        : isPast ? Theme.Colors.textTertiary.opacity(0.3)
+                                        : isToday ? Theme.Colors.primary
+                                        : Theme.Colors.textPrimary
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 32)
+                                    .background(
+                                        Circle().fill(isSelected ? Theme.Colors.primary : Color.clear)
+                                    )
+                            }
+                            .disabled(isPast)
+                        } else {
+                            Color.clear.frame(height: 32)
+                        }
                     }
                 }
             }
         }
-        .padding(Theme.Spacing.lg)
+        .padding(Theme.Spacing.sm)
         .background(
             RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                 .fill(Theme.Colors.cardBackground)
         )
-    }
-
-    // MARK: - Time Carousel
-
-    private var currentTimeForCarousel: Date {
-        isEditingEnd ? endTime : startTime
-    }
-
-    @ViewBuilder
-    private var timeCarousel: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(isEditingEnd ? "End Time" : "Start Time")
-                .font(Theme.Typography.label)
-                .foregroundColor(Theme.Colors.textTertiary)
-
-            TimeSlotCarousel(
-                times: generateTimeSlots(),
-                currentTime: currentTimeForCarousel,
-                isEditingEnd: isEditingEnd,
-                onSelect: { time in
-                    if isEditingEnd {
-                        endTime = time
-                    } else {
-                        startTime = time
-                    }
-                }
-            )
-        }
-        .padding(Theme.Spacing.lg)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                .fill(Theme.Colors.cardBackground)
-        )
-    }
-
-    // MARK: - Footer
-
-    private var footerBar: some View {
-        HStack {
-            HStack(spacing: Theme.Spacing.xs) {
-                Image(systemName: "globe")
-                    .font(.system(size: 12))
-                Text(timezoneAbbreviation)
-                    .font(Theme.Typography.caption)
-            }
-            .foregroundColor(Theme.Colors.textTertiary)
-
-            Spacer()
-
-            Button {
-                dismiss()
-            } label: {
-                Text("Done")
-                    .font(Theme.Typography.bodyMedium)
-                    .foregroundColor(Theme.Colors.background)
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                            .fill(Theme.Colors.textPrimary)
-                    )
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.xl)
-        .padding(.vertical, Theme.Spacing.md)
-        .background(Theme.Colors.cardBackground)
-    }
-
-    // MARK: - Helpers
-
-    private var defaultStartTime: Date {
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day], from: Date())
-        components.hour = 19
-        components.minute = 0
-        return calendar.date(from: components) ?? Date()
-    }
-
-    private var timezoneAbbreviation: String {
-        let tz = TimeZone.current
-        return tz.abbreviation() ?? tz.identifier
-    }
-
-    private func shortDateString(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "EEE MMM d"
-        return f.string(from: d)
-    }
-
-    private func shortTimeString(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm a"
-        return f.string(from: d)
     }
 
     private func monthYearString(_ d: Date) -> String {
@@ -335,7 +398,7 @@ struct DateTimePickerSheet: View {
         let calendar = Calendar.current
         let range = calendar.range(of: .day, in: .month, for: month)!
         let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: month))!
-        let weekdayOfFirst = calendar.component(.weekday, from: firstDay) - 1 // 0=Sun
+        let weekdayOfFirst = calendar.component(.weekday, from: firstDay) - 1
 
         var days: [Date?] = Array(repeating: nil, count: weekdayOfFirst)
         for day in range {
@@ -343,22 +406,188 @@ struct DateTimePickerSheet: View {
                 days.append(date)
             }
         }
-        // Pad to fill last row
-        while days.count % 7 != 0 {
+        // Pad to exactly 42 cells (6 rows)
+        while days.count < Self.totalCells {
             days.append(nil)
         }
         return days
     }
+}
 
-    private func generateTimeSlots() -> [Date] {
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day], from: date)
+// MARK: - MonthYearPickerView (Reusable)
+
+struct MonthYearPickerView: View {
+    @Binding var displayedMonth: Date
+
+    let onDismiss: () -> Void
+
+    private let monthSymbols = Calendar.current.shortMonthSymbols
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm), count: 3)
+
+    @State private var displayedYear: Int
+
+    init(displayedMonth: Binding<Date>, onDismiss: @escaping () -> Void) {
+        _displayedMonth = displayedMonth
+        self.onDismiss = onDismiss
+        _displayedYear = State(initialValue: Calendar.current.component(.year, from: displayedMonth.wrappedValue))
+    }
+
+    private var currentMonth: Int {
+        Calendar.current.component(.month, from: displayedMonth)
+    }
+
+    private var currentYear: Int {
+        Calendar.current.component(.year, from: displayedMonth)
+    }
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            // Year navigation
+            HStack {
+                Button {
+                    withAnimation(Theme.Animation.smooth) { displayedYear -= 1 }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                }
+
+                Spacer()
+
+                Text(String(displayedYear))
+                    .font(Theme.Typography.headlineMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(Theme.Animation.smooth) { displayedYear += 1 }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
+                }
+            }
+
+            // Month grid (3x4)
+            LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
+                ForEach(1...12, id: \.self) { month in
+                    let isSelected = month == currentMonth && displayedYear == currentYear
+                    let isPastMonth = isPast(year: displayedYear, month: month)
+
+                    Button {
+                        selectMonth(month)
+                    } label: {
+                        Text(monthSymbols[month - 1])
+                            .font(.system(size: 13, weight: isSelected ? .bold : .regular))
+                            .foregroundColor(
+                                isSelected ? Theme.Colors.background
+                                : isPastMonth ? Theme.Colors.textTertiary.opacity(0.3)
+                                : Theme.Colors.textPrimary
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.Spacing.sm)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                    .fill(isSelected ? Theme.Colors.primary : Color.clear)
+                            )
+                    }
+                    .disabled(isPastMonth)
+                }
+            }
+        }
+    }
+
+    private func isPast(year: Int, month: Int) -> Bool {
+        let now = Date()
+        let cal = Calendar.current
+        let currentYear = cal.component(.year, from: now)
+        let currentMonth = cal.component(.month, from: now)
+        return year < currentYear || (year == currentYear && month < currentMonth)
+    }
+
+    private func selectMonth(_ month: Int) {
+        var components = DateComponents()
+        components.year = displayedYear
+        components.month = month
+        components.day = 1
+        if let date = Calendar.current.date(from: components) {
+            displayedMonth = date
+            onDismiss()
+        }
+    }
+}
+
+// MARK: - TimeSlotPicker (Reusable)
+
+struct TimeSlotPicker: View {
+    @Binding var selectedTime: Date
+    var label: String = "Time"
+    var onTimeSelected: (() -> Void)? = nil
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            Text(label)
+                .font(Theme.Typography.caption2)
+                .foregroundColor(Theme.Colors.textTertiary)
+
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 1) {
+                        ForEach(timeSlots, id: \.self) { time in
+                            let isSelected = isSameTime(time, selectedTime)
+
+                            Button {
+                                selectedTime = time
+                                onTimeSelected?()
+                            } label: {
+                                Text(Self.timeFormatter.string(from: time))
+                                    .font(.system(size: isSelected ? 12 : 11, weight: isSelected ? .semibold : .regular))
+                                    .foregroundColor(isSelected ? Theme.Colors.background : Theme.Colors.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                            .fill(isSelected ? Theme.Colors.textPrimary : Color.clear)
+                                    )
+                            }
+                            .id(time)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xs)
+                }
+                .onAppear {
+                    scrollToSelected(proxy: proxy)
+                }
+                .onChange(of: selectedTime) { _, _ in
+                    scrollToSelected(proxy: proxy)
+                }
+            }
+        }
+        .padding(.vertical, Theme.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                .fill(Theme.Colors.cardBackground)
+        )
+    }
+
+    private var timeSlots: [Date] {
+        let cal = Calendar.current
+        var components = cal.dateComponents([.year, .month, .day], from: Date())
         var slots: [Date] = []
         for hour in 0..<24 {
             for minute in stride(from: 0, to: 60, by: 15) {
                 components.hour = hour
                 components.minute = minute
-                if let d = calendar.date(from: components) {
+                if let d = cal.date(from: components) {
                     slots.append(d)
                 }
             }
@@ -372,9 +601,9 @@ struct DateTimePickerSheet: View {
             && cal.component(.minute, from: a) == cal.component(.minute, from: b)
     }
 
-    private func scrollToNearest(proxy: ScrollViewProxy, times: [Date], target: Date) {
-        let nearest = times.min(by: {
-            abs(timeDistance($0, target)) < abs(timeDistance($1, target))
+    private func scrollToSelected(proxy: ScrollViewProxy) {
+        let nearest = timeSlots.min(by: {
+            abs(timeMinutes($0) - timeMinutes(selectedTime)) < abs(timeMinutes($1) - timeMinutes(selectedTime))
         })
         if let nearest {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -383,83 +612,75 @@ struct DateTimePickerSheet: View {
         }
     }
 
-    private func timeDistance(_ a: Date, _ b: Date) -> Int {
+    private func timeMinutes(_ d: Date) -> Int {
         let cal = Calendar.current
-        let aMin = cal.component(.hour, from: a) * 60 + cal.component(.minute, from: a)
-        let bMin = cal.component(.hour, from: b) * 60 + cal.component(.minute, from: b)
-        return aMin - bMin
+        return cal.component(.hour, from: d) * 60 + cal.component(.minute, from: d)
     }
 }
 
-// MARK: - Time Slot Carousel (extracted for opaque return type)
-private struct TimeSlotCarousel: View {
-    let times: [Date]
-    let currentTime: Date
-    let isEditingEnd: Bool
-    let onSelect: (Date) -> Void
+// MARK: - TimezonePicker (Reusable)
 
-    private func isSameTime(_ a: Date, _ b: Date) -> Bool {
-        let cal = Calendar.current
-        return cal.component(.hour, from: a) == cal.component(.hour, from: b)
-            && cal.component(.minute, from: a) == cal.component(.minute, from: b)
-    }
+struct TimezonePicker: View {
+    @Binding var selectedTimezone: TimeZone
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
 
-    private func shortTimeString(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm a"
-        return f.string(from: d)
-    }
+    private var filteredTimezones: [TimeZone] {
+        let all = TimeZone.knownTimeZoneIdentifiers
+            .compactMap { TimeZone(identifier: $0) }
+            .sorted { $0.identifier < $1.identifier }
 
-    private func timeDistance(_ a: Date, _ b: Date) -> Int {
-        let cal = Calendar.current
-        let aMin = cal.component(.hour, from: a) * 60 + cal.component(.minute, from: a)
-        let bMin = cal.component(.hour, from: b) * 60 + cal.component(.minute, from: b)
-        return aMin - bMin
+        if searchText.isEmpty { return all }
+
+        let query = searchText.lowercased()
+        return all.filter {
+            $0.identifier.lowercased().contains(query)
+                || ($0.abbreviation() ?? "").lowercased().contains(query)
+                || $0.localizedName(for: .standard, locale: .current)?.lowercased().contains(query) == true
+        }
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 4) {
-                    ForEach(times, id: \.self) { time in
-                        let isSelected = isSameTime(time, currentTime)
-
-                        Button {
-                            onSelect(time)
-                        } label: {
-                            Text(shortTimeString(time))
-                                .font(isSelected ? Theme.Typography.headlineMedium : Theme.Typography.bodyMedium)
-                                .foregroundColor(isSelected ? Theme.Colors.background : Theme.Colors.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, Theme.Spacing.md)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                        .fill(isSelected ? Theme.Colors.textPrimary : Color.clear)
-                                )
+        NavigationStack {
+            List(filteredTimezones, id: \.identifier) { tz in
+                Button {
+                    selectedTimezone = tz
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tz.identifier.replacingOccurrences(of: "_", with: " "))
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Text(tz.abbreviation() ?? "")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
-                        .id(time)
+                        Spacer()
+                        if tz.identifier == selectedTimezone.identifier {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(Theme.Colors.primary)
+                        }
                     }
                 }
-                .padding(.vertical, Theme.Spacing.sm)
             }
-            .frame(height: 220)
-            .onAppear {
-                scrollToNearest(proxy: proxy)
-            }
-            .onChange(of: isEditingEnd) { _, _ in
-                scrollToNearest(proxy: proxy)
+            .searchable(text: $searchText, prompt: "Search timezone...")
+            .navigationTitle("Timezone")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(Theme.Colors.primary)
+                }
             }
         }
     }
+}
 
-    private func scrollToNearest(proxy: ScrollViewProxy) {
-        let nearest = times.min(by: {
-            abs(timeDistance($0, currentTime)) < abs(timeDistance($1, currentTime))
-        })
-        if let nearest {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation { proxy.scrollTo(nearest, anchor: .center) }
-            }
-        }
+// MARK: - TimeZone Display Extension
+
+extension TimeZone {
+    var shortDisplayName: String {
+        abbreviation() ?? identifier
     }
 }
