@@ -244,6 +244,29 @@ final class EventViewModelTests: XCTestCase {
     }
 }
 
+final class EventEditSavePresentationTests: XCTestCase {
+    func testRegisteredSaveIsNotConsumedWhileSheetIsPresented() {
+        var sut = EventEditSavePresentation()
+        let event = FixtureFactory.makeEvent(title: "Updated")
+
+        sut.register(event)
+
+        XCTAssertNil(sut.consumeIfSheetDismissed(isSheetPresented: true))
+    }
+
+    func testRegisteredSaveIsConsumedAfterSheetDismisses() {
+        var sut = EventEditSavePresentation()
+        let event = FixtureFactory.makeEvent(title: "Updated")
+
+        sut.register(event)
+
+        let consumed = sut.consumeIfSheetDismissed(isSheetPresented: false)
+
+        XCTAssertEqual(consumed?.id, event.id)
+        XCTAssertNil(sut.consumeIfSheetDismissed(isSheetPresented: false))
+    }
+}
+
 private func makeInvite(
     id: UUID = UUID(),
     displayName: String,

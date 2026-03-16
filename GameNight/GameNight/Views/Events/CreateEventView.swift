@@ -11,6 +11,17 @@ struct CreateEventView: View {
     @StateObject private var groupsViewModel = GroupsViewModel()
     let onSaved: ((GameEvent) -> Void)?
 
+    private var saveErrorPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.error?.isEmpty == false },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.error = nil
+                }
+            }
+        )
+    }
+
     init(eventToEdit: GameEvent? = nil, initialInvites: [Invite] = [], onSaved: ((GameEvent) -> Void)? = nil) {
         _viewModel = StateObject(
             wrappedValue: CreateEventViewModel(
@@ -203,6 +214,11 @@ struct CreateEventView: View {
                         viewModel.addContact(contact)
                     }
                 }
+            }
+            .alert("Couldn't save changes", isPresented: saveErrorPresented) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.error ?? "Please try again.")
             }
         }
     }

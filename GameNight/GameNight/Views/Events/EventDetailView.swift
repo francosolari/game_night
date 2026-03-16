@@ -12,6 +12,7 @@ struct EventDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var showCreateGroupFromEvent = false
     @State private var toast: ToastItem?
+    @State private var editSavePresentation = EventEditSavePresentation()
 
     private var isOwner: Bool {
         guard let event = viewModel.event else { return false }
@@ -273,11 +274,17 @@ struct EventDetailView: View {
         .sheet(isPresented: $showEditSheet) {
             if let event = viewModel.event {
                 CreateEventView(eventToEdit: event, initialInvites: viewModel.invites) { savedEvent in
-                    viewModel.applyEditedEvent(savedEvent)
-                    toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
-                    Task { await viewModel.loadEvent(id: eventId) }
+                    editSavePresentation.register(savedEvent)
                 }
             }
+        }
+        .onChange(of: showEditSheet) { _, isPresented in
+            guard let savedEvent = editSavePresentation.consumeIfSheetDismissed(isSheetPresented: isPresented) else {
+                return
+            }
+            viewModel.applyEditedEvent(savedEvent)
+            toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
+            Task { await viewModel.loadEvent(id: eventId) }
         }
         .confirmationDialog(
             "Delete this event?",
@@ -334,6 +341,24 @@ struct EventDetailView: View {
 enum EventEditToastFactory {
     static func makeSuccessToast(for event: GameEvent) -> ToastItem {
         ToastItem(style: .success, message: "Saved changes to \(event.title)")
+    }
+}
+
+struct EventEditSavePresentation {
+    private var pendingSavedEvent: GameEvent?
+
+    mutating func register(_ event: GameEvent) {
+        pendingSavedEvent = event
+    }
+
+    mutating func consumeIfSheetDismissed(isSheetPresented: Bool) -> GameEvent? {
+        guard !isSheetPresented else {
+            return nil
+        }
+
+        let event = pendingSavedEvent
+        pendingSavedEvent = nil
+        return event
     }
 }
 
