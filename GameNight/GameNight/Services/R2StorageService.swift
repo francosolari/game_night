@@ -5,7 +5,7 @@ import Foundation
 actor R2StorageService {
     static let shared = R2StorageService()
 
-    private let supabase = SupabaseService.shared
+    @MainActor private var supabase: SupabaseService { SupabaseService.shared }
 
     // MARK: - Upload
 

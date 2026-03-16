@@ -477,7 +477,8 @@ final class CreateEventViewModel: ObservableObject {
             games: selectedGames,
             timeOptions: timeOptions,
             confirmedTimeOptionId: nil,
-            allowTimeSuggestions: allowTimeSuggestions,
+            allowTimeSuggestions: scheduleMode == .poll ? allowTimeSuggestions : false,
+            scheduleMode: scheduleMode,
             inviteStrategy: inviteStrategy,
             minPlayers: minPlayers,
             maxPlayers: maxPlayers,
@@ -537,12 +538,24 @@ final class CreateEventViewModel: ObservableObject {
             let event = buildEvent(status: .draft, session: session)
 
             if isEditing {
+                try await supabase.deleteEventGames(eventId: event.id)
+                try await supabase.deleteTimeOptions(eventId: event.id)
                 try await supabase.updateEvent(event)
-                self.createdEvent = try await supabase.fetchEvent(id: event.id)
             } else {
-                let created = try await supabase.createEvent(event)
-                self.createdEvent = created
+                let _ = try await supabase.createEvent(event)
             }
+
+            // Persist games and time options separately
+            try await supabase.createEventGames(eventId: event.id, games: selectedGames)
+
+            let timeOptionsWithEventId = timeOptions.map { option in
+                var o = option
+                o.eventId = event.id
+                return o
+            }
+            try await supabase.createTimeOptions(timeOptionsWithEventId)
+
+            self.createdEvent = try await supabase.fetchEvent(id: event.id)
         } catch {
             self.error = error.localizedDescription
         }
@@ -556,7 +569,6 @@ final class CreateEventViewModel: ObservableObject {
 
         do {
             let session = try await supabase.client.auth.session
-            let event = buildEvent(status: .published, session: session)
 
             // If fixed mode, create a single time option from the date pickers
             var finalTimeOptions = timeOptions
@@ -576,28 +588,7 @@ final class CreateEventViewModel: ObservableObject {
                 finalTimeOptions = [option]
             }
 
-            let event = GameEvent(
-                id: UUID(),
-                hostId: session.user.id,
-                host: nil,
-                title: title,
-                description: description.isEmpty ? nil : description,
-                location: location.isEmpty ? nil : location,
-                locationAddress: locationAddress.isEmpty ? nil : locationAddress,
-                status: .published,
-                games: [],
-                timeOptions: [],
-                confirmedTimeOptionId: nil,
-                allowTimeSuggestions: scheduleMode == .poll ? allowTimeSuggestions : false,
-                scheduleMode: scheduleMode,
-                inviteStrategy: inviteStrategy,
-                minPlayers: minPlayers,
-                maxPlayers: maxPlayers,
-                coverImageUrl: nil,
-                createdAt: Date(),
-                updatedAt: Date()
-            )
-
+            let event = buildEvent(status: .published, session: session)
             let created = try await supabase.createEvent(event)
 
             // Persist event games separately
@@ -612,29 +603,9 @@ final class CreateEventViewModel: ObservableObject {
             try await supabase.createTimeOptions(timeOptionsWithEventId)
 
             // Create invites
-            let sortedInvitees = invitees.sorted { $0.tier < $1.tier }
-            let firstTierSize = inviteStrategy.tierSize ?? sortedInvitees.count
+            try await createInviteRecords(eventId: created.id, hostId: session.user.id)
 
-            let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
-                let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
-                return Invite(
-                    id: UUID(),
-                    eventId: created.id,
-                    userId: invitee.userId,
-                    phoneNumber: invitee.phoneNumber,
-                    displayName: invitee.name,
-                    status: isFirstTier ? .pending : .waitlisted,
-                    tier: invitee.tier,
-                    tierPosition: index,
-                    isActive: isFirstTier,
-                    respondedAt: nil,
-                    selectedTimeOptionIds: [],
-                    suggestedTimes: nil,
-                    sentVia: .both,
-                    smsDeliveryStatus: nil,
-                    createdAt: Date()
-                )
-            }
+            self.createdEvent = created
         } catch {
             self.error = error.localizedDescription
         }

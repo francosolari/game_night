@@ -158,89 +158,73 @@ struct EventDetailView: View {
                                 showInviteList = true
                             } label: {
                                 HStack {
-                                    Image(systemName: myInvite.status.icon)
-                                    Text("You're \(myInvite.status.displayLabel.lowercased())")
-                                        .font(Theme.Typography.bodyMedium)
+                                    SectionHeader(title: "Guest List")
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Theme.Colors.textTertiary)
                                 }
-                                .foregroundColor(statusColor(myInvite.status))
-                                .frame(maxWidth: .infinity)
-                                .padding(Theme.Spacing.lg)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                        .fill(statusColor(myInvite.status).opacity(0.1))
-                                )
                             }
 
-                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                                Button {
-                                    showInviteList = true
-                                } label: {
-                                    HStack {
-                                        SectionHeader(title: "Guest List")
+                            let summary = viewModel.inviteSummary
+                            HStack(spacing: Theme.Spacing.lg) {
+                                GuestCountBadge(count: summary.accepted, label: "Going", color: Theme.Colors.success)
+                                GuestCountBadge(count: summary.pending, label: "Pending", color: Theme.Colors.warning)
+                                GuestCountBadge(count: summary.maybe, label: "Maybe", color: Theme.Colors.accent)
+                                GuestCountBadge(count: summary.declined, label: "Can't", color: Theme.Colors.error)
+                            }
 
-                                        Spacer()
+                            if !summary.acceptedUsers.isEmpty {
+                                AvatarStack(
+                                    urls: summary.acceptedUsers.map(\.avatarUrl),
+                                    size: 36
+                                )
+                            }
+                        }
+                        .cardStyle()
 
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14))
-                                            .foregroundColor(Theme.Colors.textTertiary)
+                        // Location
+                        if let location = event.location {
+                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                SectionHeader(title: "Location")
+
+                                HStack(spacing: Theme.Spacing.md) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                            .fill(Theme.Colors.secondary.opacity(0.15))
+                                            .frame(width: 44, height: 44)
+                                        Image(systemName: "mappin.circle.fill")
+                                            .font(.system(size: 24))
+                                            .foregroundColor(Theme.Colors.secondary)
                                     }
-                                }
 
-                                let summary = viewModel.inviteSummary
-                                HStack(spacing: Theme.Spacing.lg) {
-                                    GuestCountBadge(count: summary.accepted, label: "Going", color: Theme.Colors.success)
-                                    GuestCountBadge(count: summary.pending, label: "Pending", color: Theme.Colors.warning)
-                                    GuestCountBadge(count: summary.maybe, label: "Maybe", color: Theme.Colors.accent)
-                                    GuestCountBadge(count: summary.declined, label: "Can't", color: Theme.Colors.error)
-                                }
-
-                                if !summary.acceptedUsers.isEmpty {
-                                    AvatarStack(
-                                        urls: summary.acceptedUsers.map(\.avatarUrl),
-                                        size: 36
-                                    )
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(location)
+                                            .font(Theme.Typography.bodyMedium)
+                                            .foregroundColor(Theme.Colors.textPrimary)
+                                        if let address = event.locationAddress {
+                                            Text(address)
+                                                .font(Theme.Typography.caption)
+                                                .foregroundColor(Theme.Colors.textTertiary)
+                                        }
+                                    }
                                 }
                             }
                             .cardStyle()
+                        }
 
-                            if let location = event.location {
-                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                    SectionHeader(title: "Location")
-
-                                    HStack(spacing: Theme.Spacing.md) {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                                .fill(Theme.Colors.secondary.opacity(0.15))
-                                                .frame(width: 44, height: 44)
-                                            Image(systemName: "mappin.circle.fill")
-                                                .font(.system(size: 24))
-                                                .foregroundColor(Theme.Colors.secondary)
-                                        }
-
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(location)
-                                                .font(Theme.Typography.bodyMedium)
-                                                .foregroundColor(Theme.Colors.textPrimary)
-                                            if let address = event.locationAddress {
-                                                Text(address)
-                                                    .font(Theme.Typography.caption)
-                                                    .foregroundColor(Theme.Colors.textTertiary)
-                                            }
-                                        }
-                                    }
-                                }
-                                .cardStyle()
+                        // Description
+                        if let desc = event.description, !desc.isEmpty {
+                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                SectionHeader(title: "Details")
+                                Text(desc)
+                                    .font(Theme.Typography.body)
+                                    .foregroundColor(Theme.Colors.textSecondary)
                             }
-
-                            if let desc = event.description, !desc.isEmpty {
-                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                    SectionHeader(title: "Details")
-                                    Text(desc)
-                                        .font(Theme.Typography.body)
-                                        .foregroundColor(Theme.Colors.textSecondary)
-                                }
-                                .cardStyle()
-                            }
+                            .cardStyle()
+                        }
                         }
                         .padding(Theme.Spacing.xl)
                     }

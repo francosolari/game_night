@@ -363,7 +363,7 @@ struct BlockedUsersView: View {
     }
 
     private func unblock(id: UUID) async {
-        try? await SupabaseService.shared.client
+        _ = try? await SupabaseService.shared.client
             .from("blocked_users")
             .delete()
             .eq("id", value: id.uuidString)

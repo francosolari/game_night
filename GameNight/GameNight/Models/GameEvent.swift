@@ -65,6 +65,8 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(minPlayers, forKey: .minPlayers)
         try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
+        try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         // Intentionally skip: host, games, timeOptions (separate tables)

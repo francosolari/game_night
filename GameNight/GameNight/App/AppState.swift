@@ -27,7 +27,7 @@ final class AppState: ObservableObject {
     func checkAuthState() {
         Task {
             do {
-                let session = try await SupabaseService.shared.client.auth.session
+                _ = try await SupabaseService.shared.client.auth.session
                 self.currentUser = try await SupabaseService.shared.fetchCurrentUser()
                 self.isAuthenticated = true
             } catch {

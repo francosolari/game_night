@@ -4,7 +4,7 @@ import Foundation
 actor SMSService {
     static let shared = SMSService()
 
-    private let supabase = SupabaseService.shared
+    @MainActor private var supabase: SupabaseService { SupabaseService.shared }
 
     /// Send an event invite via SMS
     func sendInviteSMS(

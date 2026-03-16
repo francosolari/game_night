@@ -163,6 +163,18 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
+    func softDeleteEvent(id: UUID) async throws {
+        let updates: [String: AnyJSON] = [
+            "deleted_at": .string(ISO8601DateFormatter().string(from: Date())),
+            "status": .string("cancelled")
+        ]
+        try await client
+            .from("events")
+            .update(updates)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     // MARK: - Time Options & Event Games Persistence
 
     func createTimeOptions(_ timeOptions: [TimeOption]) async throws {
@@ -298,38 +310,7 @@ final class SupabaseService: ObservableObject {
                 .execute()
         }
 
-        struct RespondToInviteParams: Encodable {
-            let p_invite_id: String
-            let p_status: String
-            let p_selected_time_option_ids: [String]
-            let p_suggested_times: [SuggestedTimePayload]
-        }
-
-        let isoDateFormatter = ISO8601DateFormatter()
-        let dateFormatter = DateFormatter()
-        dateFormatter.calendar = Calendar(identifier: .gregorian)
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        let suggestedPayload = (suggestedTimes ?? []).map { option in
-            SuggestedTimePayload(
-                date: dateFormatter.string(from: option.date),
-                start_time: isoDateFormatter.string(from: option.startTime),
-                end_time: option.endTime.map { isoDateFormatter.string(from: $0) },
-                label: option.label
-            )
-        }
-
-        try await client
-            .rpc("respond_to_invite", params: RespondToInviteParams(
-                p_invite_id: inviteId.uuidString,
-                p_status: status.rawValue,
-                p_selected_time_option_ids: selectedTimeIds.map(\.uuidString),
-                p_suggested_times: suggestedPayload
-            ))
-            .execute()
-
+        // Trigger tiered invite processing on decline
         if status == .declined {
             try await invokeAuthenticatedFunction(
                 "process-tiered-invites",

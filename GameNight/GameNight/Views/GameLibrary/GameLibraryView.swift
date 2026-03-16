@@ -103,9 +103,9 @@ struct GameLibraryView: View {
                         LazyVStack(spacing: Theme.Spacing.md) {
                             ForEach(viewModel.filteredEntries) { entry in
                                 if let game = entry.game {
-                                    GameCard(game: game) {
+                                    GameCard(game: game, onTap: {
                                         selectedGame = game
-                                    }
+                                    })
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
                                             Task {
