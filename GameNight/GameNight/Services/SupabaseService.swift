@@ -108,6 +108,65 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
+    // MARK: - Time Options & Event Games Persistence
+
+    func createTimeOptions(_ timeOptions: [TimeOption]) async throws {
+        guard !timeOptions.isEmpty else { return }
+        try await client
+            .from("time_options")
+            .insert(timeOptions)
+            .execute()
+    }
+
+    private struct EventGameInsert: Encodable {
+        let id: UUID
+        let eventId: UUID
+        let gameId: UUID
+        let isPrimary: Bool
+        let sortOrder: Int
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case eventId = "event_id"
+            case gameId = "game_id"
+            case isPrimary = "is_primary"
+            case sortOrder = "sort_order"
+        }
+    }
+
+    func createEventGames(eventId: UUID, games: [EventGame]) async throws {
+        guard !games.isEmpty else { return }
+        let inserts = games.map { game in
+            EventGameInsert(
+                id: game.id,
+                eventId: eventId,
+                gameId: game.gameId,
+                isPrimary: game.isPrimary,
+                sortOrder: game.sortOrder
+            )
+        }
+        try await client
+            .from("event_games")
+            .insert(inserts)
+            .execute()
+    }
+
+    func deleteTimeOptions(eventId: UUID) async throws {
+        try await client
+            .from("time_options")
+            .delete()
+            .eq("event_id", value: eventId.uuidString)
+            .execute()
+    }
+
+    func deleteEventGames(eventId: UUID) async throws {
+        try await client
+            .from("event_games")
+            .delete()
+            .eq("event_id", value: eventId.uuidString)
+            .execute()
+    }
+
     // MARK: - Invites
 
     func fetchInvites(eventId: UUID) async throws -> [Invite] {
@@ -133,11 +192,14 @@ final class SupabaseService: ObservableObject {
         return invites
     }
 
-    func respondToInvite(inviteId: UUID, status: InviteStatus, selectedTimeIds: [UUID], suggestedTimes: [TimeOption]?) async throws {
-        var updates: [String: AnyJSON] = [
+    func respondToInvite(inviteId: UUID, status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async throws {
+        // selected_time_option_ids stores 'yes' votes for backward compat
+        let yesIds = timeVotes.filter { $0.voteType == .yes }.map { $0.timeOptionId }
+
+        let updates: [String: AnyJSON] = [
             "status": .string(status.rawValue),
             "responded_at": .string(ISO8601DateFormatter().string(from: Date())),
-            "selected_time_option_ids": .array(selectedTimeIds.map { .string($0.uuidString) })
+            "selected_time_option_ids": .array(yesIds.map { .string($0.uuidString) })
         ]
 
         try await client
@@ -145,6 +207,33 @@ final class SupabaseService: ObservableObject {
             .update(updates)
             .eq("id", value: inviteId.uuidString)
             .execute()
+
+        // Delete existing votes for this invite, then insert new ones
+        try await client
+            .from("time_option_votes")
+            .delete()
+            .eq("invite_id", value: inviteId.uuidString)
+            .execute()
+
+        if !timeVotes.isEmpty {
+            struct VoteInsert: Encodable {
+                let timeOptionId: UUID
+                let inviteId: UUID
+                let voteType: String
+                enum CodingKeys: String, CodingKey {
+                    case timeOptionId = "time_option_id"
+                    case inviteId = "invite_id"
+                    case voteType = "vote_type"
+                }
+            }
+            let voteInserts = timeVotes.map { vote in
+                VoteInsert(timeOptionId: vote.timeOptionId, inviteId: inviteId, voteType: vote.voteType.rawValue)
+            }
+            try await client
+                .from("time_option_votes")
+                .insert(voteInserts)
+                .execute()
+        }
 
         // Insert suggested times if any
         if let suggestedTimes, !suggestedTimes.isEmpty {

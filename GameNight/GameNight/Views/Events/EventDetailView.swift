@@ -4,6 +4,7 @@ struct EventDetailView: View {
     let eventId: UUID
     @StateObject private var viewModel = EventViewModel()
     @State private var selectedTimeIds = Set<UUID>()
+    @State private var pollVotes: [UUID: TimeOptionVoteType] = [:]
     @State private var showTimeSuggestion = false
     @State private var showInviteList = false
 
@@ -30,65 +31,83 @@ struct EventDetailView: View {
                         .cardStyle()
 
                         // Schedule Section
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            SectionHeader(title: "When Works?")
-
-                            if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                                Text("Select the times that work for you:")
-                                    .font(Theme.Typography.callout)
-                                    .foregroundColor(Theme.Colors.textSecondary)
-
-                                TimeOptionPicker(
-                                    timeOptions: event.timeOptions,
-                                    selectedIds: $selectedTimeIds,
-                                    allowMultiple: true,
-                                    showVoteCounts: false
-                                )
-
-                                if event.allowTimeSuggestions {
-                                    Button {
-                                        showTimeSuggestion = true
-                                    } label: {
-                                        HStack {
-                                            Image(systemName: "plus.circle")
-                                            Text("Suggest another time")
-                                        }
-                                        .font(Theme.Typography.calloutMedium)
-                                        .foregroundColor(Theme.Colors.accent)
-                                    }
+                        if event.scheduleMode == .fixed || event.timeOptions.count <= 1 {
+                            // Fixed mode: show date prominently
+                            if let timeOption = event.timeOptions.first {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(Theme.Colors.primary)
+                                    Text("\(timeOption.displayDate) \u{00B7} \(timeOption.displayTime)")
+                                        .font(Theme.Typography.headlineMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
                                 }
-                            } else {
-                                TimeOptionPicker(
-                                    timeOptions: event.timeOptions,
-                                    selectedIds: $selectedTimeIds,
-                                    allowMultiple: false,
-                                    showVoteCounts: true
-                                )
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .cardStyle()
                             }
+                        } else {
+                            // Poll mode
+                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                SectionHeader(title: "Schedule Poll")
+
+                                if let myInvite = viewModel.myInvite, myInvite.status == .pending {
+                                    Text("Vote on the times that work for you:")
+                                        .font(Theme.Typography.callout)
+                                        .foregroundColor(Theme.Colors.textSecondary)
+
+                                    PollVotingView(
+                                        timeOptions: event.timeOptions,
+                                        votes: $pollVotes
+                                    )
+
+                                    if event.allowTimeSuggestions {
+                                        Button {
+                                            showTimeSuggestion = true
+                                        } label: {
+                                            HStack {
+                                                Image(systemName: "plus.circle")
+                                                Text("Suggest another time")
+                                            }
+                                            .font(Theme.Typography.calloutMedium)
+                                            .foregroundColor(Theme.Colors.accent)
+                                        }
+                                    }
+                                } else {
+                                    // Show poll results
+                                    TimeOptionPicker(
+                                        timeOptions: event.timeOptions,
+                                        selectedIds: $selectedTimeIds,
+                                        allowMultiple: false,
+                                        showVoteCounts: true
+                                    )
+                                }
+                            }
+                            .cardStyle()
                         }
-                        .cardStyle()
 
                         // RSVP Section (if I'm invited and pending)
                         if let myInvite = viewModel.myInvite, myInvite.status == .pending {
                             RSVPSection(
                                 onAccept: {
+                                    let votes = buildTimeVotes(for: event)
                                     await viewModel.respondToInvite(
                                         status: .accepted,
-                                        selectedTimeIds: Array(selectedTimeIds),
+                                        timeVotes: votes,
                                         suggestedTimes: nil
                                     )
                                 },
                                 onDecline: {
                                     await viewModel.respondToInvite(
                                         status: .declined,
-                                        selectedTimeIds: [],
+                                        timeVotes: [],
                                         suggestedTimes: nil
                                     )
                                 },
                                 onMaybe: {
+                                    let votes = buildTimeVotes(for: event)
                                     await viewModel.respondToInvite(
                                         status: .maybe,
-                                        selectedTimeIds: Array(selectedTimeIds),
+                                        timeVotes: votes,
                                         suggestedTimes: nil
                                     )
                                 },
@@ -202,6 +221,16 @@ struct EventDetailView: View {
         }
         .task {
             await viewModel.loadEvent(id: eventId)
+        }
+    }
+
+    private func buildTimeVotes(for event: GameEvent) -> [TimeOptionVote] {
+        if event.scheduleMode == .poll && event.timeOptions.count > 1 {
+            // Use poll votes
+            return pollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
+        } else {
+            // Fixed mode: auto-vote yes for all time options
+            return selectedTimeIds.map { TimeOptionVote(timeOptionId: $0, voteType: .yes) }
         }
     }
 

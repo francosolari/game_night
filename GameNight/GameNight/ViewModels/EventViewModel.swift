@@ -55,14 +55,14 @@ final class EventViewModel: ObservableObject {
         isLoading = false
     }
 
-    func respondToInvite(status: InviteStatus, selectedTimeIds: [UUID], suggestedTimes: [TimeOption]?) async {
+    func respondToInvite(status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async {
         guard let invite = myInvite else { return }
         isSending = true
         do {
             try await supabase.respondToInvite(
                 inviteId: invite.id,
                 status: status,
-                selectedTimeIds: selectedTimeIds,
+                timeVotes: timeVotes,
                 suggestedTimes: suggestedTimes
             )
             myInvite?.status = status
@@ -97,6 +97,9 @@ final class CreateEventViewModel: ObservableObject {
     @Published var selectedGames: [EventGame] = []
     @Published var timeOptions: [TimeOption] = []
     @Published var allowTimeSuggestions = true
+    @Published var scheduleMode: ScheduleMode = .fixed
+    @Published var fixedDate: Date = Date()
+    @Published var fixedStartTime: Date = Date()
     @Published var inviteStrategy = InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true)
     @Published var minPlayers = 3
     @Published var maxPlayers: Int? = nil
@@ -128,7 +131,7 @@ final class CreateEventViewModel: ObservableObject {
         switch currentStep {
         case .details: return !title.isEmpty
         case .games: return !selectedGames.isEmpty
-        case .schedule: return !timeOptions.isEmpty
+        case .schedule: return scheduleMode == .fixed || !timeOptions.isEmpty
         case .invites: return !invitees.isEmpty
         case .review: return true
         }
@@ -185,7 +188,8 @@ final class CreateEventViewModel: ObservableObject {
             label: label,
             isSuggested: false,
             suggestedBy: nil,
-            voteCount: 0
+            voteCount: 0,
+            maybeCount: 0
         )
         timeOptions.append(option)
     }
@@ -235,6 +239,24 @@ final class CreateEventViewModel: ObservableObject {
         do {
             let session = try await supabase.client.auth.session
 
+            // If fixed mode, create a single time option from the date pickers
+            var finalTimeOptions = timeOptions
+            if scheduleMode == .fixed {
+                let option = TimeOption(
+                    id: UUID(),
+                    eventId: nil,
+                    date: fixedDate,
+                    startTime: fixedStartTime,
+                    endTime: nil,
+                    label: nil,
+                    isSuggested: false,
+                    suggestedBy: nil,
+                    voteCount: 0,
+                    maybeCount: 0
+                )
+                finalTimeOptions = [option]
+            }
+
             let event = GameEvent(
                 id: UUID(),
                 hostId: session.user.id,
@@ -244,10 +266,11 @@ final class CreateEventViewModel: ObservableObject {
                 location: location.isEmpty ? nil : location,
                 locationAddress: locationAddress.isEmpty ? nil : locationAddress,
                 status: .published,
-                games: selectedGames,
-                timeOptions: timeOptions,
+                games: [],
+                timeOptions: [],
                 confirmedTimeOptionId: nil,
-                allowTimeSuggestions: allowTimeSuggestions,
+                allowTimeSuggestions: scheduleMode == .poll ? allowTimeSuggestions : false,
+                scheduleMode: scheduleMode,
                 inviteStrategy: inviteStrategy,
                 minPlayers: minPlayers,
                 maxPlayers: maxPlayers,
@@ -257,6 +280,17 @@ final class CreateEventViewModel: ObservableObject {
             )
 
             let created = try await supabase.createEvent(event)
+
+            // Persist event games separately
+            try await supabase.createEventGames(eventId: created.id, games: selectedGames)
+
+            // Persist time options separately with eventId set
+            let timeOptionsWithEventId = finalTimeOptions.map { option in
+                var o = option
+                o.eventId = created.id
+                return o
+            }
+            try await supabase.createTimeOptions(timeOptionsWithEventId)
 
             // Create invites
             let sortedInvitees = invitees.sorted { $0.tier < $1.tier }

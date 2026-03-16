@@ -306,54 +306,74 @@ struct CreateEventView: View {
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
-            Text("Add multiple time options so invitees can vote on what works best.")
-                .font(Theme.Typography.callout)
-                .foregroundColor(Theme.Colors.textSecondary)
+            // Mode picker
+            Picker("", selection: $viewModel.scheduleMode) {
+                Text("Set a Date").tag(ScheduleMode.fixed)
+                Text("Poll Attendees").tag(ScheduleMode.poll)
+            }
+            .pickerStyle(.segmented)
 
-            // Existing time options
-            ForEach(Array(viewModel.timeOptions.enumerated()), id: \.element.id) { index, option in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(option.displayDate)
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        Text(option.displayTime)
-                            .font(Theme.Typography.callout)
-                            .foregroundColor(Theme.Colors.textSecondary)
-                        if let label = option.label {
-                            Text(label)
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.Colors.primaryLight)
-                        }
-                    }
+            if viewModel.scheduleMode == .fixed {
+                // Fixed mode: simple date + time pickers
+                VStack(spacing: Theme.Spacing.md) {
+                    DatePicker("Date", selection: $viewModel.fixedDate, displayedComponents: .date)
+                        .tint(Theme.Colors.primary)
 
-                    Spacer()
-
-                    Button { viewModel.removeTimeOption(at: index) } label: {
-                        Image(systemName: "trash")
-                            .foregroundColor(Theme.Colors.error.opacity(0.7))
-                    }
+                    DatePicker("Start Time", selection: $viewModel.fixedStartTime, displayedComponents: .hourAndMinute)
+                        .tint(Theme.Colors.primary)
                 }
                 .cardStyle()
-            }
+            } else {
+                // Poll mode: multiple time options
+                Text("Add time options for invitees to vote on.")
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textSecondary)
 
-            // Add time option
-            AddTimeOptionView { date, start, end, label in
-                viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: label)
-            }
+                // Existing time options
+                ForEach(Array(viewModel.timeOptions.enumerated()), id: \.element.id) { index, option in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(option.displayDate)
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Text(option.displayTime)
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                            if let label = option.label {
+                                Text(label)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.primaryLight)
+                            }
+                        }
 
-            // Allow suggestions toggle
-            Toggle(isOn: $viewModel.allowTimeSuggestions) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Allow time suggestions")
-                        .font(Theme.Typography.bodyMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    Text("Invitees can suggest other times")
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        Spacer()
+
+                        Button { viewModel.removeTimeOption(at: index) } label: {
+                            Image(systemName: "trash")
+                                .foregroundColor(Theme.Colors.error.opacity(0.7))
+                        }
+                    }
+                    .cardStyle()
                 }
+
+                // Add time option
+                AddTimeOptionView { date, start, end, label in
+                    viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: label)
+                }
+
+                // Allow suggestions toggle (poll mode only)
+                Toggle(isOn: $viewModel.allowTimeSuggestions) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Allow time suggestions")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Text("Invitees can suggest other times")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                }
+                .tint(Theme.Colors.primary)
             }
-            .tint(Theme.Colors.primary)
         }
     }
 
@@ -556,18 +576,44 @@ struct CreateEventView: View {
 
                 // Schedule
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Time Options")
+                    Text(viewModel.scheduleMode == .fixed ? "Date" : "Time Options")
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textTertiary)
 
-                    ForEach(viewModel.timeOptions) { option in
-                        HStack {
-                            Text(option.displayDate)
+                    if viewModel.scheduleMode == .fixed {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            Image(systemName: "calendar")
+                                .foregroundColor(Theme.Colors.primary)
+                            let dateFormatter: DateFormatter = {
+                                let f = DateFormatter()
+                                f.dateFormat = "EEE, MMM d"
+                                return f
+                            }()
+                            let timeFormatter: DateFormatter = {
+                                let f = DateFormatter()
+                                f.dateFormat = "h:mm a"
+                                return f
+                            }()
+                            Text("\(dateFormatter.string(from: viewModel.fixedDate)) at \(timeFormatter.string(from: viewModel.fixedStartTime))")
                                 .font(Theme.Typography.bodyMedium)
                                 .foregroundColor(Theme.Colors.textPrimary)
-                            Text(option.displayTime)
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    } else {
+                        ForEach(viewModel.timeOptions) { option in
+                            HStack {
+                                Text(option.displayDate)
+                                    .font(Theme.Typography.bodyMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                                Text(option.displayTime)
+                                    .font(Theme.Typography.callout)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                            }
+                        }
+
+                        if viewModel.allowTimeSuggestions {
+                            Text("Time suggestions enabled")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.accent)
                         }
                     }
                 }
@@ -679,7 +725,6 @@ struct StrategyOption: View {
 struct AddTimeOptionView: View {
     @State private var date = Date()
     @State private var startTime = Date()
-    @State private var endTime = Date()
     @State private var label = ""
     @State private var isExpanded = false
 
@@ -711,9 +756,6 @@ struct AddTimeOptionView: View {
                     DatePicker("Start Time", selection: $startTime, displayedComponents: .hourAndMinute)
                         .tint(Theme.Colors.primary)
 
-                    DatePicker("End Time", selection: $endTime, displayedComponents: .hourAndMinute)
-                        .tint(Theme.Colors.primary)
-
                     TextField("Label (e.g. Monday Evening)", text: $label)
                         .font(Theme.Typography.body)
                         .padding(Theme.Spacing.md)
@@ -723,7 +765,7 @@ struct AddTimeOptionView: View {
                         )
 
                     Button("Add") {
-                        onAdd(date, startTime, endTime, label.isEmpty ? nil : label)
+                        onAdd(date, startTime, nil, label.isEmpty ? nil : label)
                         withAnimation(Theme.Animation.snappy) { isExpanded = false }
                         label = ""
                     }
