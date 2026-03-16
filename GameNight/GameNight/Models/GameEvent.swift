@@ -321,6 +321,26 @@ struct TimeOption: Identifiable, Codable, Hashable {
         }
         return start
     }
+
+    var relativeTimeDisplay: String {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        let startOfTarget = calendar.startOfDay(for: date)
+        
+        let components = calendar.dateComponents([.day, .month], from: startOfToday, to: startOfTarget)
+        
+        if let months = components.month, months >= 1 {
+            return months == 1 ? "1 month away" : "\(months) months away"
+        }
+        
+        if let days = components.day {
+            if days == 0 { return "Today" }
+            if days == 1 { return "Tomorrow" }
+            if days > 1 { return "\(days) days away" }
+        }
+        
+        return ""
+    }
 }
 
 // MARK: - Time Option Vote Types
