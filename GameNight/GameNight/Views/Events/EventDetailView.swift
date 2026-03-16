@@ -385,34 +385,50 @@ struct EventHeroHeader: View {
             .frame(height: 240)
 
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    // Status pill
-                    Text(event.status.rawValue.capitalized)
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.primaryLight)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Theme.Colors.primary.opacity(0.2)))
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    // Title + Date/Time Row
+                    HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
+                        Text(event.title)
+                            .font(Theme.Typography.displayMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        
+                        if let timeOption = firstTimeOption {
+                            Text("•")
+                                .foregroundColor(Theme.Colors.textTertiary)
+                            Text("\(timeOption.displayDate) • \(timeOption.startTime, style: .time)")
+                                .font(Theme.Typography.headlineMedium)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
 
-                    Text(event.title)
-                        .font(Theme.Typography.displayMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
+                    // Relative Time + Status Pill Row
+                    HStack(spacing: Theme.Spacing.md) {
+                        if let timeOption = firstTimeOption {
+                            Text(timeOption.relativeTimeDisplay)
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.accent)
+                        }
+                        
+                        Text(event.status.rawValue.capitalized)
+                            .font(Theme.Typography.caption2)
+                            .foregroundColor(Theme.Colors.primaryLight)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.2)))
+                    }
 
-                    // Time + location line
-                    if let timeOption = firstTimeOption {
+                    // Location line (simplified)
+                    if let location = event.location {
                         HStack(spacing: 6) {
-                            Text("\(timeOption.displayTime)")
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                            Text(location)
                                 .font(Theme.Typography.callout)
                                 .foregroundColor(Theme.Colors.textSecondary)
-                            if let location = event.location {
-                                Text("·")
-                                    .foregroundColor(Theme.Colors.textTertiary)
-                                Text(location)
-                                    .font(Theme.Typography.callout)
-                                    .foregroundColor(Theme.Colors.textSecondary)
-                                    .lineLimit(1)
-                            }
+                                .lineLimit(1)
                         }
+                        .padding(.top, 4)
                     }
 
                     if let host = event.host {
@@ -422,15 +438,18 @@ struct EventHeroHeader: View {
                                 .font(Theme.Typography.callout)
                                 .foregroundColor(Theme.Colors.textSecondary)
                         }
+                        .padding(.top, 4)
                     }
                 }
 
                 Spacer()
 
-                // Date badge (top-right)
+                // Date badge (top-right) - Hidden for A/B testing
+                /*
                 if let timeOption = firstTimeOption {
                     DateBadge(date: timeOption.date)
                 }
+                */
             }
             .padding(Theme.Spacing.xl)
         }
