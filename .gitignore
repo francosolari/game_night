@@ -44,3 +44,6 @@ node_modules/
 # Supabase local
 supabase/.branches
 supabase/.temp
+
+# Local git worktrees
+.worktrees/
