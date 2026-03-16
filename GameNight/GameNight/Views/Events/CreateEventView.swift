@@ -8,6 +8,8 @@ struct CreateEventView: View {
     @State private var showContactList = false
     @State private var showCancelConfirmation = false
     @State private var showGroupPicker = false
+    @State private var showDateTimePicker = false
+    @State private var showPollDateTimePicker = false
     @StateObject private var groupsViewModel = GroupsViewModel()
     let onSaved: ((GameEvent) -> Void)?
 
@@ -476,15 +478,61 @@ struct CreateEventView: View {
             .pickerStyle(.segmented)
 
             if viewModel.scheduleMode == .fixed {
-                // Fixed mode: simple date + time pickers
-                VStack(spacing: Theme.Spacing.md) {
-                    DatePicker("Date", selection: $viewModel.fixedDate, displayedComponents: .date)
-                        .tint(Theme.Colors.primary)
+                // Fixed mode: tappable summary card
+                Button {
+                    showDateTimePicker = true
+                } label: {
+                    HStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 20))
+                            .foregroundColor(Theme.Colors.primary)
 
-                    DatePicker("Start Time", selection: $viewModel.fixedStartTime, displayedComponents: .hourAndMinute)
-                        .tint(Theme.Colors.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            let dateF = DateFormatter()
+                            let _ = dateF.dateFormat = "EEE, MMM d"
+                            let timeF = DateFormatter()
+                            let _ = timeF.dateFormat = "h:mm a"
+
+                            Text(dateF.string(from: viewModel.fixedDate))
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+
+                            HStack(spacing: Theme.Spacing.xs) {
+                                Text(timeF.string(from: viewModel.fixedStartTime))
+                                    .font(Theme.Typography.headlineMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+
+                                if viewModel.hasEndTime {
+                                    Text("-")
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                    Text(timeF.string(from: viewModel.fixedEndTime))
+                                        .font(Theme.Typography.headlineMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .padding(Theme.Spacing.lg)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                            .fill(Theme.Colors.cardBackground)
+                    )
                 }
-                .cardStyle()
+                .sheet(isPresented: $showDateTimePicker) {
+                    DateTimePickerSheet(
+                        date: $viewModel.fixedDate,
+                        startTime: $viewModel.fixedStartTime,
+                        endTime: $viewModel.fixedEndTime,
+                        hasEndTime: $viewModel.hasEndTime
+                    )
+                    .presentationDetents([.large])
+                }
             } else {
                 // Poll mode: multiple time options
                 Text("Add time options for invitees to vote on.")
@@ -518,10 +566,10 @@ struct CreateEventView: View {
                     .cardStyle()
                 }
 
-                // Add time option
-                AddTimeOptionView { date, start, end, label in
-                    viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: label)
-                }
+                // Add time option via Partiful-style picker
+                PollAddTimeButton(onAdd: { date, start, end in
+                    viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: nil)
+                })
 
                 // Allow suggestions toggle (poll mode only)
                 Toggle(isOn: $viewModel.allowTimeSuggestions) {
@@ -843,19 +891,25 @@ struct CreateEventView: View {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: "calendar")
                                 .foregroundColor(Theme.Colors.primary)
-                            let dateFormatter: DateFormatter = {
+                            let dateF: DateFormatter = {
                                 let f = DateFormatter()
                                 f.dateFormat = "EEE, MMM d"
                                 return f
                             }()
-                            let timeFormatter: DateFormatter = {
+                            let timeF: DateFormatter = {
                                 let f = DateFormatter()
                                 f.dateFormat = "h:mm a"
                                 return f
                             }()
-                            Text("\(dateFormatter.string(from: viewModel.fixedDate)) at \(timeFormatter.string(from: viewModel.fixedStartTime))")
-                                .font(Theme.Typography.bodyMedium)
-                                .foregroundColor(Theme.Colors.textPrimary)
+                            if viewModel.hasEndTime {
+                                Text("\(dateF.string(from: viewModel.fixedDate)) at \(timeF.string(from: viewModel.fixedStartTime)) - \(timeF.string(from: viewModel.fixedEndTime))")
+                                    .font(Theme.Typography.bodyMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                            } else {
+                                Text("\(dateF.string(from: viewModel.fixedDate)) at \(timeF.string(from: viewModel.fixedStartTime))")
+                                    .font(Theme.Typography.bodyMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                            }
                         }
                     } else {
                         ForEach(viewModel.timeOptions) { option in
@@ -1047,6 +1101,62 @@ struct AddTimeOptionView: View {
                 }
                 .cardStyle()
             }
+        }
+    }
+}
+
+// MARK: - Poll Add Time Button (uses DateTimePickerSheet)
+struct PollAddTimeButton: View {
+    let onAdd: (Date, Date, Date?) -> Void
+
+    @State private var showPicker = false
+    @State private var pickerDate = Date()
+    @State private var pickerStartTime: Date = {
+        let cal = Calendar.current
+        var c = cal.dateComponents([.year, .month, .day], from: Date())
+        c.hour = 19; c.minute = 0
+        return cal.date(from: c) ?? Date()
+    }()
+    @State private var pickerEndTime: Date = {
+        let cal = Calendar.current
+        var c = cal.dateComponents([.year, .month, .day], from: Date())
+        c.hour = 22; c.minute = 0
+        return cal.date(from: c) ?? Date()
+    }()
+    @State private var pickerHasEndTime = false
+
+    var body: some View {
+        Button {
+            // Reset to defaults before opening
+            pickerDate = Date()
+            let cal = Calendar.current
+            var c = cal.dateComponents([.year, .month, .day], from: Date())
+            c.hour = 19; c.minute = 0
+            pickerStartTime = cal.date(from: c) ?? Date()
+            c.hour = 22
+            pickerEndTime = cal.date(from: c) ?? Date()
+            pickerHasEndTime = false
+            showPicker = true
+        } label: {
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Theme.Gradients.primary)
+                Text("Add Time Option")
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.primary)
+                Spacer()
+            }
+        }
+        .sheet(isPresented: $showPicker, onDismiss: {
+            onAdd(pickerDate, pickerStartTime, pickerHasEndTime ? pickerEndTime : nil)
+        }) {
+            DateTimePickerSheet(
+                date: $pickerDate,
+                startTime: $pickerStartTime,
+                endTime: $pickerEndTime,
+                hasEndTime: $pickerHasEndTime
+            )
+            .presentationDetents([.large])
         }
     }
 }

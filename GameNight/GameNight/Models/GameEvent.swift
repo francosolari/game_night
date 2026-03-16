@@ -306,6 +306,66 @@ struct TimeOption: Identifiable, Codable, Hashable {
         case maybeCount = "maybe_count"
     }
 
+    private static let dateOnlyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone.current
+        return f
+    }()
+
+    init(id: UUID, eventId: UUID? = nil, date: Date, startTime: Date, endTime: Date? = nil, label: String? = nil, isSuggested: Bool = false, suggestedBy: UUID? = nil, voteCount: Int = 0, maybeCount: Int = 0) {
+        self.id = id
+        self.eventId = eventId
+        self.date = date
+        self.startTime = startTime
+        self.endTime = endTime
+        self.label = label
+        self.isSuggested = isSuggested
+        self.suggestedBy = suggestedBy
+        self.voteCount = voteCount
+        self.maybeCount = maybeCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        eventId = try container.decodeIfPresent(UUID.self, forKey: .eventId)
+
+        // date: try Date first (ISO8601), fall back to "yyyy-MM-dd" string
+        if let dateValue = try? container.decode(Date.self, forKey: .date) {
+            date = dateValue
+        } else {
+            let dateString = try container.decode(String.self, forKey: .date)
+            guard let parsed = Self.dateOnlyFormatter.date(from: dateString) else {
+                throw DecodingError.dataCorruptedError(forKey: .date, in: container, debugDescription: "Cannot parse date: \(dateString)")
+            }
+            date = parsed
+        }
+
+        startTime = try container.decode(Date.self, forKey: .startTime)
+        endTime = try container.decodeIfPresent(Date.self, forKey: .endTime)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        isSuggested = try container.decodeIfPresent(Bool.self, forKey: .isSuggested) ?? false
+        suggestedBy = try container.decodeIfPresent(UUID.self, forKey: .suggestedBy)
+        voteCount = try container.decodeIfPresent(Int.self, forKey: .voteCount) ?? 0
+        maybeCount = try container.decodeIfPresent(Int.self, forKey: .maybeCount) ?? 0
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(eventId, forKey: .eventId)
+        // Encode date as "yyyy-MM-dd" string to match PostgreSQL DATE column
+        try container.encode(Self.dateOnlyFormatter.string(from: date), forKey: .date)
+        try container.encode(startTime, forKey: .startTime)
+        try container.encodeIfPresent(endTime, forKey: .endTime)
+        try container.encodeIfPresent(label, forKey: .label)
+        try container.encode(isSuggested, forKey: .isSuggested)
+        try container.encodeIfPresent(suggestedBy, forKey: .suggestedBy)
+        // Skip vote_count/maybe_count — they are trigger-maintained
+    }
+
     var displayDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE, MMM d"
@@ -326,19 +386,19 @@ struct TimeOption: Identifiable, Codable, Hashable {
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: Date())
         let startOfTarget = calendar.startOfDay(for: date)
-        
+
         let components = calendar.dateComponents([.day, .month], from: startOfToday, to: startOfTarget)
-        
+
         if let months = components.month, months >= 1 {
             return months == 1 ? "1 month away" : "\(months) months away"
         }
-        
+
         if let days = components.day {
             if days == 0 { return "Today" }
             if days == 1 { return "Tomorrow" }
             if days > 1 { return "\(days) days away" }
         }
-        
+
         return ""
     }
 }

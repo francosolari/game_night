@@ -395,7 +395,7 @@ struct EventHeroHeader: View {
                         if let timeOption = firstTimeOption {
                             Text("•")
                                 .foregroundColor(Theme.Colors.textTertiary)
-                            Text("\(timeOption.displayDate) • \(timeOption.startTime, style: .time)")
+                            Text("\(timeOption.displayDate) • \(timeOption.displayTime)")
                                 .font(Theme.Typography.headlineMedium)
                                 .foregroundColor(Theme.Colors.textSecondary)
                         }
@@ -444,12 +444,9 @@ struct EventHeroHeader: View {
 
                 Spacer()
 
-                // Date badge (top-right) - Hidden for A/B testing
-                /*
                 if let timeOption = firstTimeOption {
                     DateBadge(date: timeOption.date)
                 }
-                */
             }
             .padding(Theme.Spacing.xl)
         }

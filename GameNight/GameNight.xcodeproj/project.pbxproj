@@ -48,6 +48,7 @@
 		B8CB9F46799095CFDF66F26E /* BGGService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F45F84908CD5A1C95CFFF098 /* BGGService.swift */; };
 		B9C83FE17B46B9822C47006F /* EventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24832623E66C268D9044E240 /* EventCard.swift */; };
 		B9E6E9BC3F6AF446F3E38982 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 15DEB0951CE98339F2E2354C /* Assets.xcassets */; };
+		C189CA60E4FFD650CAA0D477 /* DateTimePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C687BB107656027493FF5F5 /* DateTimePickerSheet.swift */; };
 		C490E51116FD132D9BDE3239 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAFBC98FCB83FD971A6F753 /* Theme.swift */; };
 		C50FC1236834BE18DCDDB3D1 /* ShimmerLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320F17AF3B5B3C150DC53B6F /* ShimmerLayoutMetrics.swift */; };
 		C5C23C7667D8666450441FA7 /* GameLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3FEEC34A1373C0210242FC /* GameLibraryViewModel.swift */; };
@@ -99,6 +100,7 @@
 		35ACFC5CF2D84146F1B0E5B2 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		38CD0AF08CE4B5CEF7E0D505 /* CreateGroupFromAttendeesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupFromAttendeesSheet.swift; sourceTree = "<group>"; };
 		3926C65D6513E68EE254B8FC /* GuestListTabsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestListTabsView.swift; sourceTree = "<group>"; };
+		3C687BB107656027493FF5F5 /* DateTimePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateTimePickerSheet.swift; sourceTree = "<group>"; };
 		40CDC4EFE6713EAE4B33C26B /* TestError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestError.swift; sourceTree = "<group>"; };
 		46C66541A70C31BA98A29D18 /* Group.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Group.swift; sourceTree = "<group>"; };
 		491C5BC61EA3E94B1EA73171 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 			children = (
 				7A099D30160F26BA3940E576 /* ActivityFeedView.swift */,
 				E428E34778C2894B35484021 /* CreateEventView.swift */,
+				3C687BB107656027493FF5F5 /* DateTimePickerSheet.swift */,
 				5438E24E75BD13B48ABCAD82 /* EventDetailView.swift */,
 				056DCF17A5CC08E893A25FFA /* GameVotingView.swift */,
 				3926C65D6513E68EE254B8FC /* GuestListTabsView.swift */,
@@ -481,6 +484,7 @@
 				03DE6C5AC84BC4458D2EE750 /* ContentView.swift in Sources */,
 				133E52FC137BE4A2BBF26C08 /* CreateEventView.swift in Sources */,
 				FDECD26096E37C1D41EAEDE2 /* CreateGroupFromAttendeesSheet.swift in Sources */,
+				C189CA60E4FFD650CAA0D477 /* DateTimePickerSheet.swift in Sources */,
 				B9C83FE17B46B9822C47006F /* EventCard.swift in Sources */,
 				0B1B53A086B2D5C634FB2153 /* EventDetailView.swift in Sources */,
 				EC928EA881FC49F3BC324924 /* EventViewModel.swift in Sources */,

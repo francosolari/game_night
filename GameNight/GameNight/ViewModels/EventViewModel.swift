@@ -283,6 +283,8 @@ final class CreateEventViewModel: ObservableObject {
     @Published var scheduleMode: ScheduleMode = .fixed
     @Published var fixedDate: Date = Date()
     @Published var fixedStartTime: Date = Date()
+    @Published var fixedEndTime: Date = Calendar.current.date(byAdding: .hour, value: 3, to: Date())!
+    @Published var hasEndTime: Bool = false
     @Published var inviteStrategy = InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true)
     @Published var minPlayers = 3
     @Published var maxPlayers: Int? = nil
@@ -349,6 +351,10 @@ final class CreateEventViewModel: ObservableObject {
             if eventToEdit.scheduleMode == .fixed, let fixedOption = eventToEdit.timeOptions.first {
                 fixedDate = fixedOption.date
                 fixedStartTime = fixedOption.startTime
+                if let end = fixedOption.endTime {
+                    fixedEndTime = end
+                    hasEndTime = true
+                }
             }
 
             if eventToEdit.status == .draft {
@@ -885,13 +891,38 @@ final class CreateEventViewModel: ObservableObject {
     private func resolvedTimeOptions(eventId: UUID? = nil) -> [TimeOption] {
         if scheduleMode == .fixed {
             let existingFixed = eventToEdit?.timeOptions.first ?? timeOptions.first
+            let calendar = Calendar.current
+
+            // Combine fixedDate's year/month/day + fixedStartTime's hour/minute
+            let dateComponents = calendar.dateComponents([.year, .month, .day], from: fixedDate)
+            let startComponents = calendar.dateComponents([.hour, .minute], from: fixedStartTime)
+            var combinedStart = DateComponents()
+            combinedStart.year = dateComponents.year
+            combinedStart.month = dateComponents.month
+            combinedStart.day = dateComponents.day
+            combinedStart.hour = startComponents.hour
+            combinedStart.minute = startComponents.minute
+            let resolvedStartTime = calendar.date(from: combinedStart) ?? fixedStartTime
+
+            var resolvedEndTime: Date? = nil
+            if hasEndTime {
+                let endComponents = calendar.dateComponents([.hour, .minute], from: fixedEndTime)
+                var combinedEnd = DateComponents()
+                combinedEnd.year = dateComponents.year
+                combinedEnd.month = dateComponents.month
+                combinedEnd.day = dateComponents.day
+                combinedEnd.hour = endComponents.hour
+                combinedEnd.minute = endComponents.minute
+                resolvedEndTime = calendar.date(from: combinedEnd) ?? fixedEndTime
+            }
+
             return [
                 TimeOption(
                     id: existingFixed?.id ?? UUID(),
                     eventId: eventId,
                     date: fixedDate,
-                    startTime: fixedStartTime,
-                    endTime: existingFixed?.endTime,
+                    startTime: resolvedStartTime,
+                    endTime: resolvedEndTime,
                     label: existingFixed?.label,
                     isSuggested: false,
                     suggestedBy: nil,
