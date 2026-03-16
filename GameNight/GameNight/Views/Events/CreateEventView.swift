@@ -313,6 +313,8 @@ struct CreateEventView: View {
                 }
             }
 
+            privacySection
+
             // Player count
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Player Count")
@@ -495,6 +497,89 @@ struct CreateEventView: View {
                 .cardStyle()
             }
         }
+    }
+
+    private var privacySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Privacy")
+                    .font(Theme.Typography.label)
+                    .foregroundColor(Theme.Colors.textSecondary)
+
+                Picker("", selection: $viewModel.visibility) {
+                    Text("Private").tag(EventVisibility.private)
+                    Text("Public").tag(EventVisibility.public)
+                }
+                .pickerStyle(.segmented)
+
+                Text(visibilityHelperText)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("RSVP Deadline")
+                    .font(Theme.Typography.label)
+                    .foregroundColor(Theme.Colors.textSecondary)
+
+                if viewModel.rsvpDeadline != nil {
+                    DatePicker(
+                        "Deadline",
+                        selection: rsvpDeadlineBinding,
+                        in: Date()...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .font(Theme.Typography.bodyMedium)
+                    .tint(Theme.Colors.primary)
+
+                    Button("Clear deadline") {
+                        viewModel.rsvpDeadline = nil
+                    }
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.error)
+                } else {
+                    Button {
+                        viewModel.rsvpDeadline = defaultRSVPDeadline
+                    } label: {
+                        HStack {
+                            Image(systemName: "clock.badge.plus")
+                                .foregroundColor(Theme.Colors.primary)
+                            Text("Add RSVP deadline")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Spacer()
+                        }
+                        .padding(Theme.Spacing.md)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.backgroundElevated)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var visibilityHelperText: String {
+        switch viewModel.visibility {
+        case .private:
+            return "Private events hide the exact address until guests RSVP."
+        case .public:
+            return "Public events show full event details before RSVP. Guest names stay hidden until guests RSVP."
+        }
+    }
+
+    private var defaultRSVPDeadline: Date {
+        let fallback = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        return max(viewModel.fixedDate, fallback)
+    }
+
+    private var rsvpDeadlineBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.rsvpDeadline ?? defaultRSVPDeadline },
+            set: { viewModel.rsvpDeadline = $0 }
+        )
     }
 
     // MARK: - Schedule Section (Inside Details)

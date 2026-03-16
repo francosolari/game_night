@@ -13,9 +13,14 @@
 		058DF949B94C46292DE13C5D /* TestError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40CDC4EFE6713EAE4B33C26B /* TestError.swift */; };
 		08A92E97AF62C37F0764992B /* SMSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0371A07CD113686C89A4573 /* SMSService.swift */; };
 		094E8C89690D6D3D45CE77F4 /* HomeViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11C09C50D5F989BB36A2F66 /* HomeViewModelTests.swift */; };
+		0A4F2E6AA9BD4EE39D61B3F2 /* EventAccessPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4F2E69A9BD4EE39D61B3F2 /* EventAccessPolicyTests.swift */; };
+		0B9C1A53D1844B3E9C4F7102 /* EventAccessPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9C1A52D1844B3E9C4F7102 /* EventAccessPolicy.swift */; };
 		0959401BA2FD1AED38E45306 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4B7E019A65A2A6BCF7278492 /* Supabase */; };
 		0B1B53A086B2D5C634FB2153 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5438E24E75BD13B48ABCAD82 /* EventDetailView.swift */; };
+		1283D4B1A6E142B8A5D7C901 /* EventVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1283D4B0A6E142B8A5D7C901 /* EventVisibilityTests.swift */; };
 		133E52FC137BE4A2BBF26C08 /* CreateEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E428E34778C2894B35484021 /* CreateEventView.swift */; };
+		17F7D3C0B8A94A0E81B3E0D1 /* EventVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17F7D3BFB8A94A0E81B3E0D1 /* EventVisibility.swift */; };
+		1DCA76174F664796B2083E81 /* EventLocationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4088C1976E44C796CA8D5A /* EventLocationPresentation.swift */; };
 		160BF49B9AE94EDA37D53FFE /* GameVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DCF17A5CC08E893A25FFA /* GameVotingView.swift */; };
 		190119C668A74F1F6FE44FE1 /* HomeDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7662709E90472C3F5A6F3D9 /* HomeDataLoader.swift */; };
 		200C8E68E07D69CF159A0223 /* SearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3493414C1EA4EA910807E03E /* SearchBar.swift */; };
@@ -86,8 +91,13 @@
 		056DCF17A5CC08E893A25FFA /* GameVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameVotingView.swift; sourceTree = "<group>"; };
 		06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupPickerSheet.swift; sourceTree = "<group>"; };
 		07F39EDF744F365C61B43544 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
+		0A4F2E69A9BD4EE39D61B3F2 /* EventAccessPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAccessPolicyTests.swift; sourceTree = "<group>"; };
+		0B9C1A52D1844B3E9C4F7102 /* EventAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAccessPolicy.swift; sourceTree = "<group>"; };
+		0E4088C1976E44C796CA8D5A /* EventLocationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLocationPresentation.swift; sourceTree = "<group>"; };
 		0F9FED0A38BCA3ED89457F18 /* Invite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Invite.swift; sourceTree = "<group>"; };
+		1283D4B0A6E142B8A5D7C901 /* EventVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventVisibilityTests.swift; sourceTree = "<group>"; };
 		15DEB0951CE98339F2E2354C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		17F7D3BFB8A94A0E81B3E0D1 /* EventVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventVisibility.swift; sourceTree = "<group>"; };
 		16586A19CCD58B95C6E2F257 /* TimeOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeOptionTests.swift; sourceTree = "<group>"; };
 		1B6B8635260E038104AE269E /* FixtureFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureFactory.swift; sourceTree = "<group>"; };
 		226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriStateVoteButton.swift; sourceTree = "<group>"; };
@@ -189,6 +199,8 @@
 		16CB36AC113DDE4667C45E35 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				0A4F2E69A9BD4EE39D61B3F2 /* EventAccessPolicyTests.swift */,
+				1283D4B0A6E142B8A5D7C901 /* EventVisibilityTests.swift */,
 				6F38EB39579296EB1CC1BD9F /* GameEventDecodingTests.swift */,
 				16586A19CCD58B95C6E2F257 /* TimeOptionTests.swift */,
 			);
@@ -281,6 +293,9 @@
 			isa = PBXGroup;
 			children = (
 				F71178402D6DE3B28E8EA024 /* ActivityFeedItem.swift */,
+				0B9C1A52D1844B3E9C4F7102 /* EventAccessPolicy.swift */,
+				0E4088C1976E44C796CA8D5A /* EventLocationPresentation.swift */,
+				17F7D3BFB8A94A0E81B3E0D1 /* EventVisibility.swift */,
 				496016CC950DC5C5F6E75729 /* Game.swift */,
 				5032FD47004A7CB0592B4E83 /* GameEvent.swift */,
 				32C0C3E7D517C7A120674526 /* GameVote.swift */,
@@ -491,8 +506,10 @@
 				133E52FC137BE4A2BBF26C08 /* CreateEventView.swift in Sources */,
 				FDECD26096E37C1D41EAEDE2 /* CreateGroupFromAttendeesSheet.swift in Sources */,
 				C189CA60E4FFD650CAA0D477 /* DateTimePickerSheet.swift in Sources */,
+				0B9C1A53D1844B3E9C4F7102 /* EventAccessPolicy.swift in Sources */,
 				B9C83FE17B46B9822C47006F /* EventCard.swift in Sources */,
 				0B1B53A086B2D5C634FB2153 /* EventDetailView.swift in Sources */,
+				1DCA76174F664796B2083E81 /* EventLocationPresentation.swift in Sources */,
 				EC928EA881FC49F3BC324924 /* EventViewModel.swift in Sources */,
 				04FC6FD496597BB4E781AC72 /* Game.swift in Sources */,
 				DCD8FCC8417847C108C154F7 /* GameCard.swift in Sources */,
@@ -502,6 +519,7 @@
 				CE3591329288EDA893958F12 /* GameNightApp.swift in Sources */,
 				983EAA52DD85AF3F1D597A74 /* GameVote.swift in Sources */,
 				160BF49B9AE94EDA37D53FFE /* GameVotingView.swift in Sources */,
+				17F7D3C0B8A94A0E81B3E0D1 /* EventVisibility.swift in Sources */,
 				3A8663CFA3DA830ABB3E1EBC /* Group.swift in Sources */,
 				DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */,
 				AAEBF5B0D069816F69AEA013 /* GroupsView.swift in Sources */,
@@ -539,6 +557,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				785011C763AEC050BBD859D5 /* CreateEventViewModelTests.swift in Sources */,
+				0A4F2E6AA9BD4EE39D61B3F2 /* EventAccessPolicyTests.swift in Sources */,
+				1283D4B1A6E142B8A5D7C901 /* EventVisibilityTests.swift in Sources */,
 				65532079AE877CE01667566E /* FixtureFactory.swift in Sources */,
 				D8BA6CA0E91A2ABEAEF147C0 /* GameEventDecodingTests.swift in Sources */,
 				7782918D6C4C803001CDF01A /* HomeDataLoaderTests.swift in Sources */,

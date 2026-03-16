@@ -27,7 +27,8 @@ final class HomeViewModelTests: XCTestCase {
         let provider = StubHomeDataProvider(
             upcomingEventsResult: .failure(TestError.message("events failed")),
             invitesResult: .success([]),
-            draftsResult: .success([])
+            draftsResult: .success([]),
+            fetchedEventsResult: .success([])
         )
         let sut = HomeViewModel(supabase: provider)
 
@@ -42,21 +43,69 @@ final class HomeViewModelTests: XCTestCase {
         XCTAssertNil(sut.error)
         XCTAssertFalse(sut.isLoading)
     }
+
+    func testLoadDataMergesAcceptedPrivateInviteEventsIntoUpcoming() async {
+        let publicEvent = FixtureFactory.makeEvent(visibility: .public)
+        let privateInviteEvent = FixtureFactory.makeEvent(visibility: .private)
+        let provider = StubHomeDataProvider(
+            upcomingEventsResult: .success([publicEvent]),
+            invitesResult: .success([
+                FixtureFactory.makeInvite(
+                    eventId: privateInviteEvent.id,
+                    status: .accepted
+                )
+            ]),
+            draftsResult: .success([]),
+            fetchedEventsResult: .success([privateInviteEvent])
+        )
+        let sut = HomeViewModel(supabase: provider)
+
+        await sut.loadData()
+
+        XCTAssertEqual(Set(sut.upcomingEvents.map(\.id)), Set([publicEvent.id, privateInviteEvent.id]))
+        XCTAssertEqual(provider.fetchedEventIds, [privateInviteEvent.id])
+    }
+
+    func testLoadDataDoesNotSurfacePendingPrivateInvitesInUpcoming() async {
+        let publicEvent = FixtureFactory.makeEvent(visibility: .public)
+        let privateInviteEvent = FixtureFactory.makeEvent(visibility: .private)
+        let provider = StubHomeDataProvider(
+            upcomingEventsResult: .success([publicEvent]),
+            invitesResult: .success([
+                FixtureFactory.makeInvite(
+                    eventId: privateInviteEvent.id,
+                    status: .pending
+                )
+            ]),
+            draftsResult: .success([]),
+            fetchedEventsResult: .success([privateInviteEvent])
+        )
+        let sut = HomeViewModel(supabase: provider)
+
+        await sut.loadData()
+
+        XCTAssertEqual(sut.upcomingEvents.map(\.id), [publicEvent.id])
+        XCTAssertTrue(provider.fetchedEventIds.isEmpty)
+    }
 }
 
 private final class StubHomeDataProvider: HomeDataProviding {
     var upcomingEventsResult: Result<[GameEvent], Error>
     var invitesResult: Result<[Invite], Error>
     var draftsResult: Result<[GameEvent], Error>
+    var fetchedEventsResult: Result<[GameEvent], Error>
+    var fetchedEventIds: [UUID] = []
 
     init(
         upcomingEventsResult: Result<[GameEvent], Error>,
         invitesResult: Result<[Invite], Error>,
-        draftsResult: Result<[GameEvent], Error>
+        draftsResult: Result<[GameEvent], Error>,
+        fetchedEventsResult: Result<[GameEvent], Error> = .success([])
     ) {
         self.upcomingEventsResult = upcomingEventsResult
         self.invitesResult = invitesResult
         self.draftsResult = draftsResult
+        self.fetchedEventsResult = fetchedEventsResult
     }
 
     func fetchUpcomingEvents() async throws -> [GameEvent] {
@@ -69,5 +118,10 @@ private final class StubHomeDataProvider: HomeDataProviding {
 
     func fetchDrafts() async throws -> [GameEvent] {
         try draftsResult.get()
+    }
+
+    func fetchEvents(ids: [UUID]) async throws -> [GameEvent] {
+        fetchedEventIds = ids
+        return try fetchedEventsResult.get()
     }
 }

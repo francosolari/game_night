@@ -120,14 +120,48 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     // MARK: - Events
 
     func fetchUpcomingEvents() async throws -> [GameEvent] {
-        let events: [GameEvent] = try await client
+        let session = try await client.auth.session
+
+        let publicEvents: [GameEvent] = try await client
             .from("events")
             .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .eq("visibility", value: EventVisibility.public.rawValue)
             .or("status.eq.published,status.eq.confirmed")
             .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
             .execute()
             .value
+
+        let hostedEvents: [GameEvent] = try await client
+            .from("events")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .eq("host_id", value: session.user.id.uuidString)
+            .or("status.eq.published,status.eq.confirmed")
+            .is("deleted_at", value: nil)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
+        var mergedById = Dictionary(uniqueKeysWithValues: publicEvents.map { ($0.id, $0) })
+        for event in hostedEvents {
+            mergedById[event.id] = event
+        }
+
+        return mergedById.values.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    func fetchEvents(ids: [UUID]) async throws -> [GameEvent] {
+        guard !ids.isEmpty else { return [] }
+
+        let events: [GameEvent] = try await client
+            .from("events")
+            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .in("id", values: ids.map(\.uuidString))
+            .is("deleted_at", value: nil)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
         return events
     }
 

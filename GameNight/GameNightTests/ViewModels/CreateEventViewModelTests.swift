@@ -79,6 +79,51 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(sut.createdEvent?.location, "New Venue")
     }
 
+    func testNewEventsDefaultToPrivateVisibility() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+
+        XCTAssertEqual(sut.visibility, .private)
+        XCTAssertNil(sut.rsvpDeadline)
+    }
+
+    func testEditModePreloadsVisibilityAndRSVPDeadline() {
+        let deadline = Date(timeIntervalSince1970: 1_730_000_000)
+        let event = FixtureFactory.makeEvent(
+            visibility: .public,
+            rsvpDeadline: deadline
+        )
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        XCTAssertEqual(sut.visibility, .public)
+        XCTAssertEqual(sut.rsvpDeadline, deadline)
+    }
+
+    func testSaveChangesPersistsVisibilityAndRSVPDeadline() async {
+        let deadline = Date(timeIntervalSince1970: 1_740_000_000)
+        let event = FixtureFactory.makeEvent()
+        let service = StubEventEditorService(currentUserId: event.hostId, fetchedEvent: event)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: service
+        )
+        sut.visibility = .public
+        sut.rsvpDeadline = deadline
+
+        await sut.saveChanges()
+
+        XCTAssertEqual(service.updatedEvents.last?.visibility, .public)
+        XCTAssertEqual(service.updatedEvents.last?.rsvpDeadline, deadline)
+        XCTAssertEqual(sut.createdEvent?.visibility, .public)
+        XCTAssertEqual(sut.createdEvent?.rsvpDeadline, deadline)
+    }
+
     func testPublishedEditSaveFromGamesPersistsGameChanges() async {
         let primaryGame = FixtureFactory.makeEventGame(game: FixtureFactory.makeGame(name: "Dune"))
         let addedGame = FixtureFactory.makeEventGame(

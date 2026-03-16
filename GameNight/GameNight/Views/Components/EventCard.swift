@@ -5,6 +5,41 @@ struct EventCard: View {
     var myInvite: Invite?
     var onTap: (() -> Void)?
 
+    private var viewerRole: EventViewerRole {
+        let currentUserId = SupabaseService.shared.client.auth.currentSession?.user.id
+        if event.hostId == currentUserId {
+            return .host
+        }
+
+        if let status = myInvite?.status, status == .accepted || status == .maybe {
+            return .rsvpd
+        }
+
+        if myInvite != nil {
+            return .invitedNotRSVPd
+        }
+
+        return .publicViewer
+    }
+
+    private var accessPolicy: EventAccessPolicy {
+        EventAccessPolicy(
+            visibility: event.visibility,
+            viewerRole: viewerRole,
+            rsvpDeadline: event.rsvpDeadline,
+            now: Date()
+        )
+    }
+
+    private var locationPresentation: EventLocationPresentation? {
+        guard event.location != nil || event.locationAddress != nil else { return nil }
+        return EventLocationPresentation(
+            locationName: event.location,
+            locationAddress: event.locationAddress,
+            canViewFullAddress: accessPolicy.canViewFullAddress
+        )
+    }
+
     var body: some View {
         Button(action: { onTap?() }) {
             VStack(alignment: .leading, spacing: 0) {
@@ -76,13 +111,13 @@ struct EventCard: View {
                     }
 
                     // Location
-                    if let location = event.location {
+                    if let locationPresentation {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: "mappin")
                                 .font(.system(size: 13))
                                 .foregroundColor(Theme.Colors.secondary)
 
-                            Text(location)
+                            Text(locationPresentation.title)
                                 .font(Theme.Typography.callout)
                                 .foregroundColor(Theme.Colors.textSecondary)
                                 .lineLimit(1)

@@ -6,6 +6,8 @@ struct GameEvent: Identifiable, Codable {
     var host: User?
     var title: String
     var description: String?
+    var visibility: EventVisibility
+    var rsvpDeadline: Date?
     var location: String?
     var locationAddress: String?
     var status: EventStatus
@@ -31,6 +33,8 @@ struct GameEvent: Identifiable, Codable {
         case host
         case title
         case description
+        case visibility
+        case rsvpDeadline = "rsvp_deadline"
         case location
         case locationAddress = "location_address"
         case status
@@ -57,6 +61,8 @@ struct GameEvent: Identifiable, Codable {
         host: User? = nil,
         title: String,
         description: String? = nil,
+        visibility: EventVisibility = .private,
+        rsvpDeadline: Date? = nil,
         location: String? = nil,
         locationAddress: String? = nil,
         status: EventStatus,
@@ -81,6 +87,8 @@ struct GameEvent: Identifiable, Codable {
         self.host = host
         self.title = title
         self.description = description
+        self.visibility = visibility
+        self.rsvpDeadline = rsvpDeadline
         self.location = location
         self.locationAddress = locationAddress
         self.status = status
@@ -108,6 +116,8 @@ struct GameEvent: Identifiable, Codable {
         host = try? container.decodeIfPresent(User.self, forKey: .host)
         title = try container.decode(String.self, forKey: .title)
         description = try container.decodeIfPresent(String.self, forKey: .description)
+        visibility = try container.decodeIfPresent(EventVisibility.self, forKey: .visibility) ?? .private
+        rsvpDeadline = try container.decodeIfPresent(Date.self, forKey: .rsvpDeadline)
         location = try container.decodeIfPresent(String.self, forKey: .location)
         locationAddress = try container.decodeIfPresent(String.self, forKey: .locationAddress)
         status = try container.decode(EventStatus.self, forKey: .status)
@@ -136,6 +146,8 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(hostId, forKey: .hostId)
         try container.encode(title, forKey: .title)
         try container.encodeIfPresent(description, forKey: .description)
+        try container.encode(visibility, forKey: .visibility)
+        try container.encodeIfPresent(rsvpDeadline, forKey: .rsvpDeadline)
         try container.encodeIfPresent(location, forKey: .location)
         try container.encodeIfPresent(locationAddress, forKey: .locationAddress)
         try container.encode(status, forKey: .status)
@@ -428,6 +440,8 @@ extension GameEvent {
         host: nil,
         title: "Dune Imperium Night",
         description: "Let's play some Dune! Bringing snacks and drinks.",
+        visibility: .private,
+        rsvpDeadline: nil,
         location: "Alex's Place",
         locationAddress: "123 Main St",
         status: .published,

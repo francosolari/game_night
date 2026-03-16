@@ -35,12 +35,36 @@ final class HomeViewModel: ObservableObject {
             }
         )
 
-        self.upcomingEvents = snapshot.upcomingEvents
+        var upcomingEvents = snapshot.upcomingEvents
+        var errorMessage = snapshot.errorMessage
+
+        let existingEventIds = Set(upcomingEvents.map(\.id))
+        let acceptedInviteEventIds = Set(
+            snapshot.myInvites
+                .filter { $0.status == .accepted || $0.status == .maybe }
+                .map(\.eventId)
+        )
+        let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
+
+        if !missingInviteEventIds.isEmpty {
+            do {
+                let inviteEvents = try await supabase.fetchEvents(ids: Array(missingInviteEventIds))
+                upcomingEvents = mergeUpcomingEvents(upcomingEvents, with: inviteEvents)
+            } catch {
+                let detail = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+                let inviteEventsError = "Invite Events: \(detail)"
+                errorMessage = [errorMessage, inviteEventsError]
+                    .compactMap { $0 }
+                    .joined(separator: "\n")
+            }
+        }
+
+        self.upcomingEvents = upcomingEvents
         self.myInvites = snapshot.myInvites
         self.drafts = snapshot.drafts
-        self.error = snapshot.errorMessage
+        self.error = errorMessage
 
-        if let error = snapshot.errorMessage {
+        if let error = errorMessage {
             print("🏠 [HomeViewModel] \(error)")
         }
 
@@ -49,5 +73,14 @@ final class HomeViewModel: ObservableObject {
 
     func invite(for eventId: UUID) -> Invite? {
         myInvites.first { $0.eventId == eventId }
+    }
+
+    private func mergeUpcomingEvents(_ base: [GameEvent], with additional: [GameEvent]) -> [GameEvent] {
+        var mergedById = Dictionary(uniqueKeysWithValues: base.map { ($0.id, $0) })
+        for event in additional {
+            mergedById[event.id] = event
+        }
+
+        return mergedById.values.sorted { $0.createdAt > $1.createdAt }
     }
 }

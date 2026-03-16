@@ -31,9 +31,35 @@ final class EventViewModel: ObservableObject {
         return status == .accepted || status == .maybe
     }
 
+    var viewerRole: EventViewerRole {
+        if isOwner {
+            return .host
+        }
+
+        if hasRSVPd {
+            return .rsvpd
+        }
+
+        if myInvite != nil {
+            return .invitedNotRSVPd
+        }
+
+        return .publicViewer
+    }
+
     var isOwner: Bool {
         guard let event else { return false }
         return event.hostId == SupabaseService.shared.client.auth.currentSession?.user.id
+    }
+
+    var accessPolicy: EventAccessPolicy? {
+        guard let event else { return nil }
+        return EventAccessPolicy(
+            visibility: event.visibility,
+            viewerRole: viewerRole,
+            rsvpDeadline: event.rsvpDeadline,
+            now: Date()
+        )
     }
 
     var canSeeActivityFeed: Bool {
@@ -274,6 +300,8 @@ final class EventViewModel: ObservableObject {
 final class CreateEventViewModel: ObservableObject {
     @Published var title = ""
     @Published var description = ""
+    @Published var visibility: EventVisibility = .private
+    @Published var rsvpDeadline: Date?
     @Published var location = ""
     @Published var locationAddress = ""
     @Published var selectedGames: [EventGame] = []
@@ -339,6 +367,8 @@ final class CreateEventViewModel: ObservableObject {
         if let eventToEdit {
             title = eventToEdit.title
             description = eventToEdit.description ?? ""
+            visibility = eventToEdit.visibility
+            rsvpDeadline = eventToEdit.rsvpDeadline
             location = eventToEdit.location ?? ""
             locationAddress = eventToEdit.locationAddress ?? ""
             selectedGames = eventToEdit.games
@@ -816,6 +846,8 @@ final class CreateEventViewModel: ObservableObject {
             host: nil,
             title: title,
             description: description.isEmpty ? nil : description,
+            visibility: visibility,
+            rsvpDeadline: rsvpDeadline,
             location: location.isEmpty ? nil : location,
             locationAddress: locationAddress.isEmpty ? nil : locationAddress,
             status: status,

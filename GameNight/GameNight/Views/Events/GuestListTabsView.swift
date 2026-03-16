@@ -1,7 +1,13 @@
 import SwiftUI
 
+enum GuestListVisibilityMode: Equatable {
+    case fullList
+    case countsOnly(message: String)
+}
+
 struct GuestListTabsView: View {
     let summary: InviteSummary
+    var visibilityMode: GuestListVisibilityMode = .fullList
     @State private var selectedTab = 0
 
     private var tabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
@@ -44,8 +50,14 @@ struct GuestListTabsView: View {
             // Swipeable content
             TabView(selection: $selectedTab) {
                 ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                    GuestTabContent(users: tab.users, emptyLabel: "No one \(tab.label.lowercased()) yet")
-                        .tag(index)
+                    switch visibilityMode {
+                    case .fullList:
+                        GuestTabContent(users: tab.users, emptyLabel: "No one \(tab.label.lowercased()) yet")
+                            .tag(index)
+                    case .countsOnly(let message):
+                        CountsOnlyGuestTabContent(message: message)
+                            .tag(index)
+                    }
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -56,10 +68,33 @@ struct GuestListTabsView: View {
     }
 
     private var guestListHeight: CGFloat {
-        let currentUsers = tabs[selectedTab].users
-        let rowHeight: CGFloat = 44
-        let minRows: CGFloat = 2
-        return max(minRows, CGFloat(currentUsers.count)) * rowHeight + Theme.Spacing.sm
+        switch visibilityMode {
+        case .fullList:
+            let currentUsers = tabs[selectedTab].users
+            let rowHeight: CGFloat = 44
+            let minRows: CGFloat = 2
+            return max(minRows, CGFloat(currentUsers.count)) * rowHeight + Theme.Spacing.sm
+        case .countsOnly:
+            return 96
+        }
+    }
+}
+
+private struct CountsOnlyGuestTabContent: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "person.2.slash")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(Theme.Colors.textTertiary)
+
+            Text(message)
+                .font(Theme.Typography.callout)
+                .foregroundColor(Theme.Colors.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

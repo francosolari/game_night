@@ -8,7 +8,9 @@ enum FixtureFactory {
         status: EventStatus = .published,
         games: [EventGame] = [makeEventGame()],
         timeOptions: [TimeOption] = [makeTimeOption()],
-        host: User? = makeUser()
+        host: User? = makeUser(),
+        visibility: EventVisibility = .private,
+        rsvpDeadline: Date? = nil
     ) -> GameEvent {
         GameEvent(
             id: id,
@@ -16,6 +18,8 @@ enum FixtureFactory {
             host: host,
             title: title,
             description: "Bring snacks",
+            visibility: visibility,
+            rsvpDeadline: rsvpDeadline,
             location: "Alex's House",
             locationAddress: "123 Main St",
             status: status,

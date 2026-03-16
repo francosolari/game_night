@@ -38,7 +38,10 @@ struct EventDetailView: View {
                 } else if let event = viewModel.event {
                     VStack(spacing: 0) {
                         // Hero Header with date badge
-                        EventHeroHeader(event: event)
+                        EventHeroHeader(
+                            event: event,
+                            locationPresentation: locationPresentation(for: event)
+                        )
 
                         VStack(spacing: Theme.Spacing.xxl) {
                             // RSVP Section (prominent, right after hero)
@@ -155,13 +158,16 @@ struct EventDetailView: View {
                             }
 
                             // Guest List Tabs (inline, swipeable)
-                            GuestListTabsView(summary: viewModel.inviteSummary)
+                            GuestListTabsView(
+                                summary: viewModel.inviteSummary,
+                                visibilityMode: guestListVisibilityMode
+                            )
 
                             // Activity Feed
                             ActivityFeedView(viewModel: viewModel, isHost: isOwner)
 
                             // Location
-                            if let location = event.location {
+                            if let locationPresentation = locationPresentation(for: event) {
                                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                                     SectionHeader(title: "Location")
 
@@ -176,11 +182,11 @@ struct EventDetailView: View {
                                         }
 
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(location)
+                                            Text(locationPresentation.title)
                                                 .font(Theme.Typography.bodyMedium)
                                                 .foregroundColor(Theme.Colors.textPrimary)
-                                            if let address = event.locationAddress {
-                                                Text(address)
+                                            if let subtitle = locationPresentation.subtitle {
+                                                Text(subtitle)
                                                     .font(Theme.Typography.caption)
                                                     .foregroundColor(Theme.Colors.textTertiary)
                                             }
@@ -332,6 +338,23 @@ struct EventDetailView: View {
         case .waitlisted: return Theme.Colors.accent
         }
     }
+
+    private var guestListVisibilityMode: GuestListVisibilityMode {
+        if viewModel.accessPolicy?.canViewGuestList ?? true {
+            return .fullList
+        }
+
+        return .countsOnly(message: "Guest names unlock after you RSVP.")
+    }
+
+    private func locationPresentation(for event: GameEvent) -> EventLocationPresentation? {
+        guard event.location != nil || event.locationAddress != nil else { return nil }
+        return EventLocationPresentation(
+            locationName: event.location,
+            locationAddress: event.locationAddress,
+            canViewFullAddress: viewModel.accessPolicy?.canViewFullAddress ?? true
+        )
+    }
 }
 
 enum EventEditToastFactory {
@@ -361,6 +384,7 @@ struct EventEditSavePresentation {
 // MARK: - Event Hero Header (redesigned with date badge)
 struct EventHeroHeader: View {
     let event: GameEvent
+    let locationPresentation: EventLocationPresentation?
 
     private var firstTimeOption: TimeOption? {
         event.timeOptions.first
@@ -398,12 +422,12 @@ struct EventHeroHeader: View {
                     }
 
                     // Location line (simplified)
-                    if let location = event.location {
+                    if let locationPresentation {
                         HStack(spacing: 6) {
                             Image(systemName: "mappin.circle.fill")
                                 .font(.system(size: 14))
                                 .foregroundColor(Theme.Colors.textTertiary)
-                            Text(location)
+                            Text(locationPresentation.title)
                                 .font(Theme.Typography.callout)
                                 .foregroundColor(Theme.Colors.textSecondary)
                                 .lineLimit(1)
