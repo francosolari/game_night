@@ -10,6 +10,7 @@ struct LocationPickerSheet: View {
     
     @StateObject private var locationService = LocationService()
     @State private var selectedPlacemark: MKPlacemark? = nil
+    @FocusState private var isSearchFieldFocused: Bool
     
     var body: some View {
         NavigationStack {
@@ -22,6 +23,7 @@ struct LocationPickerSheet: View {
                     TextField("Search for an address", text: $locationService.searchQuery)
                         .font(Theme.Typography.bodyMedium)
                         .autocorrectionDisabled()
+                        .focused($isSearchFieldFocused)
                     
                     if !locationService.searchQuery.isEmpty {
                         Button {
@@ -119,6 +121,11 @@ struct LocationPickerSheet: View {
                     locationAddress = address
                     dismiss()
                 })
+            }
+            .onAppear {
+                DispatchQueue.main.async {
+                    isSearchFieldFocused = true
+                }
             }
         }
     }
@@ -278,13 +285,17 @@ struct LocationFlowSheet: View {
     let onRemove: () -> Void
 
     private let pickerTransition = AnyTransition.asymmetric(
-        insertion: .move(edge: .trailing).combined(with: .opacity),
-        removal: .move(edge: .leading).combined(with: .opacity)
+        insertion: .offset(y: 36)
+            .combined(with: .scale(scale: 0.98, anchor: .bottom))
+            .combined(with: .opacity),
+        removal: .opacity
     )
 
     private let editTransition = AnyTransition.asymmetric(
-        insertion: .move(edge: .leading).combined(with: .opacity),
-        removal: .move(edge: .trailing).combined(with: .opacity)
+        insertion: .opacity,
+        removal: .offset(y: -20)
+            .combined(with: .scale(scale: 0.995, anchor: .top))
+            .combined(with: .opacity)
     )
 
     init(
