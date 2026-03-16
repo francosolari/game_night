@@ -410,6 +410,24 @@ struct CreateEventView: View {
                     }
                 }
             }
+
+            // Game voting toggle
+            if viewModel.selectedGames.count > 1 {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Toggle(isOn: $viewModel.allowGameVoting) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Allow Game Voting")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Text("Guests can vote on which games to play")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+                    .tint(Theme.Colors.primary)
+                }
+                .cardStyle()
+            }
         }
     }
 

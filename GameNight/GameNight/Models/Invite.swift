@@ -93,6 +93,7 @@ struct InviteSummary {
     var waitlisted: Int
     var acceptedUsers: [InviteUser]
     var pendingUsers: [InviteUser]
+    var maybeUsers: [InviteUser]
     var declinedUsers: [InviteUser]
     var waitlistedUsers: [InviteUser]
 

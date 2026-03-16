@@ -124,17 +124,19 @@ struct ShimmerModifier: ViewModifier {
         content
             .overlay(
                 GeometryReader { geo in
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            Color.white.opacity(0.1),
-                            .clear
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(width: geo.size.width * 2)
-                    .offset(x: -geo.size.width + phase * geo.size.width * 3)
+                    if let metrics = ShimmerLayoutMetrics.make(width: geo.size.width, phase: phase) {
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                Color.white.opacity(0.1),
+                                .clear
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: metrics.gradientWidth)
+                        .offset(x: metrics.offsetX)
+                    }
                 }
                 .mask(content)
             )

@@ -138,7 +138,7 @@ struct PollVotingView: View {
 
                     // Vote buttons
                     HStack(spacing: Theme.Spacing.sm) {
-                        PollVoteButton(
+                        TriStateVoteButton(
                             icon: "checkmark",
                             label: "Yes",
                             color: Theme.Colors.success,
@@ -147,7 +147,7 @@ struct PollVotingView: View {
                             votes[option.id] = votes[option.id] == .yes ? nil : .yes
                         }
 
-                        PollVoteButton(
+                        TriStateVoteButton(
                             icon: "questionmark",
                             label: "Maybe",
                             color: Theme.Colors.warning,
@@ -156,7 +156,7 @@ struct PollVotingView: View {
                             votes[option.id] = votes[option.id] == .maybe ? nil : .maybe
                         }
 
-                        PollVoteButton(
+                        TriStateVoteButton(
                             icon: "xmark",
                             label: "No",
                             color: Theme.Colors.error,
@@ -177,28 +177,6 @@ struct PollVotingView: View {
                 )
             }
         }
-    }
-}
-
-struct PollVoteButton: View {
-    let icon: String
-    let label: String
-    let color: Color
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(isSelected ? .white : color)
-                .frame(width: 32, height: 32)
-                .background(
-                    Circle()
-                        .fill(isSelected ? color : color.opacity(0.15))
-                )
-        }
-        .buttonStyle(.plain)
     }
 }
 

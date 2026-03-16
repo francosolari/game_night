@@ -40,3 +40,25 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - package: Supabase
+
+  GameNightTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: GameNightTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gamenight.appTests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+    dependencies:
+      - target: GameNight
+
+schemes:
+  GameNight:
+    build:
+      targets:
+        GameNight: all
+    test:
+      targets:
+        - GameNightTests

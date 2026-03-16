@@ -15,7 +15,7 @@ private struct EventSoftDeletePatch: Encodable {
 }
 
 @MainActor
-final class SupabaseService: ObservableObject {
+final class SupabaseService: ObservableObject, HomeDataProviding {
     static let shared = SupabaseService()
 
     let client: SupabaseClient
@@ -593,7 +593,136 @@ final class SupabaseService: ObservableObject {
             .execute()
     }
 
+    // MARK: - Activity Feed
+
+    func fetchActivityFeed(eventId: UUID) async throws -> [ActivityFeedItem] {
+        let items: [ActivityFeedItem] = try await client
+            .from("activity_feed")
+            .select("*, user:users(*)")
+            .eq("event_id", value: eventId.uuidString)
+            .order("created_at")
+            .execute()
+            .value
+        return items
+    }
+
+    func postComment(eventId: UUID, content: String, parentId: UUID?) async throws {
+        let session = try await client.auth.session
+        var entry: [String: AnyJSON] = [
+            "event_id": .string(eventId.uuidString),
+            "user_id": .string(session.user.id.uuidString),
+            "type": .string("comment"),
+            "content": .string(content)
+        ]
+        if let parentId {
+            entry["parent_id"] = .string(parentId.uuidString)
+        }
+        try await client
+            .from("activity_feed")
+            .insert(entry)
+            .execute()
+    }
+
+    func postAnnouncement(eventId: UUID, content: String) async throws {
+        let session = try await client.auth.session
+        let entry: [String: AnyJSON] = [
+            "event_id": .string(eventId.uuidString),
+            "user_id": .string(session.user.id.uuidString),
+            "type": .string("announcement"),
+            "content": .string(content)
+        ]
+        try await client
+            .from("activity_feed")
+            .insert(entry)
+            .execute()
+    }
+
+    func togglePinComment(itemId: UUID, isPinned: Bool) async throws {
+        let updates: [String: AnyJSON] = ["is_pinned": .bool(isPinned)]
+        try await client
+            .from("activity_feed")
+            .update(updates)
+            .eq("id", value: itemId.uuidString)
+            .execute()
+    }
+
+    func deleteComment(itemId: UUID) async throws {
+        try await client
+            .from("activity_feed")
+            .delete()
+            .eq("id", value: itemId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Game Voting
+
+    func fetchGameVotes(eventId: UUID) async throws -> [GameVote] {
+        let votes: [GameVote] = try await client
+            .from("game_votes")
+            .select()
+            .eq("event_id", value: eventId.uuidString)
+            .execute()
+            .value
+        return votes
+    }
+
+    func upsertGameVote(eventId: UUID, gameId: UUID, voteType: GameVoteType) async throws {
+        let session = try await client.auth.session
+        let entry: [String: AnyJSON] = [
+            "event_id": .string(eventId.uuidString),
+            "game_id": .string(gameId.uuidString),
+            "user_id": .string(session.user.id.uuidString),
+            "vote_type": .string(voteType.rawValue)
+        ]
+        try await client
+            .from("game_votes")
+            .upsert(entry, onConflict: "event_id,game_id,user_id")
+            .execute()
+    }
+
+    func deleteGameVote(eventId: UUID, gameId: UUID) async throws {
+        let session = try await client.auth.session
+        try await client
+            .from("game_votes")
+            .delete()
+            .eq("event_id", value: eventId.uuidString)
+            .eq("game_id", value: gameId.uuidString)
+            .eq("user_id", value: session.user.id.uuidString)
+            .execute()
+    }
+
+    func confirmGame(eventId: UUID, gameId: UUID) async throws {
+        let updates: [String: AnyJSON] = [
+            "confirmed_game_id": .string(gameId.uuidString)
+        ]
+        try await client
+            .from("events")
+            .update(updates)
+            .eq("id", value: eventId.uuidString)
+            .execute()
+    }
+
     // MARK: - Realtime
+
+    func subscribeToActivityFeed(eventId: UUID, onUpdate: @escaping () -> Void) -> RealtimeChannelV2 {
+        let channel = client.realtimeV2.channel("activity-\(eventId.uuidString)")
+
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "activity_feed",
+            filter: .eq("event_id", value: eventId)
+        )
+
+        Task {
+            try? await channel.subscribeWithError()
+            for await _ in changes {
+                onUpdate()
+            }
+        }
+
+        return channel
+    }
 
     func subscribeToEventUpdates(eventId: UUID, onUpdate: @escaping (GameEvent) -> Void) -> RealtimeChannelV2 {
         let channel = client.realtimeV2.channel("event-\(eventId.uuidString)")
@@ -602,11 +731,11 @@ final class SupabaseService: ObservableObject {
             AnyAction.self,
             schema: "public",
             table: "invites",
-            filter: "event_id=eq.\(eventId.uuidString)"
+            filter: .eq("event_id", value: eventId)
         )
 
         Task {
-            await channel.subscribe()
+            try? await channel.subscribeWithError()
             for await _ in changes {
                 if let event = try? await fetchEvent(id: eventId) {
                     onUpdate(event)

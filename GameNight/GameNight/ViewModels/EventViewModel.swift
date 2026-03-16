@@ -11,8 +11,38 @@ final class EventViewModel: ObservableObject {
     @Published var isSending = false
     @Published var isDeleting = false
 
+    // Activity feed
+    @Published var activityFeed: [ActivityFeedItem] = []
+    @Published var isPostingComment = false
+    @Published var newCommentText = ""
+
+    // Game voting
+    @Published var gameVotes: [GameVote] = []
+    @Published var myGameVotes: [UUID: GameVoteType] = [:]
+
     private let supabase = SupabaseService.shared
     private var realtimeChannel: RealtimeChannelV2?
+    private var activityChannel: RealtimeChannelV2?
+    private var subscribedEventId: UUID?
+    private var subscribedActivityEventId: UUID?
+
+    var hasRSVPd: Bool {
+        guard let status = myInvite?.status else { return false }
+        return status == .accepted || status == .maybe
+    }
+
+    var isOwner: Bool {
+        guard let event else { return false }
+        return event.hostId == SupabaseService.shared.client.auth.currentSession?.user.id
+    }
+
+    var canSeeActivityFeed: Bool {
+        hasRSVPd || isOwner
+    }
+
+    var confirmedPlayerCount: Int {
+        inviteSummary.accepted
+    }
 
     var inviteSummary: InviteSummary {
         let accepted = invites.filter { $0.status == .accepted }
@@ -21,6 +51,10 @@ final class EventViewModel: ObservableObject {
         let maybe = invites.filter { $0.status == .maybe }
         let waitlisted = invites.filter { $0.status == .waitlisted }
 
+        func mapUsers(_ list: [Invite]) -> [InviteSummary.InviteUser] {
+            list.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) }
+        }
+
         return InviteSummary(
             total: invites.count,
             accepted: accepted.count,
@@ -28,10 +62,11 @@ final class EventViewModel: ObservableObject {
             pending: pending.count,
             maybe: maybe.count,
             waitlisted: waitlisted.count,
-            acceptedUsers: accepted.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) },
-            pendingUsers: pending.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) },
-            declinedUsers: declined.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) },
-            waitlistedUsers: waitlisted.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) }
+            acceptedUsers: mapUsers(accepted),
+            pendingUsers: mapUsers(pending),
+            maybeUsers: mapUsers(maybe),
+            declinedUsers: mapUsers(declined),
+            waitlistedUsers: mapUsers(waitlisted)
         )
     }
 
@@ -48,12 +83,130 @@ final class EventViewModel: ObservableObject {
             let session = try await supabase.client.auth.session
             self.myInvite = invites.first { $0.userId == session.user.id }
 
+            // Load activity feed and game votes
+            await loadActivityFeed(eventId: id)
+            await loadGameVotes(eventId: id, currentUserId: session.user.id)
+
             // Subscribe to realtime updates
-            subscribeToUpdates(eventId: id)
+            if subscribedEventId != id {
+                subscribeToUpdates(eventId: id)
+                subscribedEventId = id
+            }
+
+            if subscribedActivityEventId != id {
+                subscribeToActivityFeed(eventId: id)
+                subscribedActivityEventId = id
+            }
         } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    func loadActivityFeed(eventId: UUID) async {
+        do {
+            let items = try await supabase.fetchActivityFeed(eventId: eventId)
+            // Group into threads: top-level items with replies attached
+            var topLevel: [ActivityFeedItem] = []
+            var repliesByParent: [UUID: [ActivityFeedItem]] = [:]
+
+            for item in items {
+                if let parentId = item.parentId {
+                    repliesByParent[parentId, default: []].append(item)
+                } else {
+                    topLevel.append(item)
+                }
+            }
+
+            // Attach replies and sort: pinned first, then chronological
+            self.activityFeed = topLevel.map { item in
+                var withReplies = item
+                withReplies.replies = repliesByParent[item.id]?.sorted { $0.createdAt < $1.createdAt }
+                return withReplies
+            }.sorted { lhs, rhs in
+                if lhs.isPinned != rhs.isPinned { return lhs.isPinned }
+                return lhs.createdAt < rhs.createdAt
+            }
+        } catch {
+            // Non-critical: activity feed may not be accessible if not RSVP'd
+        }
+    }
+
+    func loadGameVotes(eventId: UUID, currentUserId: UUID) async {
+        do {
+            self.gameVotes = try await supabase.fetchGameVotes(eventId: eventId)
+            self.myGameVotes = Dictionary(
+                uniqueKeysWithValues: gameVotes
+                    .filter { $0.userId == currentUserId }
+                    .map { ($0.gameId, $0.voteType) }
+            )
+        } catch {
+            // Non-critical
+        }
+    }
+
+    func postComment(content: String, parentId: UUID? = nil) async {
+        guard let eventId = event?.id else { return }
+        isPostingComment = true
+        do {
+            try await supabase.postComment(eventId: eventId, content: content, parentId: parentId)
+            await loadActivityFeed(eventId: eventId)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isPostingComment = false
+    }
+
+    func postAnnouncement(content: String) async {
+        guard let eventId = event?.id else { return }
+        isPostingComment = true
+        do {
+            try await supabase.postAnnouncement(eventId: eventId, content: content)
+            await loadActivityFeed(eventId: eventId)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isPostingComment = false
+    }
+
+    func togglePin(itemId: UUID, isPinned: Bool) async {
+        guard let eventId = event?.id else { return }
+        do {
+            try await supabase.togglePinComment(itemId: itemId, isPinned: isPinned)
+            await loadActivityFeed(eventId: eventId)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func voteForGame(gameId: UUID, voteType: GameVoteType) async {
+        guard let eventId = event?.id else { return }
+        do {
+            // Toggle off if already selected
+            if myGameVotes[gameId] == voteType {
+                try await supabase.deleteGameVote(eventId: eventId, gameId: gameId)
+                myGameVotes.removeValue(forKey: gameId)
+            } else {
+                try await supabase.upsertGameVote(eventId: eventId, gameId: gameId, voteType: voteType)
+                myGameVotes[gameId] = voteType
+            }
+            // Reload event to get updated vote counts
+            if let event = try? await supabase.fetchEvent(id: eventId) {
+                self.event = event
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func confirmGame(gameId: UUID) async {
+        guard let eventId = event?.id else { return }
+        do {
+            try await supabase.confirmGame(eventId: eventId, gameId: gameId)
+            event?.confirmedGameId = gameId
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     func respondToInvite(status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async {
@@ -96,9 +249,18 @@ final class EventViewModel: ObservableObject {
         }
     }
 
+    private func subscribeToActivityFeed(eventId: UUID) {
+        activityChannel = supabase.subscribeToActivityFeed(eventId: eventId) { [weak self] in
+            Task { @MainActor in
+                await self?.loadActivityFeed(eventId: eventId)
+            }
+        }
+    }
+
     deinit {
-        Task { [realtimeChannel] in
+        Task { [realtimeChannel, activityChannel] in
             await realtimeChannel?.unsubscribe()
+            await activityChannel?.unsubscribe()
         }
     }
 }
@@ -113,6 +275,7 @@ final class CreateEventViewModel: ObservableObject {
     @Published var selectedGames: [EventGame] = []
     @Published var timeOptions: [TimeOption] = []
     @Published var allowTimeSuggestions = true
+    @Published var allowGameVoting = false
     @Published var scheduleMode: ScheduleMode = .fixed
     @Published var fixedDate: Date = Date()
     @Published var fixedStartTime: Date = Date()
@@ -164,6 +327,7 @@ final class CreateEventViewModel: ObservableObject {
             selectedGames = eventToEdit.games
             timeOptions = eventToEdit.timeOptions
             allowTimeSuggestions = eventToEdit.allowTimeSuggestions
+            allowGameVoting = eventToEdit.allowGameVoting
             inviteStrategy = eventToEdit.inviteStrategy
             minPlayers = eventToEdit.minPlayers
             maxPlayers = eventToEdit.maxPlayers
@@ -482,6 +646,8 @@ final class CreateEventViewModel: ObservableObject {
             inviteStrategy: inviteStrategy,
             minPlayers: minPlayers,
             maxPlayers: maxPlayers,
+            allowGameVoting: allowGameVoting,
+            confirmedGameId: nil,
             coverImageUrl: existingEvent?.coverImageUrl,
             draftInvitees: status == .draft ? invitees.map { entry in
                 DraftInvitee(

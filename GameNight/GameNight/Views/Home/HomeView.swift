@@ -35,6 +35,13 @@ struct HomeView: View {
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.lg)
 
+                    if let error = viewModel.error {
+                        HomeErrorCard(error: error) {
+                            Task { await viewModel.loadData() }
+                        }
+                        .padding(.horizontal, Theme.Spacing.xl)
+                    }
+
                     // Drafts section (always visible when drafts exist, even while loading)
                     if !viewModel.drafts.isEmpty {
                         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -143,6 +150,37 @@ struct HomeView: View {
 }
 
 // MARK: - Pending Invite Card
+private struct HomeErrorCard: View {
+    let error: String
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("Some home data couldn't load")
+                .font(Theme.Typography.bodySemibold)
+                .foregroundColor(Theme.Colors.error)
+
+            Text(error)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button("Try Again", action: onRetry)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.primary)
+        }
+        .padding(Theme.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.error.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .stroke(Theme.Colors.error.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
 struct PendingInviteCard: View {
     let invite: Invite
 

@@ -8,7 +8,6 @@ struct EventDetailView: View {
     @State private var selectedTimeIds = Set<UUID>()
     @State private var pollVotes: [UUID: TimeOptionVoteType] = [:]
     @State private var showTimeSuggestion = false
-    @State private var showInviteList = false
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
     @State private var showCreateGroupFromEvent = false
@@ -37,194 +36,183 @@ struct EventDetailView: View {
                     LoadingView()
                 } else if let event = viewModel.event {
                     VStack(spacing: 0) {
-                        // Hero Header
+                        // Hero Header with date badge
                         EventHeroHeader(event: event)
 
                         VStack(spacing: Theme.Spacing.xxl) {
-                            // Games Section
-                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                                SectionHeader(title: "Games")
-
-                                ForEach(event.games) { eventGame in
-                                    if let game = eventGame.game {
-                                        CompactGameCard(game: game, isPrimary: eventGame.isPrimary)
-                                    }
-                                }
-                            }
-                            .cardStyle()
-
-                        // Schedule Section
-                        if event.scheduleMode == .fixed || event.timeOptions.count <= 1 {
-                            // Fixed mode: show date prominently
-                            if let timeOption = event.timeOptions.first {
-                                HStack(spacing: Theme.Spacing.md) {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(Theme.Colors.primary)
-                                    Text("\(timeOption.displayDate) \u{00B7} \(timeOption.displayTime)")
-                                        .font(Theme.Typography.headlineMedium)
-                                        .foregroundColor(Theme.Colors.textPrimary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .cardStyle()
-                            }
-                        } else {
-                            // Poll mode
-                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                                SectionHeader(title: "Schedule Poll")
-
-                                if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                                    Text("Vote on the times that work for you:")
-                                        .font(Theme.Typography.callout)
-                                        .foregroundColor(Theme.Colors.textSecondary)
-
-                                    PollVotingView(
-                                        timeOptions: event.timeOptions,
-                                        votes: $pollVotes
-                                    )
-
-                                    if event.allowTimeSuggestions {
-                                        Button {
-                                            showTimeSuggestion = true
-                                        } label: {
-                                            HStack {
-                                                Image(systemName: "plus.circle")
-                                                Text("Suggest another time")
-                                            }
-                                            .font(Theme.Typography.calloutMedium)
-                                            .foregroundColor(Theme.Colors.accent)
-                                        }
-                                    }
-                                } else {
-                                    // Show poll results
-                                    TimeOptionPicker(
-                                        timeOptions: event.timeOptions,
-                                        selectedIds: $selectedTimeIds,
-                                        allowMultiple: false,
-                                        showVoteCounts: true
-                                    )
-                                }
-                            }
-                            .cardStyle()
-                        }
-
-                        // RSVP Section (if I'm invited and pending)
-                        if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                            RSVPSection(
-                                onAccept: {
-                                    let votes = buildTimeVotes(for: event)
-                                    await viewModel.respondToInvite(
-                                        status: .accepted,
-                                        timeVotes: votes,
-                                        suggestedTimes: nil
-                                    )
-                                },
-                                onDecline: {
-                                    await viewModel.respondToInvite(
-                                        status: .declined,
-                                        timeVotes: [],
-                                        suggestedTimes: nil
-                                    )
-                                },
-                                onMaybe: {
-                                    let votes = buildTimeVotes(for: event)
-                                    await viewModel.respondToInvite(
-                                        status: .maybe,
-                                        timeVotes: votes,
-                                        suggestedTimes: nil
-                                    )
-                                },
-                                isSending: viewModel.isSending
-                            )
-                        } else if let myInvite = viewModel.myInvite {
-                            // Show current status
-                            HStack {
-                                Image(systemName: myInvite.status.icon)
-                                Text("You're \(myInvite.status.displayLabel.lowercased())")
-                                    .font(Theme.Typography.bodyMedium)
-                            }
-                            .foregroundColor(statusColor(myInvite.status))
-                            .frame(maxWidth: .infinity)
-                            .padding(Theme.Spacing.lg)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                    .fill(statusColor(myInvite.status).opacity(0.1))
-                            )
-                        }
-
-                        // Guest List Section
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            Button {
-                                showInviteList = true
-                            } label: {
+                            // RSVP Section (prominent, right after hero)
+                            if let myInvite = viewModel.myInvite, myInvite.status == .pending {
+                                RSVPSection(
+                                    onAccept: {
+                                        let votes = buildTimeVotes(for: event)
+                                        await viewModel.respondToInvite(
+                                            status: .accepted,
+                                            timeVotes: votes,
+                                            suggestedTimes: nil
+                                        )
+                                    },
+                                    onDecline: {
+                                        await viewModel.respondToInvite(
+                                            status: .declined,
+                                            timeVotes: [],
+                                            suggestedTimes: nil
+                                        )
+                                    },
+                                    onMaybe: {
+                                        let votes = buildTimeVotes(for: event)
+                                        await viewModel.respondToInvite(
+                                            status: .maybe,
+                                            timeVotes: votes,
+                                            suggestedTimes: nil
+                                        )
+                                    },
+                                    isSending: viewModel.isSending
+                                )
+                            } else if let myInvite = viewModel.myInvite {
                                 HStack {
-                                    SectionHeader(title: "Guest List")
-
-                                    Spacer()
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(Theme.Colors.textTertiary)
+                                    Image(systemName: myInvite.status.icon)
+                                    Text("You're \(myInvite.status.displayLabel.lowercased())")
+                                        .font(Theme.Typography.bodyMedium)
                                 }
-                            }
-
-                            let summary = viewModel.inviteSummary
-                            HStack(spacing: Theme.Spacing.lg) {
-                                GuestCountBadge(count: summary.accepted, label: "Going", color: Theme.Colors.success)
-                                GuestCountBadge(count: summary.pending, label: "Pending", color: Theme.Colors.warning)
-                                GuestCountBadge(count: summary.maybe, label: "Maybe", color: Theme.Colors.accent)
-                                GuestCountBadge(count: summary.declined, label: "Can't", color: Theme.Colors.error)
-                            }
-
-                            if !summary.acceptedUsers.isEmpty {
-                                AvatarStack(
-                                    urls: summary.acceptedUsers.map(\.avatarUrl),
-                                    size: 36
+                                .foregroundColor(statusColor(myInvite.status))
+                                .frame(maxWidth: .infinity)
+                                .padding(Theme.Spacing.lg)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                        .fill(statusColor(myInvite.status).opacity(0.1))
                                 )
                             }
-                        }
-                        .cardStyle()
 
-                        // Location
-                        if let location = event.location {
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                SectionHeader(title: "Location")
+                            // Primary Game Card with pills
+                            if let primaryGame = event.games.first(where: { $0.isPrimary }),
+                               let game = primaryGame.game {
+                                PrimaryGameCard(game: game, eventGame: primaryGame)
+                            }
 
-                                HStack(spacing: Theme.Spacing.md) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                            .fill(Theme.Colors.secondary.opacity(0.15))
-                                            .frame(width: 44, height: 44)
-                                        Image(systemName: "mappin.circle.fill")
-                                            .font(.system(size: 24))
-                                            .foregroundColor(Theme.Colors.secondary)
-                                    }
+                            // Player Count Indicator
+                            if event.minPlayers > 0 {
+                                PlayerCountIndicator(
+                                    confirmedCount: viewModel.inviteSummary.accepted,
+                                    minPlayers: event.minPlayers,
+                                    maxPlayers: event.maxPlayers
+                                )
+                            }
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(location)
-                                            .font(Theme.Typography.bodyMedium)
-                                            .foregroundColor(Theme.Colors.textPrimary)
-                                        if let address = event.locationAddress {
-                                            Text(address)
-                                                .font(Theme.Typography.caption)
-                                                .foregroundColor(Theme.Colors.textTertiary)
+                            // Game Voting (if enabled)
+                            if event.allowGameVoting && !event.games.isEmpty {
+                                GameVotingView(
+                                    eventGames: event.games,
+                                    myVotes: viewModel.myGameVotes,
+                                    isHost: isOwner,
+                                    confirmedGameId: event.confirmedGameId,
+                                    onVote: { gameId, voteType in
+                                        await viewModel.voteForGame(gameId: gameId, voteType: voteType)
+                                    },
+                                    onConfirm: isOwner ? { gameId in
+                                        await viewModel.confirmGame(gameId: gameId)
+                                    } : nil
+                                )
+                            }
+
+                            // Other games (non-primary)
+                            let otherGames = event.games.filter { !$0.isPrimary }
+                            if !otherGames.isEmpty {
+                                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                    SectionHeader(title: "Other Games")
+                                    ForEach(otherGames) { eventGame in
+                                        if let game = eventGame.game {
+                                            CompactGameCard(game: game, isPrimary: false)
                                         }
                                     }
                                 }
+                                .cardStyle()
                             }
-                            .cardStyle()
-                        }
 
-                        // Description
-                        if let desc = event.description, !desc.isEmpty {
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                SectionHeader(title: "Details")
-                                Text(desc)
-                                    .font(Theme.Typography.body)
-                                    .foregroundColor(Theme.Colors.textSecondary)
+                            // Schedule Section (poll mode or add-to-calendar)
+                            if event.scheduleMode == .poll && event.timeOptions.count > 1 {
+                                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                    SectionHeader(title: "Schedule Poll")
+
+                                    if let myInvite = viewModel.myInvite, myInvite.status == .pending {
+                                        Text("Vote on the times that work for you:")
+                                            .font(Theme.Typography.callout)
+                                            .foregroundColor(Theme.Colors.textSecondary)
+
+                                        PollVotingView(
+                                            timeOptions: event.timeOptions,
+                                            votes: $pollVotes
+                                        )
+
+                                        if event.allowTimeSuggestions {
+                                            Button {
+                                                showTimeSuggestion = true
+                                            } label: {
+                                                HStack {
+                                                    Image(systemName: "plus.circle")
+                                                    Text("Suggest another time")
+                                                }
+                                                .font(Theme.Typography.calloutMedium)
+                                                .foregroundColor(Theme.Colors.accent)
+                                            }
+                                        }
+                                    } else {
+                                        TimeOptionPicker(
+                                            timeOptions: event.timeOptions,
+                                            selectedIds: $selectedTimeIds,
+                                            allowMultiple: false,
+                                            showVoteCounts: true
+                                        )
+                                    }
+                                }
+                                .cardStyle()
                             }
-                            .cardStyle()
-                        }
+
+                            // Guest List Tabs (inline, swipeable)
+                            GuestListTabsView(summary: viewModel.inviteSummary)
+
+                            // Activity Feed
+                            ActivityFeedView(viewModel: viewModel, isHost: isOwner)
+
+                            // Location
+                            if let location = event.location {
+                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                    SectionHeader(title: "Location")
+
+                                    HStack(spacing: Theme.Spacing.md) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                                .fill(Theme.Colors.secondary.opacity(0.15))
+                                                .frame(width: 44, height: 44)
+                                            Image(systemName: "mappin.circle.fill")
+                                                .font(.system(size: 24))
+                                                .foregroundColor(Theme.Colors.secondary)
+                                        }
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(location)
+                                                .font(Theme.Typography.bodyMedium)
+                                                .foregroundColor(Theme.Colors.textPrimary)
+                                            if let address = event.locationAddress {
+                                                Text(address)
+                                                    .font(Theme.Typography.caption)
+                                                    .foregroundColor(Theme.Colors.textTertiary)
+                                            }
+                                        }
+                                    }
+                                }
+                                .cardStyle()
+                            }
+
+                            // Description
+                            if let desc = event.description, !desc.isEmpty {
+                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                    SectionHeader(title: "Details")
+                                    Text(desc)
+                                        .font(Theme.Typography.body)
+                                        .foregroundColor(Theme.Colors.textSecondary)
+                                }
+                                .cardStyle()
+                            }
                         }
                         .padding(Theme.Spacing.xl)
                     }
@@ -282,9 +270,6 @@ struct EventDetailView: View {
                 // Handle time suggestion
             }
         }
-        .sheet(isPresented: $showInviteList) {
-            InviteListSheet(invites: viewModel.invites, summary: viewModel.inviteSummary)
-        }
         .sheet(isPresented: $showEditSheet) {
             if let event = viewModel.event {
                 CreateEventView(eventToEdit: event) { _ in
@@ -326,10 +311,8 @@ struct EventDetailView: View {
 
     private func buildTimeVotes(for event: GameEvent) -> [TimeOptionVote] {
         if event.scheduleMode == .poll && event.timeOptions.count > 1 {
-            // Use poll votes
             return pollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
         } else {
-            // Fixed mode: auto-vote yes for all time options
             return selectedTimeIds.map { TimeOptionVote(timeOptionId: $0, voteType: .yes) }
         }
     }
@@ -346,9 +329,13 @@ struct EventDetailView: View {
     }
 }
 
-// MARK: - Event Hero Header
+// MARK: - Event Hero Header (redesigned with date badge)
 struct EventHeroHeader: View {
     let event: GameEvent
+
+    private var firstTimeOption: TimeOption? {
+        event.timeOptions.first
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -362,32 +349,178 @@ struct EventHeroHeader: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 220)
+            .frame(height: 240)
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                // Status pill
-                Text(event.status.rawValue.capitalized)
-                    .font(Theme.Typography.caption2)
-                    .foregroundColor(Theme.Colors.primaryLight)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Theme.Colors.primary.opacity(0.2)))
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    // Status pill
+                    Text(event.status.rawValue.capitalized)
+                        .font(Theme.Typography.caption2)
+                        .foregroundColor(Theme.Colors.primaryLight)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Theme.Colors.primary.opacity(0.2)))
 
-                Text(event.title)
-                    .font(Theme.Typography.displayMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
+                    Text(event.title)
+                        .font(Theme.Typography.displayMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
 
-                if let host = event.host {
-                    HStack(spacing: 8) {
-                        AvatarView(url: host.avatarUrl, size: 24)
-                        Text("Hosted by \(host.displayName)")
-                            .font(Theme.Typography.callout)
-                            .foregroundColor(Theme.Colors.textSecondary)
+                    // Time + location line
+                    if let timeOption = firstTimeOption {
+                        HStack(spacing: 6) {
+                            Text("\(timeOption.displayTime)")
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                            if let location = event.location {
+                                Text("·")
+                                    .foregroundColor(Theme.Colors.textTertiary)
+                                Text(location)
+                                    .font(Theme.Typography.callout)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
+
+                    if let host = event.host {
+                        HStack(spacing: 8) {
+                            AvatarView(url: host.avatarUrl, size: 24)
+                            Text("Hosted by \(host.displayName)")
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // Date badge (top-right)
+                if let timeOption = firstTimeOption {
+                    DateBadge(date: timeOption.date)
                 }
             }
             .padding(Theme.Spacing.xl)
         }
+    }
+}
+
+// MARK: - Date Badge
+struct DateBadge: View {
+    let date: Date
+
+    private var dayOfWeek: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date).uppercased()
+    }
+
+    private var dayNumber: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter.string(from: date)
+    }
+
+    private var month: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        return formatter.string(from: date).uppercased()
+    }
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(dayOfWeek)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(Theme.Colors.error)
+            Text(dayNumber)
+                .font(.system(size: 26, weight: .heavy))
+                .foregroundColor(Theme.Colors.textPrimary)
+            Text(month)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(Theme.Colors.textSecondary)
+        }
+        .frame(width: 52)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .stroke(Theme.Colors.divider, lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Primary Game Card with Pills
+struct PrimaryGameCard: View {
+    let game: Game
+    let eventGame: EventGame
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            // Thumbnail
+            if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                AsyncImage(url: imageUrl) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .fill(Theme.Colors.backgroundElevated)
+                }
+                .frame(width: 52, height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+            } else {
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .fill(Theme.Colors.backgroundElevated)
+                    .frame(width: 52, height: 52)
+                    .overlay(
+                        Image(systemName: "dice.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text(game.name)
+                    .font(Theme.Typography.titleLarge)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                // Pills
+                HStack(spacing: 6) {
+                    GamePill(icon: "star.fill", text: "Primary", color: Theme.Colors.warning)
+                    GamePill(icon: "clock", text: game.playtimeDisplay, color: Theme.Colors.textSecondary)
+                    if game.complexity > 0 {
+                        GamePill(
+                            icon: "brain",
+                            text: String(format: "%.1f/5", game.complexity),
+                            color: Theme.Colors.complexity(game.complexity)
+                        )
+                    }
+                }
+            }
+        }
+        .cardStyle()
+    }
+}
+
+// MARK: - Game Info Pill
+struct GamePill: View {
+    let icon: String
+    let text: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 9))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule().fill(color.opacity(0.12))
+        )
     }
 }
 
@@ -449,7 +582,7 @@ struct GuestCountBadge: View {
     }
 }
 
-// MARK: - Invite List Sheet
+// MARK: - Invite List Sheet (kept for backward compatibility)
 struct InviteListSheet: View {
     let invites: [Invite]
     let summary: InviteSummary

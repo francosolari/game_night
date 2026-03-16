@@ -17,6 +17,8 @@ struct GameEvent: Identifiable, Codable {
     var inviteStrategy: InviteStrategy
     var minPlayers: Int
     var maxPlayers: Int?
+    var allowGameVoting: Bool
+    var confirmedGameId: UUID?
     var coverImageUrl: String?
     var draftInvitees: [DraftInvitee]?
     var deletedAt: Date?
@@ -40,11 +42,90 @@ struct GameEvent: Identifiable, Codable {
         case inviteStrategy = "invite_strategy"
         case minPlayers = "min_players"
         case maxPlayers = "max_players"
+        case allowGameVoting = "allow_game_voting"
+        case confirmedGameId = "confirmed_game_id"
         case coverImageUrl = "cover_image_url"
         case draftInvitees = "draft_invitees"
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    init(
+        id: UUID,
+        hostId: UUID,
+        host: User? = nil,
+        title: String,
+        description: String? = nil,
+        location: String? = nil,
+        locationAddress: String? = nil,
+        status: EventStatus,
+        games: [EventGame],
+        timeOptions: [TimeOption],
+        confirmedTimeOptionId: UUID? = nil,
+        allowTimeSuggestions: Bool,
+        scheduleMode: ScheduleMode,
+        inviteStrategy: InviteStrategy,
+        minPlayers: Int,
+        maxPlayers: Int? = nil,
+        allowGameVoting: Bool = false,
+        confirmedGameId: UUID? = nil,
+        coverImageUrl: String? = nil,
+        draftInvitees: [DraftInvitee]? = nil,
+        deletedAt: Date? = nil,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.hostId = hostId
+        self.host = host
+        self.title = title
+        self.description = description
+        self.location = location
+        self.locationAddress = locationAddress
+        self.status = status
+        self.games = games
+        self.timeOptions = timeOptions
+        self.confirmedTimeOptionId = confirmedTimeOptionId
+        self.allowTimeSuggestions = allowTimeSuggestions
+        self.scheduleMode = scheduleMode
+        self.inviteStrategy = inviteStrategy
+        self.minPlayers = minPlayers
+        self.maxPlayers = maxPlayers
+        self.allowGameVoting = allowGameVoting
+        self.confirmedGameId = confirmedGameId
+        self.coverImageUrl = coverImageUrl
+        self.draftInvitees = draftInvitees
+        self.deletedAt = deletedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        hostId = try container.decode(UUID.self, forKey: .hostId)
+        host = try? container.decodeIfPresent(User.self, forKey: .host)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        location = try container.decodeIfPresent(String.self, forKey: .location)
+        locationAddress = try container.decodeIfPresent(String.self, forKey: .locationAddress)
+        status = try container.decode(EventStatus.self, forKey: .status)
+        games = (try? container.decodeIfPresent([EventGame].self, forKey: .games)) ?? []
+        timeOptions = (try? container.decodeIfPresent([TimeOption].self, forKey: .timeOptions)) ?? []
+        confirmedTimeOptionId = try container.decodeIfPresent(UUID.self, forKey: .confirmedTimeOptionId)
+        allowTimeSuggestions = try container.decode(Bool.self, forKey: .allowTimeSuggestions)
+        scheduleMode = try container.decode(ScheduleMode.self, forKey: .scheduleMode)
+        inviteStrategy = try container.decode(InviteStrategy.self, forKey: .inviteStrategy)
+        minPlayers = try container.decode(Int.self, forKey: .minPlayers)
+        maxPlayers = try container.decodeIfPresent(Int.self, forKey: .maxPlayers)
+        allowGameVoting = try container.decodeIfPresent(Bool.self, forKey: .allowGameVoting) ?? false
+        confirmedGameId = try container.decodeIfPresent(UUID.self, forKey: .confirmedGameId)
+        coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
+        draftInvitees = try container.decodeIfPresent([DraftInvitee].self, forKey: .draftInvitees)
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 
     // Custom encode to skip nested relations (games, timeOptions, host)
@@ -64,6 +145,8 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(inviteStrategy, forKey: .inviteStrategy)
         try container.encode(minPlayers, forKey: .minPlayers)
         try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
+        try container.encode(allowGameVoting, forKey: .allowGameVoting)
+        try container.encodeIfPresent(confirmedGameId, forKey: .confirmedGameId)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
         try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)
         try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
@@ -95,6 +178,9 @@ struct EventGame: Identifiable, Codable, Hashable {
     var game: Game?
     var isPrimary: Bool // Star indicator
     var sortOrder: Int
+    var yesCount: Int
+    var maybeCount: Int
+    var noCount: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -102,6 +188,32 @@ struct EventGame: Identifiable, Codable, Hashable {
         case game
         case isPrimary = "is_primary"
         case sortOrder = "sort_order"
+        case yesCount = "yes_count"
+        case maybeCount = "maybe_count"
+        case noCount = "no_count"
+    }
+
+    init(id: UUID, gameId: UUID, game: Game? = nil, isPrimary: Bool, sortOrder: Int, yesCount: Int = 0, maybeCount: Int = 0, noCount: Int = 0) {
+        self.id = id
+        self.gameId = gameId
+        self.game = game
+        self.isPrimary = isPrimary
+        self.sortOrder = sortOrder
+        self.yesCount = yesCount
+        self.maybeCount = maybeCount
+        self.noCount = noCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        gameId = try container.decode(UUID.self, forKey: .gameId)
+        game = try container.decodeIfPresent(Game.self, forKey: .game)
+        isPrimary = try container.decode(Bool.self, forKey: .isPrimary)
+        sortOrder = try container.decode(Int.self, forKey: .sortOrder)
+        yesCount = try container.decodeIfPresent(Int.self, forKey: .yesCount) ?? 0
+        maybeCount = try container.decodeIfPresent(Int.self, forKey: .maybeCount) ?? 0
+        noCount = try container.decodeIfPresent(Int.self, forKey: .noCount) ?? 0
     }
 
     func encode(to encoder: Encoder) throws {
@@ -110,7 +222,7 @@ struct EventGame: Identifiable, Codable, Hashable {
         try container.encode(gameId, forKey: .gameId)
         try container.encode(isPrimary, forKey: .isPrimary)
         try container.encode(sortOrder, forKey: .sortOrder)
-        // Skip: game — it's a joined relation, not a column
+        // Skip: game, yesCount, maybeCount, noCount (joined/trigger-maintained)
     }
 }
 
@@ -250,6 +362,8 @@ extension GameEvent {
         inviteStrategy: InviteStrategy(type: .tiered, tierSize: 3, autoPromote: true),
         minPlayers: 3,
         maxPlayers: 4,
+        allowGameVoting: false,
+        confirmedGameId: nil,
         coverImageUrl: nil,
         draftInvitees: nil,
         deletedAt: nil,
