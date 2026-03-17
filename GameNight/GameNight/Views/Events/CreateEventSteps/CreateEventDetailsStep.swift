@@ -7,12 +7,16 @@ struct CreateEventDetailsStep: View {
     @Binding var showRSVPDeadlinePicker: Bool
     @Binding var pollEditorItem: PollEditorItem?
 
+    @State private var showRSVPOptions = false
+    @State private var showPlayerCountDetail = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
             Text("Event Details")
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
+            // Title
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Title")
                     .font(Theme.Typography.label)
@@ -26,6 +30,22 @@ struct CreateEventDetailsStep: View {
                     )
             }
 
+            // Schedule (date/time)
+            scheduleSection
+
+            // Player Count (compact expandable)
+            playerCountSection
+
+            // Location (compact row)
+            locationRow
+
+            // RSVP Options (expandable)
+            rsvpOptionsSection
+
+            // Privacy
+            privacySection
+
+            // Description (at bottom)
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 Text("Description (optional)")
                     .font(Theme.Typography.label)
@@ -39,61 +59,49 @@ struct CreateEventDetailsStep: View {
                             .fill(Theme.Colors.backgroundElevated)
                     )
             }
+        }
+    }
 
-            scheduleSection
+    // MARK: - Player Count Section
 
-            rsvpDeadlineSection
+    private var playerCountSummary: String {
+        if let max = viewModel.maxPlayers {
+            return "\(viewModel.minPlayers)–\(max) players"
+        }
+        return "\(viewModel.minPlayers)+ players"
+    }
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Location")
-                    .font(Theme.Typography.label)
-                    .foregroundColor(Theme.Colors.textSecondary)
-
-                Button {
-                    if viewModel.location.isEmpty {
-                        locationSheetMode = .picker
-                    } else {
-                        locationSheetMode = .edit
-                    }
-                } label: {
-                    HStack {
-                        if viewModel.location.isEmpty {
-                            Text("e.g. Alex's Place")
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        } else {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(viewModel.location)
-                                    .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
-                                if !viewModel.locationAddress.isEmpty {
-                                    Text(viewModel.locationAddress)
-                                        .font(Theme.Typography.caption)
-                                        .foregroundColor(Theme.Colors.textSecondary)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "mappin.circle.fill")
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    }
-                    .padding(Theme.Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
-                    )
+    private var playerCountSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showPlayerCountDetail.toggle()
                 }
+            } label: {
+                HStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "person.2")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .frame(width: 24)
+                    Text("Player Count")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Spacer()
+                    Text(playerCountSummary)
+                        .font(Theme.Typography.body)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                    Image(systemName: showPlayerCountDetail ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+                .padding(Theme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.backgroundElevated)
+                )
             }
+            .buttonStyle(.plain)
 
-            privacySection
-
-            // Player count
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Player Count")
-                    .font(Theme.Typography.label)
-                    .foregroundColor(Theme.Colors.textSecondary)
-
+            if showPlayerCountDetail {
                 HStack(spacing: Theme.Spacing.lg) {
                     VStack(alignment: .leading) {
                         Text("Minimum")
@@ -121,41 +129,209 @@ struct CreateEventDetailsStep: View {
                         .font(Theme.Typography.bodyMedium)
                     }
                 }
+                .padding(Theme.Spacing.md)
+                .padding(.top, Theme.Spacing.xs)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+    }
+
+    // MARK: - Location Row
+
+    private var locationRow: some View {
+        Button {
+            if viewModel.location.isEmpty {
+                locationSheetMode = .picker
+            } else {
+                locationSheetMode = .edit
+            }
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "mappin.circle.fill")
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .frame(width: 24)
+
+                if viewModel.location.isEmpty {
+                    Text("Location")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(viewModel.location)
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        if !viewModel.locationAddress.isEmpty {
+                            Text(viewModel.locationAddress)
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            .padding(Theme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(Theme.Colors.backgroundElevated)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - RSVP Options Section
+
+    private var rsvpOptionsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showRSVPOptions.toggle()
+                }
+            } label: {
+                HStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "envelope.badge")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .frame(width: 24)
+                    Text("RSVP Options")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Spacer()
+                    Image(systemName: showRSVPOptions ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+                .padding(Theme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.backgroundElevated)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if showRSVPOptions {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    // RSVP Deadline
+                    rsvpDeadlineRow
+
+                    Divider()
+                        .overlay(Theme.Colors.divider)
+
+                    // Allow guests to invite others
+                    Toggle(isOn: $viewModel.allowGuestInvites) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Allow guests to invite others")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Text("Guests who RSVP can invite their friends from the event page.")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+                    .tint(Theme.Colors.primary)
+
+                    Divider()
+                        .overlay(Theme.Colors.divider)
+
+                    // Capacity shortcut
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showPlayerCountDetail = true
+                        }
+                    } label: {
+                        HStack(spacing: Theme.Spacing.md) {
+                            Image(systemName: "person.2")
+                                .foregroundColor(Theme.Colors.textTertiary)
+                                .frame(width: 24)
+                            Text("Max Capacity")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Spacer()
+                            Text(viewModel.maxPlayers.map { "\($0)" } ?? "No limit")
+                                .font(Theme.Typography.body)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(Theme.Spacing.md)
+                .padding(.top, Theme.Spacing.xs)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private var rsvpDeadlineRow: some View {
+        Button {
+            if viewModel.rsvpDeadline == nil {
+                viewModel.rsvpDeadline = defaultRSVPDeadline
+            }
+            showRSVPDeadlinePicker = true
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "hourglass")
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .frame(width: 24)
+                Text("RSVP Deadline")
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Spacer()
+                Text(rsvpDeadlineValueText)
+                    .font(Theme.Typography.body)
+                    .foregroundColor(viewModel.rsvpDeadline == nil ? Theme.Colors.textTertiary : Theme.Colors.textSecondary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showRSVPDeadlinePicker) {
+            DateTimePickerSheet(
+                title: "RSVP Deadline",
+                allowsEndTime: false,
+                date: rsvpDeadlineBinding,
+                startTime: rsvpDeadlineTimeBinding,
+                endDate: rsvpDeadlineEndDateBinding,
+                endTime: rsvpDeadlineEndTimeBinding,
+                hasEndTime: rsvpDeadlineHasEndTimeBinding,
+                hasDate: rsvpDeadlineHasDateBinding,
+                timezone: $viewModel.selectedTimezone,
+                onClear: {
+                    viewModel.rsvpDeadline = nil
+                    showRSVPDeadlinePicker = false
+                }
+            )
+        }
+    }
+
+    private var rsvpDeadlineValueText: String {
+        guard let deadline = viewModel.rsvpDeadline else { return "Not set" }
+        return RSVPDeadlineDisplay.label(for: deadline)
     }
 
     // MARK: - Privacy Section
 
     private var privacySection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                Text("Privacy")
-                    .font(Theme.Typography.label)
-                    .foregroundColor(Theme.Colors.textSecondary)
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text("Privacy")
+                .font(Theme.Typography.label)
+                .foregroundColor(Theme.Colors.textSecondary)
 
-                Picker("", selection: $viewModel.visibility) {
-                    Text("Private").tag(EventVisibility.private)
-                    Text("Public").tag(EventVisibility.public)
-                }
-                .pickerStyle(.segmented)
-
-                Text(visibilityHelperText)
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.textTertiary)
+            Picker("", selection: $viewModel.visibility) {
+                Text("Private").tag(EventVisibility.private)
+                Text("Public").tag(EventVisibility.public)
             }
+            .pickerStyle(.segmented)
 
-            Toggle(isOn: $viewModel.allowGuestInvites) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Allow guests to invite others")
-                        .font(Theme.Typography.bodyMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    Text("Guests who RSVP can invite their friends from the event page.")
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
-            }
-            .tint(Theme.Colors.primary)
+            Text(visibilityHelperText)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.textTertiary)
         }
     }
 
@@ -168,7 +344,7 @@ struct CreateEventDetailsStep: View {
         }
     }
 
-    // MARK: - RSVP Deadline
+    // MARK: - RSVP Deadline Helpers
 
     private var defaultRSVPDeadline: Date {
         if viewModel.scheduleMode == .fixed, viewModel.hasDate {
@@ -246,55 +422,6 @@ struct CreateEventDetailsStep: View {
         components.hour = 23
         components.minute = 59
         return Calendar.current.date(from: components) ?? date
-    }
-
-    private var rsvpDeadlineSection: some View {
-        Button {
-            if viewModel.rsvpDeadline == nil {
-                viewModel.rsvpDeadline = defaultRSVPDeadline
-            }
-            showRSVPDeadlinePicker = true
-        } label: {
-            HStack(spacing: Theme.Spacing.md) {
-                Text(rsvpDeadlineRowText)
-                    .font(Theme.Typography.bodyMedium)
-                    .foregroundColor(viewModel.rsvpDeadline == nil ? Theme.Colors.textSecondary : Theme.Colors.textPrimary)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Theme.Colors.textTertiary)
-            }
-            .padding(Theme.Spacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                    .fill(Theme.Colors.cardBackground)
-            )
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showRSVPDeadlinePicker) {
-            DateTimePickerSheet(
-                title: "RSVP Deadline",
-                allowsEndTime: false,
-                date: rsvpDeadlineBinding,
-                startTime: rsvpDeadlineTimeBinding,
-                endDate: rsvpDeadlineEndDateBinding,
-                endTime: rsvpDeadlineEndTimeBinding,
-                hasEndTime: rsvpDeadlineHasEndTimeBinding,
-                hasDate: rsvpDeadlineHasDateBinding,
-                timezone: $viewModel.selectedTimezone,
-                onClear: {
-                    viewModel.rsvpDeadline = nil
-                    showRSVPDeadlinePicker = false
-                }
-            )
-        }
-    }
-
-    private var rsvpDeadlineRowText: String {
-        guard let deadline = viewModel.rsvpDeadline else { return "RSVP deadline" }
-        return RSVPDeadlineDisplay.label(for: deadline)
     }
 
     // MARK: - Schedule Section
