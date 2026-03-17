@@ -440,6 +440,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func createInvites(_ invites: [Invite]) async throws {
+        guard !invites.isEmpty else { return }
         let normalizedInvites = invites.map { invite in
             var normalizedInvite = invite
             normalizedInvite.phoneNumber = ContactPickerService.normalizePhone(invite.phoneNumber)
