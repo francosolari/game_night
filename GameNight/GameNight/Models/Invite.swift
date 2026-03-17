@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct Invite: Identifiable, Codable {
     let id: UUID
@@ -65,6 +66,17 @@ enum InviteStatus: String, Codable, CaseIterable {
         case .maybe: return "questionmark.circle.fill"
         case .expired: return "clock.badge.exclamationmark.fill"
         case .waitlisted: return "list.number"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .accepted: return Theme.Colors.success
+        case .declined: return Theme.Colors.error
+        case .maybe: return Theme.Colors.warning
+        case .pending: return Theme.Colors.textTertiary
+        case .expired: return Theme.Colors.textTertiary
+        case .waitlisted: return Theme.Colors.accent
         }
     }
 }

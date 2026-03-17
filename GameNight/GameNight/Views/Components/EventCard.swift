@@ -184,17 +184,6 @@ struct EventCard: View {
 struct InviteStatusBadge: View {
     let status: InviteStatus
 
-    private var color: Color {
-        switch status {
-        case .accepted: return Theme.Colors.success
-        case .declined: return Theme.Colors.error
-        case .maybe: return Theme.Colors.warning
-        case .pending: return Theme.Colors.textTertiary
-        case .expired: return Theme.Colors.textTertiary
-        case .waitlisted: return Theme.Colors.accent
-        }
-    }
-
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: status.icon)
@@ -202,12 +191,12 @@ struct InviteStatusBadge: View {
             Text(status.displayLabel)
                 .font(Theme.Typography.caption2)
         }
-        .foregroundColor(color)
+        .foregroundColor(status.color)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(
             Capsule()
-                .fill(color.opacity(0.15))
+                .fill(status.color.opacity(0.15))
         )
     }
 }

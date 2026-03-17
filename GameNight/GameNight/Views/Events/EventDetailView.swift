@@ -15,11 +15,6 @@ struct EventDetailView: View {
     @State private var toast: ToastItem?
     @State private var editSavePresentation = EventEditSavePresentation()
 
-    private var isOwner: Bool {
-        guard let event = viewModel.event else { return false }
-        return appState.currentUser?.id == event.hostId
-    }
-
     private var deleteErrorPresented: Binding<Bool> {
         Binding(
             get: { viewModel.error?.isEmpty == false },
@@ -81,7 +76,7 @@ struct EventDetailView: View {
                                         Text("You're \(myInvite.status.displayLabel.lowercased())")
                                             .font(Theme.Typography.bodyMedium)
                                     }
-                                    .foregroundColor(statusColor(myInvite.status))
+                                    .foregroundColor(myInvite.status.color)
 
                                     if let deadlineText = rsvpDeadlineText(for: event) {
                                         Text(deadlineText)
@@ -93,7 +88,7 @@ struct EventDetailView: View {
                                 .padding(Theme.Spacing.lg)
                                 .background(
                                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                        .fill(statusColor(myInvite.status).opacity(0.1))
+                                        .fill(myInvite.status.color.opacity(0.1))
                                 )
                             }
 
@@ -102,12 +97,12 @@ struct EventDetailView: View {
                                 GameVotingView(
                                     eventGames: event.games,
                                     myVotes: viewModel.myGameVotes,
-                                    isHost: isOwner,
+                                    isHost: viewModel.isOwner,
                                     confirmedGameId: event.confirmedGameId,
                                     onVote: { gameId, voteType in
                                         await viewModel.voteForGame(gameId: gameId, voteType: voteType)
                                     },
-                                    onConfirm: isOwner ? { gameId in
+                                    onConfirm: viewModel.isOwner ? { gameId in
                                         await viewModel.confirmGame(gameId: gameId)
                                     } : nil
                                 )
@@ -178,7 +173,7 @@ struct EventDetailView: View {
                             )
 
                             // Activity Feed
-                            ActivityFeedView(viewModel: viewModel, isHost: isOwner)
+                            ActivityFeedView(viewModel: viewModel, isHost: viewModel.isOwner)
 
                             // Description
                             if let desc = event.description, !desc.isEmpty {
@@ -219,7 +214,7 @@ struct EventDetailView: View {
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if isOwner {
+            if viewModel.isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: Theme.Spacing.sm) {
                         Button {
@@ -320,16 +315,6 @@ struct EventDetailView: View {
         }
     }
 
-    private func statusColor(_ status: InviteStatus) -> Color {
-        switch status {
-        case .accepted: return Theme.Colors.success
-        case .declined: return Theme.Colors.error
-        case .maybe: return Theme.Colors.warning
-        case .pending: return Theme.Colors.textTertiary
-        case .expired: return Theme.Colors.textTertiary
-        case .waitlisted: return Theme.Colors.accent
-        }
-    }
 
     private var guestListVisibilityMode: GuestListVisibilityMode {
         if viewModel.accessPolicy?.canViewGuestList ?? true {

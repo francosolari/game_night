@@ -38,6 +38,7 @@ private struct EventSoftDeletePatch: Encodable {
 @MainActor
 final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingProviding {
     static let shared = SupabaseService()
+    static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)"
 
     let client: SupabaseClient
 
@@ -141,7 +142,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let publicEvents: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .eq("visibility", value: EventVisibility.public.rawValue)
             .or("status.eq.published,status.eq.confirmed")
             .is("deleted_at", value: nil)
@@ -151,7 +152,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let hostedEvents: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .eq("host_id", value: session.user.id.uuidString)
             .or("status.eq.published,status.eq.confirmed")
             .is("deleted_at", value: nil)
@@ -172,7 +173,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let events: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .in("id", values: ids.map(\.uuidString))
             .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
@@ -186,7 +187,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let session = try await client.auth.session
         let events: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .eq("host_id", value: session.user.id.uuidString)
             .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
@@ -199,7 +200,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let session = try await client.auth.session
         let events: [GameEvent] = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .eq("host_id", value: session.user.id.uuidString)
             .eq("status", value: "draft")
             .is("deleted_at", value: nil)
@@ -212,7 +213,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchEvent(id: UUID) async throws -> GameEvent {
         let event: GameEvent = try await client
             .from("events")
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .eq("id", value: id.uuidString)
             .is("deleted_at", value: nil)
             .single()
@@ -225,7 +226,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let created: GameEvent = try await client
             .from("events")
             .insert(event)
-            .select("*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)")
+            .select(Self.eventSelect)
             .single()
             .execute()
             .value
@@ -372,7 +373,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let session = try await client.auth.session
         let invites: [Invite] = try await client
             .from("invites")
-            .select("*, event:events(*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*))")
+            .select("*, event:events(\(Self.eventSelect))")
             .eq("user_id", value: session.user.id.uuidString)
             .execute()
             .value

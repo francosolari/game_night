@@ -19,7 +19,7 @@ serve(async (req) => {
     // Fetch the invite that was just responded to
     const { data: respondedInvite } = await supabase
       .from("invites")
-      .select("id, event_id, host_user_id, status")
+      .select("id, event_id, host_user_id, user_id, status")
       .eq("id", invite_id)
       .single();
 
@@ -30,9 +30,10 @@ serve(async (req) => {
       );
     }
 
-    if (respondedInvite.host_user_id !== caller.id) {
+    // Verify the caller is the person who responded to this invite
+    if (respondedInvite.user_id !== caller.id) {
       return new Response(
-        JSON.stringify({ error: "Only the event host can process tiered invites" }),
+        JSON.stringify({ error: "Unauthorized" }),
         { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }

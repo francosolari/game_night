@@ -14,10 +14,10 @@ struct GuestListTabsView: View {
 
     private var tabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
         [
-            ("Going", summary.accepted, Theme.Colors.success, summary.acceptedUsers),
-            ("Maybe", summary.maybe, Theme.Colors.warning, summary.maybeUsers),
-            ("Pending", summary.pending, Theme.Colors.textTertiary, summary.pendingUsers),
-            ("Can't", summary.declined, Theme.Colors.error, summary.declinedUsers)
+            ("Going", summary.accepted, InviteStatus.accepted.color, summary.acceptedUsers),
+            ("Maybe", summary.maybe, InviteStatus.maybe.color, summary.maybeUsers),
+            ("Pending", summary.pending, InviteStatus.pending.color, summary.pendingUsers),
+            ("Can't", summary.declined, InviteStatus.declined.color, summary.declinedUsers)
         ]
     }
 
