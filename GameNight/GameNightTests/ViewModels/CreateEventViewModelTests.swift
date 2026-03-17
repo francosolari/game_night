@@ -163,8 +163,13 @@ final class CreateEventViewModelTests: XCTestCase {
             supabase: service
         )
         sut.currentStep = .details
-        sut.fixedDate = Date(timeIntervalSince1970: 1_720_000_000)
-        sut.fixedStartTime = Date(timeIntervalSince1970: 1_720_003_600)
+        // resolvedTimeOptions recombines date (year/month/day) + time (hour/minute),
+        // so the test dates must have zero seconds to survive the round-trip.
+        let cal = Calendar.current
+        let fixedDate = cal.date(from: DateComponents(year: 2024, month: 7, day: 3))!
+        let fixedStart = cal.date(from: DateComponents(year: 2024, month: 7, day: 3, hour: 14, minute: 0))!
+        sut.fixedDate = fixedDate
+        sut.fixedStartTime = fixedStart
 
         await sut.saveChanges()
 
@@ -399,6 +404,160 @@ final class CreateEventViewModelTests: XCTestCase {
 
         XCTAssertTrue(sut.invitees.isEmpty)
     }
+
+    // MARK: - canProceed navigation logic
+
+    func testCanProceedRequiresTitleForDetails() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .details
+        sut.title = ""
+
+        XCTAssertFalse(sut.canProceed)
+
+        sut.title = "Board Game Night"
+
+        XCTAssertTrue(sut.canProceed)
+    }
+
+    func testCanProceedAlwaysTrueForReview() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .review
+
+        XCTAssertTrue(sut.canProceed)
+    }
+
+    func testCanProceedGamesStepRequiresSelectedGames() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .games
+        sut.selectedGames = []
+
+        XCTAssertFalse(sut.canProceed)
+
+        sut.selectedGames = [FixtureFactory.makeEventGame()]
+
+        XCTAssertTrue(sut.canProceed)
+    }
+
+    func testCanProceedInvitesStepRequiresInvitees() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .invites
+        sut.invitees = []
+
+        XCTAssertFalse(sut.canProceed)
+
+        sut.invitees = [
+            InviteeEntry(id: UUID(), name: "Jordan", phoneNumber: "+15555550111", userId: nil, tier: 1)
+        ]
+
+        XCTAssertTrue(sut.canProceed)
+    }
+
+    func testNavigateToStepAllowsBackwardNavigation() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .games
+        sut.completedSteps = [.details]
+
+        sut.navigateToStep(.details)
+
+        XCTAssertEqual(sut.currentStep, .details)
+    }
+
+    func testNavigateToStepBlocksSkippingAhead() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .details
+        sut.completedSteps = []
+
+        sut.navigateToStep(.review)
+
+        XCTAssertEqual(sut.currentStep, .details)
+    }
+
+    func testCanNavigateToStepAllowsAllStepsInEditMode() {
+        let event = FixtureFactory.makeEvent()
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        for step in CreateEventViewModel.CreateStep.allCases {
+            XCTAssertTrue(sut.canNavigateToStep(step), "Should allow navigating to \(step) in published edit mode")
+        }
+    }
+
+    func testMarkCurrentStepCompletedAddsToSet() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+        sut.currentStep = .details
+
+        XCTAssertFalse(sut.completedSteps.contains(.details))
+
+        sut.markCurrentStepCompleted()
+
+        XCTAssertTrue(sut.completedSteps.contains(.details))
+    }
+
+    // MARK: - Draft initialization
+
+    func testDraftEditPreloadsCompletedStepsAndNavigatesToFirstIncomplete() {
+        let game = FixtureFactory.makeEventGame(game: FixtureFactory.makeGame(name: "Dune"))
+        let event = FixtureFactory.makeEvent(
+            title: "Draft Night",
+            status: .draft,
+            games: [game]
+        )
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        XCTAssertTrue(sut.completedSteps.contains(.details))
+        XCTAssertTrue(sut.completedSteps.contains(.games))
+        XCTAssertFalse(sut.completedSteps.contains(.invites))
+        XCTAssertEqual(sut.currentStep, .invites)
+    }
+
+    func testDraftEditWithDraftInviteesPreloadsInviteeEntries() {
+        let inviteeId = UUID()
+        let draftInvitees = [
+            DraftInvitee(
+                id: inviteeId,
+                name: "Jordan",
+                phoneNumber: "+15555550111",
+                userId: nil,
+                tier: 1,
+                groupId: nil,
+                groupEmoji: nil
+            )
+        ]
+        var event = FixtureFactory.makeEvent(status: .draft)
+        event.draftInvitees = draftInvitees
+
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        XCTAssertEqual(sut.invitees.count, 1)
+        XCTAssertEqual(sut.invitees.first?.name, "Jordan")
+        XCTAssertEqual(sut.invitees.first?.phoneNumber, "+15555550111")
+        XCTAssertEqual(sut.invitees.first?.id, inviteeId)
+    }
 }
 
 @MainActor
@@ -441,6 +600,121 @@ final class EventViewModelTests: XCTestCase {
         XCTAssertEqual(sut.inviteSummary.accepted, 1)
         XCTAssertEqual(sut.inviteSummary.acceptedUsers.first?.id, hostId)
         XCTAssertEqual(sut.inviteSummary.acceptedUsers.first?.name, "Franco")
+    }
+
+    func testInviteSummaryGroupsByStatusCorrectly() {
+        let hostId = UUID()
+        let host = FixtureFactory.makeUser(id: hostId, displayName: "Franco")
+        let event = FixtureFactory.makeEvent(host: host)
+        let sut = EventViewModel()
+        sut.event = event
+        sut.invites = [
+            makeInvite(displayName: "Jordan", phoneNumber: "+15555550111", tier: 1, status: .accepted),
+            makeInvite(displayName: "Casey", phoneNumber: "+15555550112", tier: 1, status: .declined),
+            makeInvite(displayName: "Alex", phoneNumber: "+15555550113", tier: 1, status: .maybe),
+            makeInvite(displayName: "Sam", phoneNumber: "+15555550114", tier: 1, status: .pending),
+            makeInvite(displayName: "Riley", phoneNumber: "+15555550115", tier: 2, status: .waitlisted),
+        ]
+
+        let summary = sut.inviteSummary
+
+        XCTAssertEqual(summary.accepted, 2) // Jordan + host
+        XCTAssertEqual(summary.declined, 1)
+        XCTAssertEqual(summary.maybe, 1)
+        XCTAssertEqual(summary.pending, 1)
+        XCTAssertEqual(summary.waitlisted, 1)
+        XCTAssertTrue(summary.acceptedUsers.contains { $0.name == "Jordan" })
+        XCTAssertTrue(summary.acceptedUsers.contains { $0.name == "Franco" })
+        XCTAssertEqual(summary.declinedUsers.first?.name, "Casey")
+    }
+
+    func testInviteSummaryExcludesHostByUserId() {
+        let hostId = UUID()
+        let host = FixtureFactory.makeUser(id: hostId, displayName: "Franco")
+        let event = FixtureFactory.makeEvent(host: host)
+        let sut = EventViewModel()
+        sut.event = event
+
+        let hostInvite = Invite(
+            id: UUID(),
+            eventId: event.id,
+            hostUserId: hostId,
+            userId: hostId,
+            phoneNumber: "+15555550199",
+            displayName: "Franco",
+            status: .accepted,
+            tier: 1,
+            tierPosition: 0,
+            isActive: true,
+            respondedAt: nil,
+            selectedTimeOptionIds: [],
+            suggestedTimes: nil,
+            sentVia: .both,
+            smsDeliveryStatus: .delivered,
+            createdAt: Date(timeIntervalSince1970: 1_710_000_000)
+        )
+        sut.invites = [hostInvite]
+
+        let summary = sut.inviteSummary
+
+        // Host invite should be excluded, but host is still counted via the host user logic
+        XCTAssertEqual(summary.accepted, 1)
+        XCTAssertEqual(summary.acceptedUsers.count, 1)
+        XCTAssertEqual(summary.acceptedUsers.first?.name, "Franco")
+    }
+
+    func testInviteSummaryExcludesHostByPhoneNumber() {
+        let hostId = UUID()
+        let hostPhone = "19543482945"
+        let host = FixtureFactory.makeUser(id: hostId, displayName: "Franco")
+        let event = FixtureFactory.makeEvent(host: host)
+        let sut = EventViewModel()
+        sut.event = event
+
+        let hostInviteByPhone = Invite(
+            id: UUID(),
+            eventId: event.id,
+            hostUserId: hostId,
+            userId: nil,
+            phoneNumber: hostPhone,
+            displayName: "Franco",
+            status: .accepted,
+            tier: 1,
+            tierPosition: 0,
+            isActive: true,
+            respondedAt: nil,
+            selectedTimeOptionIds: [],
+            suggestedTimes: nil,
+            sentVia: .both,
+            smsDeliveryStatus: .delivered,
+            createdAt: Date(timeIntervalSince1970: 1_710_000_000)
+        )
+        sut.invites = [hostInviteByPhone]
+
+        let summary = sut.inviteSummary
+
+        // Host invite matched by phone should be excluded
+        XCTAssertEqual(summary.accepted, 1)
+        XCTAssertEqual(summary.acceptedUsers.count, 1)
+        XCTAssertEqual(summary.acceptedUsers.first?.name, "Franco")
+    }
+
+    func testInviteSummaryWithNoInvitesShowsOnlyHost() {
+        let host = FixtureFactory.makeUser(displayName: "Franco")
+        let event = FixtureFactory.makeEvent(host: host)
+        let sut = EventViewModel()
+        sut.event = event
+        sut.invites = []
+
+        let summary = sut.inviteSummary
+
+        XCTAssertEqual(summary.total, 1)
+        XCTAssertEqual(summary.accepted, 1)
+        XCTAssertEqual(summary.declined, 0)
+        XCTAssertEqual(summary.pending, 0)
+        XCTAssertEqual(summary.maybe, 0)
+        XCTAssertEqual(summary.waitlisted, 0)
+        XCTAssertEqual(summary.acceptedUsers.first?.name, "Franco")
     }
 }
 
