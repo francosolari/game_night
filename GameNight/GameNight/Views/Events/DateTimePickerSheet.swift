@@ -5,7 +5,12 @@ import SwiftUI
 struct DateTimePickerSheet: View {
     let title: String
     let allowsEndTime: Bool
+    let clearButtonTitle: String?
+    let primaryActionTitle: String
+    let isPrimaryActionDisabled: Bool
     let onClear: (() -> Void)?
+    let onPrimaryAction: (() -> Void)?
+    let accessory: AnyView?
     @Binding var startDate: Date
     @Binding var startTime: Date
     @Binding var endDate: Date
@@ -21,6 +26,7 @@ struct DateTimePickerSheet: View {
     init(
         title: String = "Date & Time",
         allowsEndTime: Bool = true,
+        clearButtonTitle: String? = "Clear",
         date: Binding<Date>,
         startTime: Binding<Date>,
         endDate: Binding<Date>,
@@ -28,11 +34,20 @@ struct DateTimePickerSheet: View {
         hasEndTime: Binding<Bool>,
         hasDate: Binding<Bool> = .constant(true),
         timezone: Binding<TimeZone> = .constant(.current),
-        onClear: (() -> Void)? = nil
+        primaryActionTitle: String = "Done",
+        isPrimaryActionDisabled: Bool = false,
+        onClear: (() -> Void)? = nil,
+        onPrimaryAction: (() -> Void)? = nil,
+        accessory: AnyView? = nil
     ) {
         self.title = title
         self.allowsEndTime = allowsEndTime
+        self.clearButtonTitle = clearButtonTitle
+        self.primaryActionTitle = primaryActionTitle
+        self.isPrimaryActionDisabled = isPrimaryActionDisabled
         self.onClear = onClear
+        self.onPrimaryAction = onPrimaryAction
+        self.accessory = accessory
         _startDate = date
         _startTime = startTime
         _endDate = endDate
@@ -54,21 +69,26 @@ struct DateTimePickerSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("Clear") {
-                    if let onClear {
-                        onClear()
-                    } else {
-                        hasDate = false
-                        hasEndTime = false
-                        isEditingEnd = false
-                        startDate = Date()
-                        endDate = Date()
-                        startTime = Self.defaultTime(hour: 19)
-                        endTime = Self.defaultTime(hour: 22)
+                if let clearButtonTitle {
+                    Button(clearButtonTitle) {
+                        if let onClear {
+                            onClear()
+                        } else {
+                            hasDate = false
+                            hasEndTime = false
+                            isEditingEnd = false
+                            startDate = Date()
+                            endDate = Date()
+                            startTime = Self.defaultTime(hour: 19)
+                            endTime = Self.defaultTime(hour: 22)
+                        }
                     }
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                } else {
+                    Color.clear
+                        .frame(width: 44, height: 20)
                 }
-                .font(Theme.Typography.bodyMedium)
-                .foregroundColor(Theme.Colors.textSecondary)
 
                 Spacer()
 
@@ -144,6 +164,12 @@ struct DateTimePickerSheet: View {
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.bottom, Theme.Spacing.sm)
 
+            if let accessory {
+                accessory
+                    .padding(.horizontal, Theme.Spacing.lg)
+                    .padding(.bottom, Theme.Spacing.sm)
+            }
+
             // Footer with timezone
             HStack {
                 Button {
@@ -161,18 +187,23 @@ struct DateTimePickerSheet: View {
                 Spacer()
 
                 Button {
-                    dismiss()
+                    if let onPrimaryAction {
+                        onPrimaryAction()
+                    } else {
+                        dismiss()
+                    }
                 } label: {
-                    Text("Done")
+                    Text(primaryActionTitle)
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.background)
                         .padding(.horizontal, Theme.Spacing.xl)
                         .padding(.vertical, Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                .fill(Theme.Colors.textPrimary)
+                                .fill(isPrimaryActionDisabled ? Theme.Colors.textTertiary : Theme.Colors.textPrimary)
                         )
                 }
+                .disabled(isPrimaryActionDisabled)
             }
             .padding(.horizontal, Theme.Spacing.lg)
             .padding(.vertical, Theme.Spacing.sm)

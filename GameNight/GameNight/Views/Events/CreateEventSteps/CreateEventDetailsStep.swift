@@ -520,7 +520,6 @@ struct CreateEventDetailsStep: View {
                             startTime: option.startTime,
                             endTime: option.endTime,
                             hasEndTime: option.endTime != nil,
-                            label: option.label,
                             onDelete: {
                                 viewModel.removeTimeOption(id: option.id)
                             }
@@ -550,26 +549,26 @@ struct CreateEventDetailsStep: View {
         .sheet(item: $pollEditorItem) { item in
             switch item {
             case .add:
-                PollEditSheet(
+                PollDateTimePickerSheet(
                     title: "Add Time Option",
                     saveTitle: "Add",
+                    timezone: $viewModel.selectedTimezone,
                     initialDate: Date(),
                     initialStartTime: DateTimePickerSheet.defaultTime(hour: 19),
                     initialEndTime: nil,
-                    initialLabel: nil,
                     onSave: { date, start, end, label in
                         viewModel.addTimeOption(date: date, startTime: start, endTime: end, label: label)
                     }
                 )
             case .edit(let optionId):
                 if let option = viewModel.timeOptions.first(where: { $0.id == optionId }) {
-                    PollEditSheet(
+                    PollDateTimePickerSheet(
                         title: "Edit Time Option",
                         saveTitle: "Save",
+                        timezone: $viewModel.selectedTimezone,
                         initialDate: option.date,
                         initialStartTime: option.startTime,
                         initialEndTime: option.endTime,
-                        initialLabel: option.label,
                         onSave: { date, start, end, label in
                             viewModel.updateTimeOption(
                                 id: optionId,
@@ -578,9 +577,6 @@ struct CreateEventDetailsStep: View {
                                 endTime: end,
                                 label: label
                             )
-                        },
-                        onDelete: {
-                            viewModel.removeTimeOption(id: optionId)
                         }
                     )
                 }
@@ -600,5 +596,81 @@ enum PollEditorItem: Identifiable {
         case .edit(let optionId):
             return optionId.uuidString
         }
+    }
+}
+
+struct PollDateTimePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let title: String
+    let saveTitle: String
+    @Binding var timezone: TimeZone
+    @State private var date: Date
+    @State private var startTime: Date
+    @State private var endDate: Date
+    @State private var endTime: Date
+    @State private var hasEndTime: Bool
+    @State private var hasDate: Bool
+
+    let onSave: (Date, Date, Date?, String?) -> Void
+
+    init(
+        title: String,
+        saveTitle: String,
+        timezone: Binding<TimeZone>,
+        initialDate: Date,
+        initialStartTime: Date,
+        initialEndTime: Date?,
+        onSave: @escaping (Date, Date, Date?, String?) -> Void
+    ) {
+        self.title = title
+        self.saveTitle = saveTitle
+        _timezone = timezone
+        _date = State(initialValue: initialDate)
+        _startTime = State(initialValue: initialStartTime)
+        _endDate = State(initialValue: initialEndTime.map { Calendar.current.startOfDay(for: $0) } ?? initialDate)
+        _endTime = State(initialValue: initialEndTime ?? DateTimePickerSheet.defaultTime(hour: 22))
+        _hasEndTime = State(initialValue: initialEndTime != nil)
+        _hasDate = State(initialValue: true)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        DateTimePickerSheet(
+            title: title,
+            date: $date,
+            startTime: $startTime,
+            endDate: $endDate,
+            endTime: $endTime,
+            hasEndTime: $hasEndTime,
+            hasDate: $hasDate,
+            timezone: $timezone,
+            primaryActionTitle: saveTitle,
+            isPrimaryActionDisabled: !hasDate,
+            onPrimaryAction: {
+                onSave(
+                    date,
+                    resolvedDateTime(date: date, time: startTime),
+                    hasEndTime ? resolvedDateTime(date: endDate, time: endTime) : nil,
+                    nil
+                )
+                dismiss()
+            }
+        )
+    }
+
+    private func resolvedDateTime(date: Date, time: Date) -> Date {
+        let calendar = Calendar.current
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+
+        var resolved = DateComponents()
+        resolved.year = dateComponents.year
+        resolved.month = dateComponents.month
+        resolved.day = dateComponents.day
+        resolved.hour = timeComponents.hour
+        resolved.minute = timeComponents.minute
+
+        return calendar.date(from: resolved) ?? time
     }
 }
