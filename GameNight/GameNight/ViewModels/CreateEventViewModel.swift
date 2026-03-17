@@ -27,6 +27,9 @@ final class CreateEventViewModel: ObservableObject {
     @Published var inviteStrategy = InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true)
     @Published var minPlayers = 3
     @Published var maxPlayers: Int? = nil
+    @Published var plusOneLimit: Int = 0
+    @Published var allowMaybeRSVP: Bool = true
+    @Published var requirePlusOneNames: Bool = false
     @Published var selectedGroup: GameGroup?
     @Published var invitees: [InviteeEntry] = []
     @Published var isSaving = false
@@ -90,6 +93,9 @@ final class CreateEventViewModel: ObservableObject {
             inviteStrategy = eventToEdit.inviteStrategy
             minPlayers = eventToEdit.minPlayers
             maxPlayers = eventToEdit.maxPlayers
+            plusOneLimit = eventToEdit.plusOneLimit
+            allowMaybeRSVP = eventToEdit.allowMaybeRSVP
+            requirePlusOneNames = eventToEdit.requirePlusOneNames
 
             if eventToEdit.scheduleMode == .fixed {
                 if let fixedOption = eventToEdit.timeOptions.first {
@@ -587,6 +593,9 @@ final class CreateEventViewModel: ObservableObject {
             maxPlayers: maxPlayers,
             allowGameVoting: allowGameVoting,
             confirmedGameId: existingEvent?.confirmedGameId,
+            plusOneLimit: plusOneLimit,
+            allowMaybeRSVP: allowMaybeRSVP,
+            requirePlusOneNames: requirePlusOneNames,
             coverImageUrl: existingEvent?.coverImageUrl,
             draftInvitees: status == .draft ? orderedInvitees().map { entry in
                 DraftInvitee(

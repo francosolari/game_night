@@ -22,6 +22,9 @@ struct GameEvent: Identifiable, Codable {
     var maxPlayers: Int?
     var allowGameVoting: Bool
     var confirmedGameId: UUID?
+    var plusOneLimit: Int
+    var allowMaybeRSVP: Bool
+    var requirePlusOneNames: Bool
     var coverImageUrl: String?
     var draftInvitees: [DraftInvitee]?
     var deletedAt: Date?
@@ -50,6 +53,9 @@ struct GameEvent: Identifiable, Codable {
         case maxPlayers = "max_players"
         case allowGameVoting = "allow_game_voting"
         case confirmedGameId = "confirmed_game_id"
+        case plusOneLimit = "plus_one_limit"
+        case allowMaybeRSVP = "allow_maybe_rsvp"
+        case requirePlusOneNames = "require_plus_one_names"
         case coverImageUrl = "cover_image_url"
         case draftInvitees = "draft_invitees"
         case deletedAt = "deleted_at"
@@ -79,6 +85,9 @@ struct GameEvent: Identifiable, Codable {
         maxPlayers: Int? = nil,
         allowGameVoting: Bool = false,
         confirmedGameId: UUID? = nil,
+        plusOneLimit: Int = 0,
+        allowMaybeRSVP: Bool = true,
+        requirePlusOneNames: Bool = false,
         coverImageUrl: String? = nil,
         draftInvitees: [DraftInvitee]? = nil,
         deletedAt: Date? = nil,
@@ -106,6 +115,9 @@ struct GameEvent: Identifiable, Codable {
         self.maxPlayers = maxPlayers
         self.allowGameVoting = allowGameVoting
         self.confirmedGameId = confirmedGameId
+        self.plusOneLimit = plusOneLimit
+        self.allowMaybeRSVP = allowMaybeRSVP
+        self.requirePlusOneNames = requirePlusOneNames
         self.coverImageUrl = coverImageUrl
         self.draftInvitees = draftInvitees
         self.deletedAt = deletedAt
@@ -136,6 +148,9 @@ struct GameEvent: Identifiable, Codable {
         maxPlayers = try container.decodeIfPresent(Int.self, forKey: .maxPlayers)
         allowGameVoting = try container.decodeIfPresent(Bool.self, forKey: .allowGameVoting) ?? false
         confirmedGameId = try container.decodeIfPresent(UUID.self, forKey: .confirmedGameId)
+        plusOneLimit = try container.decodeIfPresent(Int.self, forKey: .plusOneLimit) ?? 0
+        allowMaybeRSVP = try container.decodeIfPresent(Bool.self, forKey: .allowMaybeRSVP) ?? true
+        requirePlusOneNames = try container.decodeIfPresent(Bool.self, forKey: .requirePlusOneNames) ?? false
         coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
         draftInvitees = try container.decodeIfPresent([DraftInvitee].self, forKey: .draftInvitees)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
@@ -165,6 +180,9 @@ struct GameEvent: Identifiable, Codable {
         try container.encodeIfPresent(maxPlayers, forKey: .maxPlayers)
         try container.encode(allowGameVoting, forKey: .allowGameVoting)
         try container.encodeIfPresent(confirmedGameId, forKey: .confirmedGameId)
+        try container.encode(plusOneLimit, forKey: .plusOneLimit)
+        try container.encode(allowMaybeRSVP, forKey: .allowMaybeRSVP)
+        try container.encode(requirePlusOneNames, forKey: .requirePlusOneNames)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
         try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)
         try container.encodeIfPresent(deletedAt, forKey: .deletedAt)

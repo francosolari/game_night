@@ -11,7 +11,10 @@ enum FixtureFactory {
         host: User? = makeUser(),
         visibility: EventVisibility = .private,
         rsvpDeadline: Date? = nil,
-        allowGuestInvites: Bool = false
+        allowGuestInvites: Bool = false,
+        plusOneLimit: Int = 0,
+        allowMaybeRSVP: Bool = true,
+        requirePlusOneNames: Bool = false
     ) -> GameEvent {
         GameEvent(
             id: id,
@@ -35,6 +38,9 @@ enum FixtureFactory {
             maxPlayers: 6,
             allowGameVoting: false,
             confirmedGameId: nil,
+            plusOneLimit: plusOneLimit,
+            allowMaybeRSVP: allowMaybeRSVP,
+            requirePlusOneNames: requirePlusOneNames,
             coverImageUrl: nil,
             draftInvitees: nil,
             deletedAt: nil,

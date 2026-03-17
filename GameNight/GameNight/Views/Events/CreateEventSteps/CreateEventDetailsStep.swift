@@ -236,29 +236,69 @@ struct CreateEventDetailsStep: View {
                     Divider()
                         .overlay(Theme.Colors.divider)
 
-                    // Capacity shortcut
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showPlayerCountDetail = true
+                    // Plus Ones
+                    HStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "person.badge.plus")
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .frame(width: 24)
+                        Text("Plus Ones")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Spacer()
+                        Menu {
+                            ForEach(0...9, id: \.self) { value in
+                                Button {
+                                    viewModel.plusOneLimit = value
+                                } label: {
+                                    if value == viewModel.plusOneLimit {
+                                        Label(value == 0 ? "None" : "Up to \(value)", systemImage: "checkmark")
+                                    } else {
+                                        Text(value == 0 ? "None" : "Up to \(value)")
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(viewModel.plusOneLimit == 0 ? "None" : "Up to \(viewModel.plusOneLimit)")
+                                    .font(Theme.Typography.body)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(Theme.Colors.textTertiary)
+                            }
                         }
-                    } label: {
-                        HStack(spacing: Theme.Spacing.md) {
-                            Image(systemName: "person.2")
-                                .foregroundColor(Theme.Colors.textTertiary)
-                                .frame(width: 24)
-                            Text("Max Capacity")
+                    }
+
+                    // Require plus-one names (only when plus-ones allowed)
+                    if viewModel.plusOneLimit > 0 {
+                        Toggle(isOn: $viewModel.requirePlusOneNames) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Require plus-one names")
+                                    .font(Theme.Typography.bodyMedium)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                                Text("Guests must provide names for their plus-ones")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.textTertiary)
+                            }
+                        }
+                        .tint(Theme.Colors.primary)
+                    }
+
+                    Divider()
+                        .overlay(Theme.Colors.divider)
+
+                    // Allow Maybe RSVPs
+                    Toggle(isOn: $viewModel.allowMaybeRSVP) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Guests can RSVP 'Maybe'")
                                 .font(Theme.Typography.bodyMedium)
                                 .foregroundColor(Theme.Colors.textPrimary)
-                            Spacer()
-                            Text(viewModel.maxPlayers.map { "\($0)" } ?? "No limit")
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
+                            Text("Guests can indicate they might attend")
+                                .font(Theme.Typography.caption)
                                 .foregroundColor(Theme.Colors.textTertiary)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .tint(Theme.Colors.primary)
                 }
                 .padding(Theme.Spacing.md)
                 .padding(.top, Theme.Spacing.xs)

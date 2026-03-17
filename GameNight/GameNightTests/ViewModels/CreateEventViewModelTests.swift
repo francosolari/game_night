@@ -531,6 +531,84 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(sut.currentStep, .invites)
     }
 
+    // MARK: - RSVP Options (plus-one, maybe, require names)
+
+    func testDefaultPlusOneLimitIsZero() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+
+        XCTAssertEqual(sut.plusOneLimit, 0)
+    }
+
+    func testDefaultAllowMaybeRSVPIsTrue() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+
+        XCTAssertTrue(sut.allowMaybeRSVP)
+    }
+
+    func testDefaultRequirePlusOneNamesIsFalse() {
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: UUID())
+        )
+
+        XCTAssertFalse(sut.requirePlusOneNames)
+    }
+
+    func testEditModePreloadsPlusOneLimitFromEvent() {
+        let event = FixtureFactory.makeEvent(plusOneLimit: 2)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        XCTAssertEqual(sut.plusOneLimit, 2)
+    }
+
+    func testEditModePreloadsAllowMaybeRSVPFromEvent() {
+        let event = FixtureFactory.makeEvent(allowMaybeRSVP: false)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        XCTAssertFalse(sut.allowMaybeRSVP)
+    }
+
+    func testEditModePreloadsRequirePlusOneNamesFromEvent() {
+        let event = FixtureFactory.makeEvent(requirePlusOneNames: true)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: StubEventEditorService(currentUserId: event.hostId)
+        )
+
+        XCTAssertTrue(sut.requirePlusOneNames)
+    }
+
+    func testSaveChangesPersistsRSVPOptions() async {
+        let event = FixtureFactory.makeEvent()
+        let service = StubEventEditorService(currentUserId: event.hostId, fetchedEvent: event)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: service
+        )
+        sut.plusOneLimit = 3
+        sut.allowMaybeRSVP = false
+        sut.requirePlusOneNames = true
+
+        await sut.saveChanges()
+
+        XCTAssertEqual(service.updatedEvents.last?.plusOneLimit, 3)
+        XCTAssertEqual(service.updatedEvents.last?.allowMaybeRSVP, false)
+        XCTAssertEqual(service.updatedEvents.last?.requirePlusOneNames, true)
+    }
+
     func testDraftEditWithDraftInviteesPreloadsInviteeEntries() {
         let inviteeId = UUID()
         let draftInvitees = [
