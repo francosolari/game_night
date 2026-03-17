@@ -513,15 +513,6 @@ struct DateBadge: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            if let relativeTime {
-                Text(relativeTime.uppercased())
-                    .font(.system(size: 10, weight: .heavy))
-                    .foregroundColor(Theme.Colors.background)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Theme.Colors.accent))
-            }
-            
             VStack(spacing: 1) {
                 Text(dayOfWeek)
                     .font(.system(size: 10, weight: .bold))
@@ -544,7 +535,7 @@ struct DateBadge: View {
                     )
                     .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
             )
-            
+
             if let timeString {
                 HStack(spacing: 4) {
                     Image(systemName: "clock.fill")
@@ -554,6 +545,15 @@ struct DateBadge: View {
                 }
                 .foregroundColor(Theme.Colors.textPrimary)
                 .padding(.top, 2)
+            }
+
+            if let relativeTime, !relativeTime.isEmpty {
+                Text(relativeTime.uppercased())
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundColor(Theme.Colors.background)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Theme.Colors.accent))
             }
         }
     }
