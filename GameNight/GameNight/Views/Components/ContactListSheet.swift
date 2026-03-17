@@ -7,6 +7,8 @@ struct ContactListSheet: View {
     @State private var searchText = ""
     @State private var savedContacts: [SavedContact] = []
     @State private var frequentContacts: [FrequentContact] = []
+    @State private var currentUserId: UUID?
+    @State private var currentUserPhone: String?
     @State private var isLoading = true
     @State private var showDevicePicker = false
     @State private var selectedIds = Set<UUID>()
@@ -17,9 +19,15 @@ struct ContactListSheet: View {
 
     private var allContacts: [UserContact] {
         var seen = excludedPhones
+        if let currentUserPhone {
+            seen.insert(currentUserPhone)
+        }
         var result: [UserContact] = []
 
         for fc in frequentContacts {
+            if let currentUserId, fc.contactUserId == currentUserId {
+                continue
+            }
             guard !seen.contains(fc.contactPhone) else { continue }
             seen.insert(fc.contactPhone)
             result.append(UserContact(
@@ -226,9 +234,14 @@ struct ContactListSheet: View {
         let supabase = SupabaseService.shared
         async let savedResult = supabase.fetchSavedContacts()
         async let frequentResult = supabase.fetchFrequentContacts()
+        async let currentUserResult = try? supabase.fetchCurrentUser()
 
         savedContacts = (try? await savedResult) ?? []
         frequentContacts = (try? await frequentResult) ?? []
+        if let currentUser = await currentUserResult {
+            currentUserId = currentUser.id
+            currentUserPhone = ContactPickerService.normalizePhone(currentUser.phoneNumber)
+        }
         isLoading = false
     }
 }

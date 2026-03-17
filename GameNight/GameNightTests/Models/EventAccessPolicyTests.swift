@@ -67,6 +67,19 @@ final class EventAccessPolicyTests: XCTestCase {
         XCTAssertFalse(presentation.title.contains("1545"))
     }
 
+    func testVisibleLocationBuildsMapsURLFromFullAddress() {
+        let presentation = EventLocationPresentation(
+            locationName: "Alex's House",
+            locationAddress: "123 Main St Unit 4, Washington, DC",
+            canViewFullAddress: true
+        )
+
+        XCTAssertEqual(
+            presentation.mapsURL?.absoluteString,
+            "http://maps.apple.com/?q=123%20Main%20St%20Unit%204,%20Washington,%20DC"
+        )
+    }
+
     func testHostCanAlwaysInviteGuests() {
         let policy = EventAccessPolicy(
             visibility: .private,

@@ -154,3 +154,19 @@ struct FrequentContact: Identifiable, Codable, Hashable {
         case mutualEventCount = "mutual_event_count"
     }
 }
+
+struct UserProfileSummary: Codable, Equatable {
+    let userId: UUID
+    let joinedAt: Date
+    let hostedEventCount: Int
+    let attendedEventCount: Int
+    let groupCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case joinedAt = "joined_at"
+        case hostedEventCount = "hosted_event_count"
+        case attendedEventCount = "attended_event_count"
+        case groupCount = "group_count"
+    }
+}

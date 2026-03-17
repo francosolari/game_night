@@ -87,6 +87,23 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func fetchMyProfileSummary() async throws -> UserProfileSummary {
+        let summaries: [UserProfileSummary] = try await client
+            .rpc("get_my_profile_summary")
+            .execute()
+            .value
+
+        guard let summary = summaries.first else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Profile summary not found"]
+            )
+        }
+
+        return summary
+    }
+
     func invokeAuthenticatedFunction(
         _ functionName: String,
         body: some Encodable

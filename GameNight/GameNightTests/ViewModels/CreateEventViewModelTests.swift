@@ -313,6 +313,92 @@ final class CreateEventViewModelTests: XCTestCase {
 
         XCTAssertEqual(sut.timeOptions.map(\.id), [second.id])
     }
+
+    func testConfigureCurrentUserRemovesExistingSelfInviteesByPhoneAndUserId() {
+        let hostId = UUID()
+        let hostPhone = "+15555550199"
+        let event = FixtureFactory.makeEvent()
+        let service = StubEventEditorService(currentUserId: hostId)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: service
+        )
+        sut.invitees = [
+            InviteeEntry(
+                id: UUID(),
+                name: "Me By User",
+                phoneNumber: "+15555550001",
+                userId: hostId,
+                tier: 1
+            ),
+            InviteeEntry(
+                id: UUID(),
+                name: "Me By Phone",
+                phoneNumber: hostPhone,
+                userId: nil,
+                tier: 1
+            ),
+            InviteeEntry(
+                id: UUID(),
+                name: "Jordan",
+                phoneNumber: "+15555550111",
+                userId: UUID(),
+                tier: 1
+            )
+        ]
+
+        sut.configureCurrentUser(
+            User(
+                id: hostId,
+                phoneNumber: hostPhone,
+                displayName: "Franco",
+                avatarUrl: nil,
+                bio: nil,
+                bggUsername: nil,
+                phoneVisible: false,
+                discoverableByPhone: true,
+                marketingOptIn: false,
+                contactsSynced: false,
+                phoneVerified: true,
+                privacyAcceptedAt: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        )
+
+        XCTAssertEqual(sut.invitees.map(\.name), ["Jordan"])
+    }
+
+    func testAddInviteeIgnoresCurrentUserPhone() {
+        let hostId = UUID()
+        let sut = CreateEventViewModel(
+            supabase: StubEventEditorService(currentUserId: hostId)
+        )
+
+        sut.configureCurrentUser(
+            User(
+                id: hostId,
+                phoneNumber: "+15555550199",
+                displayName: "Franco",
+                avatarUrl: nil,
+                bio: nil,
+                bggUsername: nil,
+                phoneVisible: false,
+                discoverableByPhone: true,
+                marketingOptIn: false,
+                contactsSynced: false,
+                phoneVerified: true,
+                privacyAcceptedAt: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        )
+
+        sut.addInvitee(name: "Franco", phoneNumber: "(555) 555-0199", tier: 1)
+
+        XCTAssertTrue(sut.invitees.isEmpty)
+    }
 }
 
 @MainActor

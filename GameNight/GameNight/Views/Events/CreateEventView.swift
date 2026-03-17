@@ -222,6 +222,9 @@ struct CreateEventView: View {
             } message: {
                 Text(viewModel.error ?? "Please try again.")
             }
+            .task(id: appState.currentUser?.phoneNumber) {
+                viewModel.configureCurrentUser(appState.currentUser)
+            }
             .sheet(item: $locationSheetMode) { mode in
                 LocationFlowSheet(
                     initialMode: mode,

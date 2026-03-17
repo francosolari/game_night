@@ -420,24 +420,7 @@ struct EventHeroHeader: View {
 
                     // Location line (simplified)
                     if let locationPresentation {
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(Theme.Colors.textTertiary)
-                                .padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(locationPresentation.title)
-                                    .font(Theme.Typography.callout)
-                                    .foregroundColor(Theme.Colors.textSecondary)
-                                    .lineLimit(1)
-                                if let subtitle = locationPresentation.subtitle {
-                                    Text(subtitle)
-                                        .font(Theme.Typography.caption)
-                                        .foregroundColor(Theme.Colors.textTertiary)
-                                        .lineLimit(1)
-                                }
-                            }
-                        }
+                        locationRow(locationPresentation)
                         .padding(.top, 4)
                     }
 
@@ -463,6 +446,43 @@ struct EventHeroHeader: View {
                 }
             }
             .padding(Theme.Spacing.xl)
+        }
+    }
+
+    @ViewBuilder
+    private func locationRow(_ locationPresentation: EventLocationPresentation) -> some View {
+        let content = HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 14))
+                .foregroundColor(Theme.Colors.textTertiary)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(locationPresentation.title)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(1)
+                if let subtitle = locationPresentation.subtitle {
+                    Text(subtitle)
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+            if locationPresentation.mapsURL != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .padding(.top, 3)
+            }
+        }
+
+        if let mapsURL = locationPresentation.mapsURL {
+            Link(destination: mapsURL) {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            content
         }
     }
 }

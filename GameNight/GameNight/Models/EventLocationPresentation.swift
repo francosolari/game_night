@@ -3,12 +3,14 @@ import Foundation
 struct EventLocationPresentation {
     let title: String
     let subtitle: String?
+    let fullAddress: String?
 
     init(locationName: String?, locationAddress: String?, canViewFullAddress: Bool) {
         let trimmedName = locationName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let parsedAddress = ParsedEventAddress(address: locationAddress)
 
         if canViewFullAddress {
+            fullAddress = parsedAddress.fullAddress
             if !trimmedName.isEmpty {
                 title = trimmedName
                 subtitle = parsedAddress.fullAddress
@@ -22,6 +24,7 @@ struct EventLocationPresentation {
             return
         }
 
+        fullAddress = nil
         if !trimmedName.isEmpty {
             title = trimmedName
             subtitle = parsedAddress.cityState
@@ -29,6 +32,16 @@ struct EventLocationPresentation {
             title = parsedAddress.cityState ?? "Approximate location"
             subtitle = nil
         }
+    }
+
+    var mapsURL: URL? {
+        guard let fullAddress,
+              let encodedAddress = fullAddress.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else {
+            return nil
+        }
+
+        return URL(string: "http://maps.apple.com/?q=\(encodedAddress)")
     }
 }
 

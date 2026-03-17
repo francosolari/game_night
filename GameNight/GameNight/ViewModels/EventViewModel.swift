@@ -76,19 +76,29 @@ final class EventViewModel: ObservableObject {
     }
 
     var inviteSummary: InviteSummary {
-        let accepted = invites.filter { $0.status == .accepted }
-        let declined = invites.filter { $0.status == .declined }
-        let pending = invites.filter { $0.status == .pending }
-        let maybe = invites.filter { $0.status == .maybe }
-        let waitlisted = invites.filter { $0.status == .waitlisted }
+        let hostPhone = event.map { ContactPickerService.normalizePhone($0.host?.phoneNumber ?? "") }
+        let nonHostInvites = invites.filter { invite in
+            if let hostId = event?.hostId, invite.userId == hostId {
+                return false
+            }
+            if let hostPhone, !hostPhone.isEmpty {
+                return ContactPickerService.normalizePhone(invite.phoneNumber) != hostPhone
+            }
+            return true
+        }
+
+        let accepted = nonHostInvites.filter { $0.status == .accepted }
+        let declined = nonHostInvites.filter { $0.status == .declined }
+        let pending = nonHostInvites.filter { $0.status == .pending }
+        let maybe = nonHostInvites.filter { $0.status == .maybe }
+        let waitlisted = nonHostInvites.filter { $0.status == .waitlisted }
 
         func mapUsers(_ list: [Invite]) -> [InviteSummary.InviteUser] {
             list.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) }
         }
 
-        let hostIncludedInAccepted = accepted.contains(where: { $0.userId == event?.hostId })
         let hostUser: InviteSummary.InviteUser? = {
-            guard let event, !hostIncludedInAccepted else { return nil }
+            guard let event else { return nil }
             let name = event.host?.displayName ?? "Host"
             let avatarUrl = event.host?.avatarUrl
             return .init(id: event.hostId, name: name, avatarUrl: avatarUrl, status: .accepted, tier: 1)
@@ -97,7 +107,7 @@ final class EventViewModel: ObservableObject {
         let acceptedUsers = mapUsers(accepted) + (hostUser.map { [$0] } ?? [])
 
         return InviteSummary(
-            total: invites.count + (hostUser == nil ? 0 : 1),
+            total: nonHostInvites.count + (hostUser == nil ? 0 : 1),
             accepted: accepted.count + (hostUser == nil ? 0 : 1),
             declined: declined.count,
             pending: pending.count,
@@ -387,6 +397,8 @@ final class CreateEventViewModel: ObservableObject {
     @Published var suggestedContacts: [FrequentContact] = []
     @Published var isLoadingSuggestions = true
     @Published var collapsedGroups: Set<UUID> = []
+    @Published private(set) var currentUserId: UUID?
+    @Published private(set) var currentUserPhone: String?
 
     @Published var currentStep: CreateStep = .details
     @Published var completedSteps: Set<CreateStep> = []
@@ -667,7 +679,10 @@ final class CreateEventViewModel: ObservableObject {
         selectedGroup = group
         let existingPhones = Set(invitees.map(\.phoneNumber))
         let newMembers = group.members
-            .filter { !existingPhones.contains($0.phoneNumber) }
+            .filter {
+                !existingPhones.contains($0.phoneNumber)
+                    && !isCurrentUser(phoneNumber: $0.phoneNumber, userId: $0.userId)
+            }
             .map { member in
                 InviteeEntry(
                     id: UUID(),
@@ -696,6 +711,7 @@ final class CreateEventViewModel: ObservableObject {
         suggestedContacts
             .filter { contact in
                 !invitees.contains(where: { $0.phoneNumber == contact.contactPhone })
+                    && !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId)
             }
             .prefix(3)
             .map { $0 }
@@ -714,12 +730,20 @@ final class CreateEventViewModel: ObservableObject {
         Set(invitees.map(\.phoneNumber))
     }
 
+    func configureCurrentUser(_ user: User?) {
+        currentUserId = user?.id
+        currentUserPhone = user.map { ContactPickerService.normalizePhone($0.phoneNumber) }
+        removeSelfInvitees()
+    }
+
     func addContact(_ contact: UserContact) {
+        guard !isCurrentUser(phoneNumber: contact.phoneNumber, userId: nil) else { return }
         guard !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber }) else { return }
         addInvitee(name: contact.name, phoneNumber: contact.phoneNumber, tier: 1)
     }
 
     func addFrequentContact(_ contact: FrequentContact) {
+        guard !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId) else { return }
         guard !invitees.contains(where: { $0.phoneNumber == contact.contactPhone }) else { return }
         addInvitee(name: contact.contactName, phoneNumber: contact.contactPhone, tier: 1)
     }
@@ -772,10 +796,12 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     func addInvitee(name: String, phoneNumber: String, tier: Int = 1) {
+        let normalizedPhone = ContactPickerService.normalizePhone(phoneNumber)
+        guard !isCurrentUser(phoneNumber: normalizedPhone, userId: nil) else { return }
         let entry = InviteeEntry(
             id: UUID(),
             name: name,
-            phoneNumber: ContactPickerService.normalizePhone(phoneNumber),
+            phoneNumber: normalizedPhone,
             userId: nil,
             tier: tier
         )
@@ -917,7 +943,7 @@ final class CreateEventViewModel: ObservableObject {
             allowGameVoting: allowGameVoting,
             confirmedGameId: existingEvent?.confirmedGameId,
             coverImageUrl: existingEvent?.coverImageUrl,
-            draftInvitees: status == .draft ? invitees.map { entry in
+            draftInvitees: status == .draft ? orderedInvitees().map { entry in
                 DraftInvitee(
                     id: entry.id,
                     name: entry.name,
@@ -1073,6 +1099,9 @@ final class CreateEventViewModel: ObservableObject {
 
     private func orderedInvitees() -> [InviteeEntry] {
         invitees.enumerated()
+            .map(\.element)
+            .filter { !isCurrentUser(phoneNumber: $0.phoneNumber, userId: $0.userId) }
+            .enumerated()
             .sorted { lhs, rhs in
                 if lhs.element.tier == rhs.element.tier {
                     return lhs.offset < rhs.offset
@@ -1080,6 +1109,19 @@ final class CreateEventViewModel: ObservableObject {
                 return lhs.element.tier < rhs.element.tier
             }
             .map(\.element)
+    }
+
+    private func removeSelfInvitees() {
+        invitees.removeAll { isCurrentUser(phoneNumber: $0.phoneNumber, userId: $0.userId) }
+    }
+
+    private func isCurrentUser(phoneNumber: String, userId: UUID?) -> Bool {
+        if let currentUserId, let userId, currentUserId == userId {
+            return true
+        }
+
+        guard let currentUserPhone else { return false }
+        return ContactPickerService.normalizePhone(phoneNumber) == currentUserPhone
     }
 
     private func buildInviteRecord(

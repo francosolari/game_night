@@ -60,6 +60,7 @@ struct ContactRow: View {
 struct ContactPickerSheet: View {
     @Environment(\.dismiss) var dismiss
     @State private var contacts: [UserContact] = []
+    @State private var currentUserPhone: String?
     @State private var searchText = ""
     @State private var selectedIds = Set<UUID>()
     @State private var isLoading = true
@@ -237,7 +238,12 @@ struct ContactPickerSheet: View {
         }
 
         do {
-            contacts = try await picker.fetchLocalContacts()
+            async let currentUserResult = try? SupabaseService.shared.fetchCurrentUser()
+            let fetchedContacts = try await picker.fetchLocalContacts()
+            if let currentUser = await currentUserResult {
+                currentUserPhone = ContactPickerService.normalizePhone(currentUser.phoneNumber)
+            }
+            contacts = filterOutCurrentUser(from: fetchedContacts)
         } catch {
             self.error = "Couldn't read contacts"
         }
@@ -256,13 +262,13 @@ struct ContactPickerSheet: View {
         let picker = ContactPickerService.shared
 
         if identifiers.isEmpty {
-            contacts = (try? await picker.fetchLocalContacts()) ?? contacts
+            contacts = filterOutCurrentUser(from: (try? await picker.fetchLocalContacts()) ?? contacts)
             return
         }
 
         let addedContacts = (try? await picker.fetchContacts(withIdentifiers: identifiers)) ?? []
         guard !addedContacts.isEmpty else {
-            contacts = (try? await picker.fetchLocalContacts()) ?? contacts
+            contacts = filterOutCurrentUser(from: (try? await picker.fetchLocalContacts()) ?? contacts)
             return
         }
 
@@ -270,10 +276,15 @@ struct ContactPickerSheet: View {
         let uniqueNewContacts = addedContacts.filter { !existingPhones.contains($0.phoneNumber) }
 
         if uniqueNewContacts.isEmpty {
-            contacts = (try? await picker.fetchLocalContacts()) ?? contacts
+            contacts = filterOutCurrentUser(from: (try? await picker.fetchLocalContacts()) ?? contacts)
         } else {
-            contacts.append(contentsOf: uniqueNewContacts)
+            contacts.append(contentsOf: filterOutCurrentUser(from: uniqueNewContacts))
         }
+    }
+
+    private func filterOutCurrentUser(from contacts: [UserContact]) -> [UserContact] {
+        guard let currentUserPhone else { return contacts }
+        return contacts.filter { ContactPickerService.normalizePhone($0.phoneNumber) != currentUserPhone }
     }
 }
 
