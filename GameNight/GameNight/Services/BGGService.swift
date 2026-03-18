@@ -44,6 +44,14 @@ actor BGGService {
         return try BGGXMLParser.parseMultipleGames(data: data)
     }
 
+    func fetchGameDetailsWithRelations(bggId: Int) async throws -> BGGGameParseResult {
+        let url = URL(string: "\(baseURL)/thing?id=\(bggId)&stats=1")!
+        let (data, _) = try await session.data(from: url)
+        let results = try BGGXMLParser.parseMultipleGamesWithRelations(data: data)
+        guard let result = results.first else { throw BGGError.gameNotFound }
+        return result
+    }
+
     // MARK: - Hot Games
 
     func fetchHotGames() async throws -> [BGGSearchResult] {
@@ -113,6 +121,22 @@ struct BGGXMLParser {
         guard parser.parse() else { throw BGGError.parseFailed }
         return delegate.results
     }
+
+    static func parseMultipleGamesWithRelations(data: Data) throws -> [BGGGameParseResult] {
+        let parser = XMLParser(data: data)
+        let delegate = BGGGameDetailDelegate()
+        parser.delegate = delegate
+        guard parser.parse() else { throw BGGError.parseFailed }
+        return delegate.parseResults
+    }
+}
+
+// MARK: - BGG Game Parse Result
+
+struct BGGGameParseResult {
+    let game: Game
+    let expansionLinks: [(bggId: Int, name: String, isInbound: Bool)]
+    let familyLinks: [(bggFamilyId: Int, name: String)]
 }
 
 // MARK: - XML Delegates
@@ -157,6 +181,7 @@ class BGGSearchDelegate: NSObject, XMLParserDelegate {
 
 class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
     var games: [Game] = []
+    var parseResults: [BGGGameParseResult] = []
 
     private var currentId: Int?
     private var currentName: String?
@@ -172,6 +197,13 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
     private var gameDescription: String?
     private var categories: [String] = []
     private var mechanics: [String] = []
+    private var designers: [String] = []
+    private var publishers: [String] = []
+    private var artists: [String] = []
+    private var minAge: Int?
+    private var bggRank: Int?
+    private var expansionBggIds: [(bggId: Int, name: String, isInbound: Bool)] = []
+    private var familyLinks: [(bggFamilyId: Int, name: String)] = []
     private var currentText = ""
     private var inItem = false
 
@@ -190,6 +222,13 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
                 image = nil
                 categories = []
                 mechanics = []
+                designers = []
+                publishers = []
+                artists = []
+                minAge = nil
+                bggRank = nil
+                expansionBggIds = []
+                familyLinks = []
                 gameDescription = nil
             }
         case "name":
@@ -210,12 +249,28 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
             if inItem { rating = Double(attributeDict["value"] ?? "0") ?? 0 }
         case "averageweight":
             if inItem { weight = Double(attributeDict["value"] ?? "2.5") ?? 2.5 }
+        case "minage":
+            if inItem { minAge = Int(attributeDict["value"] ?? "") }
+        case "rank":
+            if inItem && attributeDict["name"] == "boardgame" {
+                bggRank = Int(attributeDict["value"] ?? "")
+            }
         case "link":
             if inItem {
                 let type = attributeDict["type"] ?? ""
                 let value = attributeDict["value"] ?? ""
                 if type == "boardgamecategory" { categories.append(value) }
                 if type == "boardgamemechanic" { mechanics.append(value) }
+                if type == "boardgamedesigner" { designers.append(value) }
+                if type == "boardgamepublisher" { publishers.append(value) }
+                if type == "boardgameartist" { artists.append(value) }
+                if type == "boardgameexpansion", let bggId = Int(attributeDict["id"] ?? "") {
+                    let isInbound = attributeDict["inbound"] == "true"
+                    expansionBggIds.append((bggId: bggId, name: value, isInbound: isInbound))
+                }
+                if type == "boardgamefamily", let bggId = Int(attributeDict["id"] ?? "") {
+                    familyLinks.append((bggFamilyId: bggId, name: value))
+                }
             }
         default:
             break
@@ -252,11 +307,16 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
                         description: gameDescription,
                         categories: categories,
                         mechanics: mechanics,
-                        designers: [],
-                        publishers: [],
-                        artists: [],
-                        minAge: nil,
-                        bggRank: nil
+                        designers: designers,
+                        publishers: publishers,
+                        artists: artists,
+                        minAge: minAge,
+                        bggRank: bggRank
+                    ))
+                    parseResults.append(BGGGameParseResult(
+                        game: games.last!,
+                        expansionLinks: expansionBggIds,
+                        familyLinks: familyLinks
                     ))
                 }
                 inItem = false
