@@ -328,6 +328,15 @@ struct GameDetailView: View {
             detailColor: Theme.Colors.complexity(game.complexity)
         ))
 
+        if let rating = game.bggRating {
+            rows.append(InfoRowData(
+                icon: "star.fill",
+                label: "Rating",
+                value: String(format: "%.1f / 10", rating),
+                detailColor: Theme.Colors.primary
+            ))
+        }
+
         // Age
         if let age = game.minAge {
             rows.append(InfoRowData(
@@ -440,6 +449,46 @@ private struct ManualGameEditorSection: View {
                     Text(game.complexityLabel)
                         .font(Theme.Typography.caption)
                         .foregroundColor(Theme.Colors.textTertiary)
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack {
+                        Text("Rating")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Spacer()
+                        Text(String(format: "%.1f", game.bggRating ?? 0))
+                            .font(Theme.Typography.calloutMedium)
+                            .foregroundColor(Theme.Colors.accent)
+                    }
+                    Slider(
+                        value: Binding(
+                            get: { game.bggRating ?? 0 },
+                            set: { game.bggRating = min(max($0, 0), 10) }
+                        ),
+                        in: 0...10,
+                        step: 0.1
+                    )
+                    .tint(Theme.Colors.accent)
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("Recommended Players")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    TextField(
+                        "Example: 3, 4",
+                        text: Binding(
+                            get: { playerString(from: game.recommendedPlayers) },
+                            set: {
+                                game.recommendedPlayers = parsePlayerString($0)
+                            }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(1...2)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textSecondary)
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -582,6 +631,16 @@ private struct ManualTagEditorSection: View {
                     placeholder: "Deck Building, Drafting",
                     binding: commaSeparatedBinding(\.mechanics)
                 )
+                tagField(
+                    title: "Designers",
+                    placeholder: "Designer names",
+                    binding: commaSeparatedBinding(\.designers)
+                )
+                tagField(
+                    title: "Publishers",
+                    placeholder: "Publisher names",
+                    binding: commaSeparatedBinding(\.publishers)
+                )
             }
             .padding(Theme.Spacing.lg)
             .background(
@@ -644,6 +703,18 @@ private struct ManualDescriptionEditorSection: View {
             .foregroundColor(Theme.Colors.textSecondary)
         }
     }
+}
+
+private func parsePlayerString(_ input: String) -> [Int]? {
+    let cleaned = input
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .compactMap { Int($0) }
+    return cleaned.isEmpty ? nil : cleaned
+}
+
+private func playerString(from players: [Int]?) -> String {
+    players?.map(String.init).joined(separator: ", ") ?? ""
 }
 
 struct GameFamilyDetailView: View {
