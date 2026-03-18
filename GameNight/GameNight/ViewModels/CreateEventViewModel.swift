@@ -276,7 +276,12 @@ final class CreateEventViewModel: ObservableObject {
             bggRating: nil,
             description: nil,
             categories: [],
-            mechanics: []
+            mechanics: [],
+            designers: [],
+            publishers: [],
+            artists: [],
+            minAge: nil,
+            bggRank: nil
         )
 
         do {

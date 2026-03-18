@@ -17,6 +17,11 @@ struct Game: Identifiable, Codable, Hashable {
     var description: String?
     var categories: [String]
     var mechanics: [String]
+    var designers: [String]
+    var publishers: [String]
+    var artists: [String]
+    var minAge: Int?
+    var bggRank: Int?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -35,6 +40,82 @@ struct Game: Identifiable, Codable, Hashable {
         case description
         case categories
         case mechanics
+        case designers
+        case publishers
+        case artists
+        case minAge = "min_age"
+        case bggRank = "bgg_rank"
+    }
+
+    init(
+        id: UUID,
+        bggId: Int? = nil,
+        name: String,
+        yearPublished: Int? = nil,
+        thumbnailUrl: String? = nil,
+        imageUrl: String? = nil,
+        minPlayers: Int = 1,
+        maxPlayers: Int = 4,
+        recommendedPlayers: [Int]? = nil,
+        minPlaytime: Int = 30,
+        maxPlaytime: Int = 60,
+        complexity: Double = 0,
+        bggRating: Double? = nil,
+        description: String? = nil,
+        categories: [String] = [],
+        mechanics: [String] = [],
+        designers: [String] = [],
+        publishers: [String] = [],
+        artists: [String] = [],
+        minAge: Int? = nil,
+        bggRank: Int? = nil
+    ) {
+        self.id = id
+        self.bggId = bggId
+        self.name = name
+        self.yearPublished = yearPublished
+        self.thumbnailUrl = thumbnailUrl
+        self.imageUrl = imageUrl
+        self.minPlayers = minPlayers
+        self.maxPlayers = maxPlayers
+        self.recommendedPlayers = recommendedPlayers
+        self.minPlaytime = minPlaytime
+        self.maxPlaytime = maxPlaytime
+        self.complexity = complexity
+        self.bggRating = bggRating
+        self.description = description
+        self.categories = categories
+        self.mechanics = mechanics
+        self.designers = designers
+        self.publishers = publishers
+        self.artists = artists
+        self.minAge = minAge
+        self.bggRank = bggRank
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        bggId = try container.decodeIfPresent(Int.self, forKey: .bggId)
+        name = try container.decode(String.self, forKey: .name)
+        yearPublished = try container.decodeIfPresent(Int.self, forKey: .yearPublished)
+        thumbnailUrl = try container.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        minPlayers = try container.decodeIfPresent(Int.self, forKey: .minPlayers) ?? 1
+        maxPlayers = try container.decodeIfPresent(Int.self, forKey: .maxPlayers) ?? 4
+        recommendedPlayers = try container.decodeIfPresent([Int].self, forKey: .recommendedPlayers)
+        minPlaytime = try container.decodeIfPresent(Int.self, forKey: .minPlaytime) ?? 30
+        maxPlaytime = try container.decodeIfPresent(Int.self, forKey: .maxPlaytime) ?? 60
+        complexity = try container.decodeIfPresent(Double.self, forKey: .complexity) ?? 0
+        bggRating = try container.decodeIfPresent(Double.self, forKey: .bggRating)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        categories = try container.decodeIfPresent([String].self, forKey: .categories) ?? []
+        mechanics = try container.decodeIfPresent([String].self, forKey: .mechanics) ?? []
+        designers = try container.decodeIfPresent([String].self, forKey: .designers) ?? []
+        publishers = try container.decodeIfPresent([String].self, forKey: .publishers) ?? []
+        artists = try container.decodeIfPresent([String].self, forKey: .artists) ?? []
+        minAge = try container.decodeIfPresent(Int.self, forKey: .minAge)
+        bggRank = try container.decodeIfPresent(Int.self, forKey: .bggRank)
     }
 
     var playerCountDisplay: String {
@@ -71,7 +152,12 @@ struct Game: Identifiable, Codable, Hashable {
         bggRating: 8.3,
         description: "Deck-building meets worker placement in the world of Dune.",
         categories: ["Science Fiction", "Strategy"],
-        mechanics: ["Deck Building", "Worker Placement"]
+        mechanics: ["Deck Building", "Worker Placement"],
+        designers: ["Paul Dennen"],
+        publishers: ["Dire Wolf"],
+        artists: ["Clay Brooks"],
+        minAge: 14,
+        bggRank: 6
     )
 
     static let previewArk = Game(
@@ -90,7 +176,12 @@ struct Game: Identifiable, Codable, Hashable {
         bggRating: 8.5,
         description: "Build a modern zoo to support conservation projects.",
         categories: ["Animals", "Strategy"],
-        mechanics: ["Hand Management", "Card Drafting"]
+        mechanics: ["Hand Management", "Card Drafting"],
+        designers: ["Mathias Wigge"],
+        publishers: ["Capstone Games"],
+        artists: ["Loïc Billiau"],
+        minAge: 14,
+        bggRank: 7
     )
 }
 

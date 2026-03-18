@@ -251,7 +251,12 @@ class BGGGameDetailDelegate: NSObject, XMLParserDelegate {
                         bggRating: rating > 0 ? rating : nil,
                         description: gameDescription,
                         categories: categories,
-                        mechanics: mechanics
+                        mechanics: mechanics,
+                        designers: [],
+                        publishers: [],
+                        artists: [],
+                        minAge: nil,
+                        bggRank: nil
                     ))
                 }
                 inItem = false

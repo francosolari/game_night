@@ -110,7 +110,12 @@ enum FixtureFactory {
             bggRating: nil,
             description: nil,
             categories: [],
-            mechanics: []
+            mechanics: [],
+            designers: [],
+            publishers: [],
+            artists: [],
+            minAge: nil,
+            bggRank: nil
         )
     }
 
