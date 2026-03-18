@@ -52,7 +52,7 @@ struct ListEventCard: View {
                         EventDateLabel(event: event, size: .standard)
 
                         Text(event.title)
-                            .font(Theme.Typography.headlineMedium)
+                            .font(Theme.Typography.headlineMedium.weight(.bold))
                             .foregroundColor(Theme.Colors.textPrimary)
                             .lineLimit(1)
                     }

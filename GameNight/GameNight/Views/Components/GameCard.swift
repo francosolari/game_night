@@ -90,12 +90,18 @@ struct CompactGameCard: View {
                     if isPrimary {
                         Image(systemName: "star.fill")
                             .font(.system(size: 10))
-                            .foregroundColor(Theme.Colors.warning)
+                            .foregroundColor(Theme.Colors.accent)
                     }
                     Text(game.name)
-                        .font(Theme.Typography.calloutMedium)
+                        .font(Theme.Typography.calloutMedium.weight(.bold))
                         .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(1)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Theme.Colors.textPrimary.opacity(0.08))
+                        )
                 }
 
                 HStack(spacing: Theme.Spacing.sm) {

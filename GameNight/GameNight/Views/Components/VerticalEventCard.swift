@@ -54,7 +54,7 @@ struct VerticalEventCard: View {
 
                     // Title
                     Text(event.title)
-                        .font(Theme.Typography.calloutMedium)
+                        .font(Theme.Typography.calloutMedium.weight(.bold))
                         .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)

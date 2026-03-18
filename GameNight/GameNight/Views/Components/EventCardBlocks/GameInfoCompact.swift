@@ -36,12 +36,18 @@ struct GameInfoCompact: View {
             if isPrimary {
                 Image(systemName: "star.fill")
                     .font(.system(size: 8))
-                    .foregroundColor(Theme.Colors.highlight)
+                    .foregroundColor(Theme.Colors.accent)
             }
             Text(game.name)
-                .font(Theme.Typography.caption2)
+                .font(Theme.Typography.caption2.weight(.bold))
                 .foregroundColor(Theme.Colors.textPrimary)
                 .lineLimit(1)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Theme.Colors.textPrimary.opacity(0.08))
+                )
 
             Text("\u{00B7}")
                 .foregroundColor(Theme.Colors.textTertiary)
@@ -60,12 +66,18 @@ struct GameInfoCompact: View {
             if isPrimary {
                 Image(systemName: "star.fill")
                     .font(.system(size: size == .expanded ? 10 : 10))
-                    .foregroundColor(Theme.Colors.highlight)
+                    .foregroundColor(Theme.Colors.accent)
             }
             Text(game.name)
-                .font(size.captionFont)
+                .font(size.captionFont.weight(.bold))
                 .foregroundColor(Theme.Colors.textPrimary)
                 .lineLimit(1)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Theme.Colors.textPrimary.opacity(0.08))
+                )
             ComplexityDot(weight: game.complexity)
             Text(game.playtimeDisplay)
                 .font(size == .expanded ? Theme.Typography.caption : Theme.Typography.caption2)

@@ -2,13 +2,18 @@ import SwiftUI
 
 struct GameDetailView: View {
     @StateObject private var viewModel: GameDetailViewModel
+    @EnvironmentObject private var appState: AppState
     @State private var isDescriptionExpanded = false
     @State private var isEditingManualGame = false
     @State private var manualDraftGame: Game?
     @State private var isSavingManualGame = false
 
     private var isManualGame: Bool {
-        viewModel.game.bggId == nil
+        displayedGame.isManual
+    }
+
+    private var canEditManualGame: Bool {
+        displayedGame.isEditable(by: appState.currentUser?.id)
     }
 
     private var displayedGame: Game {
@@ -191,7 +196,7 @@ struct GameDetailView: View {
                             (manualDraftGame?.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
                         )
                     }
-                } else {
+                } else if canEditManualGame {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Edit") {
                             startManualEditing()
@@ -276,6 +281,7 @@ struct GameDetailView: View {
     }
 
     private func startManualEditing() {
+        guard canEditManualGame else { return }
         manualDraftGame = viewModel.game
         isEditingManualGame = true
     }
@@ -310,9 +316,8 @@ struct GameDetailView: View {
         var rows: [InfoRowData] = []
 
         // Players
-        let bestStr = game.recommendedPlayers.map { recs in
-            recs.isEmpty ? nil : "Best: \(recs.map(String.init).joined(separator: "\u{2013}"))"
-        } ?? nil
+        let bestStr = Game.formatPlayerRanges(game.recommendedPlayers)
+            .map { "Best: \($0)" }
         rows.append(InfoRowData(
             icon: "person.2.fill",
             label: "Players",
@@ -383,11 +388,13 @@ private struct ManualGameEditorSection: View {
                         guard game.minPlayers > 1 else { return }
                         game.minPlayers -= 1
                         game.maxPlayers = max(game.maxPlayers, game.minPlayers)
+                        clampRecommendedPlayers()
                     },
                     increment: {
                         guard game.minPlayers < 20 else { return }
                         game.minPlayers += 1
                         game.maxPlayers = max(game.maxPlayers, game.minPlayers)
+                        clampRecommendedPlayers()
                     }
                 )
 
@@ -397,10 +404,12 @@ private struct ManualGameEditorSection: View {
                     decrement: {
                         guard game.maxPlayers > game.minPlayers else { return }
                         game.maxPlayers -= 1
+                        clampRecommendedPlayers()
                     },
                     increment: {
                         guard game.maxPlayers < 20 else { return }
                         game.maxPlayers += 1
+                        clampRecommendedPlayers()
                     }
                 )
 
@@ -409,13 +418,13 @@ private struct ManualGameEditorSection: View {
                     value: game.minPlaytime,
                     suffix: "min",
                     decrement: {
-                        guard game.minPlaytime > 5 else { return }
-                        game.minPlaytime -= 5
+                        guard game.minPlaytime > 30 else { return }
+                        game.minPlaytime -= 30
                         game.maxPlaytime = max(game.maxPlaytime, game.minPlaytime)
                     },
                     increment: {
                         guard game.minPlaytime < 600 else { return }
-                        game.minPlaytime += 5
+                        game.minPlaytime += 30
                         game.maxPlaytime = max(game.maxPlaytime, game.minPlaytime)
                     }
                 )
@@ -426,11 +435,11 @@ private struct ManualGameEditorSection: View {
                     suffix: "min",
                     decrement: {
                         guard game.maxPlaytime > game.minPlaytime else { return }
-                        game.maxPlaytime -= 5
+                        game.maxPlaytime -= 30
                     },
                     increment: {
                         guard game.maxPlaytime < 600 else { return }
-                        game.maxPlaytime += 5
+                        game.maxPlaytime += 30
                     }
                 )
 
@@ -485,19 +494,33 @@ private struct ManualGameEditorSection: View {
                     Text("Recommended Players")
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
-                    TextField(
-                        "Example: 3, 4",
-                        text: Binding(
-                            get: { playerString(from: game.recommendedPlayers) },
-                            set: {
-                                game.recommendedPlayers = parsePlayerString($0)
+
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 52), spacing: Theme.Spacing.sm)],
+                        spacing: Theme.Spacing.sm
+                    ) {
+                        ForEach(game.minPlayers...game.maxPlayers, id: \.self) { count in
+                            let isSelected = recommendedPlayersSelection.contains(count)
+                            Button {
+                                toggleRecommendedPlayer(count)
+                            } label: {
+                                Text("\(count)")
+                                    .font(Theme.Typography.calloutMedium)
+                                    .padding(.vertical, Theme.Spacing.xs)
+                                    .padding(.horizontal, Theme.Spacing.sm)
+                                    .background(
+                                        Capsule()
+                                            .fill(isSelected ? Theme.Colors.primary : Theme.Colors.backgroundElevated)
+                                    )
+                                    .foregroundColor(isSelected ? .white : Theme.Colors.textPrimary)
                             }
-                        ),
-                        axis: .vertical
-                    )
-                    .lineLimit(1...2)
-                    .font(Theme.Typography.callout)
-                    .foregroundColor(Theme.Colors.textSecondary)
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    Text("Tap to mark the best player counts.")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -557,6 +580,39 @@ private struct ManualGameEditorSection: View {
                     .fill(Theme.Colors.backgroundElevated)
             )
         }
+    }
+
+    private var recommendedPlayersRange: ClosedRange<Int> {
+        game.minPlayers...game.maxPlayers
+    }
+
+    private var recommendedPlayersSelection: Set<Int> {
+        let base = game.recommendedPlayers ?? Array(recommendedPlayersRange)
+        return Set(base.filter { recommendedPlayersRange.contains($0) })
+    }
+
+    private func toggleRecommendedPlayer(_ count: Int) {
+        var selection = recommendedPlayersSelection
+        if selection.contains(count) {
+            selection.remove(count)
+        } else {
+            selection.insert(count)
+        }
+        updateRecommendedPlayers(with: selection)
+    }
+
+    private func updateRecommendedPlayers(with selection: Set<Int>) {
+        if selection.isEmpty {
+            game.recommendedPlayers = nil
+        } else {
+            game.recommendedPlayers = Array(selection).sorted()
+        }
+    }
+
+    private func clampRecommendedPlayers() {
+        guard let recs = game.recommendedPlayers else { return }
+        let filtered = recs.filter { recommendedPlayersRange.contains($0) }
+        game.recommendedPlayers = filtered.isEmpty ? nil : filtered.sorted()
     }
 
     private func numericRow(title: String, value: Binding<String>, placeholder: String) -> some View {
@@ -712,18 +768,6 @@ private struct ManualDescriptionEditorSection: View {
             .foregroundColor(Theme.Colors.textSecondary)
         }
     }
-}
-
-private func parsePlayerString(_ input: String) -> [Int]? {
-    let cleaned = input
-        .split(separator: ",")
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .compactMap { Int($0) }
-    return cleaned.isEmpty ? nil : cleaned
-}
-
-private func playerString(from players: [Int]?) -> String {
-    players?.map(String.init).joined(separator: ", ") ?? ""
 }
 
 struct GameFamilyDetailView: View {

@@ -58,7 +58,7 @@ struct EventCard: View {
                     // Title & Location
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         Text(event.title)
-                            .font(Theme.Typography.displaySmall)
+                            .font(Theme.Typography.displaySmall.weight(.bold))
                             .foregroundColor(Theme.Colors.textPrimary)
                             .lineLimit(2)
                         

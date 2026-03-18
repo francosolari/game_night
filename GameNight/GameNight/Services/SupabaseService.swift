@@ -574,11 +574,21 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    private func normalizedGameForUpsert(_ game: Game) async throws -> Game {
+        var normalized = game
+        if normalized.bggId == nil && normalized.ownerId == nil {
+            let session = try await client.auth.session
+            normalized.ownerId = session.user.id
+        }
+        return normalized
+    }
+
     func upsertGame(_ game: Game) async throws -> Game {
+        let normalizedGame = try await normalizedGameForUpsert(game)
         if game.bggId != nil {
             let saved: Game = try await client
                 .from("games")
-                .upsert(game, onConflict: "bgg_id")
+                .upsert(normalizedGame, onConflict: "bgg_id")
                 .select()
                 .single()
                 .execute()
@@ -587,7 +597,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         } else {
             let saved: Game = try await client
                 .from("games")
-                .insert(game)
+                .insert(normalizedGame)
                 .select()
                 .single()
                 .execute()

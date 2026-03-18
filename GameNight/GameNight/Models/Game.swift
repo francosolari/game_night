@@ -2,6 +2,7 @@ import Foundation
 
 struct Game: Identifiable, Codable, Hashable {
     let id: UUID
+    var ownerId: UUID?
     var bggId: Int?
     var name: String
     var yearPublished: Int?
@@ -23,8 +24,17 @@ struct Game: Identifiable, Codable, Hashable {
     var minAge: Int?
     var bggRank: Int?
 
+    var isManual: Bool {
+        bggId == nil && ownerId != nil
+    }
+
+    func isEditable(by userId: UUID?) -> Bool {
+        isManual && ownerId == userId
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
+        case ownerId = "owner_id"
         case bggId = "bgg_id"
         case name
         case yearPublished = "year_published"
@@ -49,6 +59,7 @@ struct Game: Identifiable, Codable, Hashable {
 
     init(
         id: UUID,
+        ownerId: UUID? = nil,
         bggId: Int? = nil,
         name: String,
         yearPublished: Int? = nil,
@@ -71,6 +82,7 @@ struct Game: Identifiable, Codable, Hashable {
         bggRank: Int? = nil
     ) {
         self.id = id
+        self.ownerId = ownerId
         self.bggId = bggId
         self.name = name
         self.yearPublished = yearPublished
@@ -103,6 +115,7 @@ struct Game: Identifiable, Codable, Hashable {
         imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
         minPlayers = try container.decodeIfPresent(Int.self, forKey: .minPlayers) ?? 1
         maxPlayers = try container.decodeIfPresent(Int.self, forKey: .maxPlayers) ?? 4
+        ownerId = try container.decodeIfPresent(UUID.self, forKey: .ownerId)
         recommendedPlayers = try container.decodeIfPresent([Int].self, forKey: .recommendedPlayers)
         minPlaytime = try container.decodeIfPresent(Int.self, forKey: .minPlaytime) ?? 30
         maxPlaytime = try container.decodeIfPresent(Int.self, forKey: .maxPlaytime) ?? 60
@@ -134,6 +147,26 @@ struct Game: Identifiable, Codable, Hashable {
 
     var complexityLabel: String {
         Theme.Colors.complexityLabel(complexity)
+    }
+
+    static func formatPlayerRanges(_ values: [Int]?) -> String? {
+        guard let values = values, !values.isEmpty else { return nil }
+        let sorted = Array(Set(values)).sorted()
+        var ranges: [String] = []
+        var rangeStart = sorted[0]
+        var rangeEnd = rangeStart
+
+        for value in sorted.dropFirst() {
+            if value == rangeEnd + 1 {
+                rangeEnd = value
+            } else {
+                ranges.append(rangeStart == rangeEnd ? "\(rangeStart)" : "\(rangeStart)–\(rangeEnd)")
+                rangeStart = value
+                rangeEnd = value
+            }
+        }
+        ranges.append(rangeStart == rangeEnd ? "\(rangeStart)" : "\(rangeStart)–\(rangeEnd)")
+        return ranges.joined(separator: ", ")
     }
 
     static let preview = Game(

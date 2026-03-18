@@ -25,15 +25,15 @@ final class CreateEventViewModel: ObservableObject {
     @Published var allowGameVoting = false
     @Published var scheduleMode: ScheduleMode = .fixed
     @Published var fixedDate: Date = Date()
-    @Published var fixedStartTime: Date = Date()
+    @Published var fixedStartTime: Date = DateTimePickerSheet.defaultTime(hour: 19)
     @Published var fixedEndDate: Date = Date()
-    @Published var fixedEndTime: Date = Calendar.current.date(byAdding: .hour, value: 3, to: Date())!
+    @Published var fixedEndTime: Date = DateTimePickerSheet.defaultTime(hour: 22)
     @Published var hasEndTime: Bool = false
     @Published var hasDate: Bool = true
     @Published var selectedTimezone: TimeZone = .current
     @Published var inviteStrategy = InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true)
-    @Published var minPlayers = 3
-    @Published var maxPlayers: Int? = nil
+    @Published var minPlayers = 2
+    @Published var maxPlayers: Int? = 4
     @Published var plusOneLimit: Int = 0
     @Published var allowMaybeRSVP: Bool = true
     @Published var requirePlusOneNames: Bool = false
@@ -312,10 +312,10 @@ final class CreateEventViewModel: ObservableObject {
             yearPublished: nil,
             thumbnailUrl: nil,
             imageUrl: nil,
-            minPlayers: 1,
-            maxPlayers: 10,
+            minPlayers: 2,
+            maxPlayers: 4,
             recommendedPlayers: nil,
-            minPlaytime: 30,
+            minPlaytime: 60,
             maxPlaytime: 120,
             complexity: 0,
             bggRating: nil,

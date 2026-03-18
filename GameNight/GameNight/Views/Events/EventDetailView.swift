@@ -408,7 +408,7 @@ struct EventHeroHeader: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     // Title
                     Text(event.title)
-                        .font(Theme.Typography.displayMedium)
+                        .font(Theme.Typography.displayMedium.weight(.bold))
                         .foregroundColor(Theme.Colors.textPrimary)
 
                     // Status Pill
@@ -617,8 +617,14 @@ struct PrimaryGameCard: View {
 
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         Text(game.name)
-                            .font(Theme.Typography.titleLarge)
+                            .font(Theme.Typography.titleLarge.weight(.bold))
                             .foregroundColor(Theme.Colors.textPrimary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Theme.Colors.textPrimary.opacity(0.08))
+                            )
 
                         // Pills
                         HStack(spacing: 6) {
@@ -670,8 +676,14 @@ struct PrimaryGameCard: View {
                                                     .foregroundColor(Theme.Colors.textTertiary)
                                             }
                                             Text(oGame.name)
-                                                .font(Theme.Typography.caption)
+                                                .font(Theme.Typography.caption.weight(.bold))
                                                 .foregroundColor(Theme.Colors.textSecondary)
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .fill(Theme.Colors.textPrimary.opacity(0.08))
+                                                )
                                         }
                                     }
                                     .buttonStyle(.plain)

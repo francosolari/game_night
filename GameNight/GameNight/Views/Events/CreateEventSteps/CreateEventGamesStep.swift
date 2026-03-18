@@ -209,7 +209,7 @@ struct CreateEventGamesStep: View {
                                         viewModel.setPrimaryGame(id: eventGame.id)
                                     } label: {
                                         Image(systemName: eventGame.isPrimary ? "star.fill" : "star")
-                                            .foregroundColor(eventGame.isPrimary ? Theme.Colors.warning : Theme.Colors.textTertiary)
+                                            .foregroundColor(eventGame.isPrimary ? Theme.Colors.accent : Theme.Colors.textTertiary)
                                     }
 
                                     CompactGameCard(game: game, isPrimary: eventGame.isPrimary)
