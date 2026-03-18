@@ -100,7 +100,7 @@ struct CompactGameCard: View {
                         .padding(.vertical, 1)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Theme.Colors.textPrimary.opacity(0.08))
+                                .fill(Theme.Colors.gameHighlight)
                         )
                 }
 

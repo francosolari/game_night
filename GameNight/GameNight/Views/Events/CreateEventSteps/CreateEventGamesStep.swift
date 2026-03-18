@@ -304,14 +304,13 @@ private struct ManualGameSettingsPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             // Complexity
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text("Complexity")
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.textTertiary)
-
-                StarRatingPicker(rating: $complexity)
-                    .onChange(of: complexity) { _, _ in commitChanges() }
-            }
+            ComplexitySliderPicker(
+                complexity: $complexity,
+                titleFont: Theme.Typography.caption,
+                valueFont: Theme.Typography.calloutMedium,
+                detailFont: Theme.Typography.caption2
+            )
+            .onChange(of: complexity) { _, _ in commitChanges() }
 
             Divider().background(Theme.Colors.divider)
 

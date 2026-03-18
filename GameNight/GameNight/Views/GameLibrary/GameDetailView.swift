@@ -299,12 +299,13 @@ struct GameDetailView: View {
         guard !updatedGame.name.isEmpty else { return }
 
         isSavingManualGame = true
-        viewModel.game = updatedGame
 
         do {
-            _ = try await SupabaseService.shared.upsertGame(updatedGame)
+            try await SupabaseService.shared.updateGame(updatedGame)
+            viewModel.game = updatedGame
         } catch {
-            // Non-critical — local state is already updated
+            isSavingManualGame = false
+            return
         }
 
         manualDraftGame = nil
@@ -443,31 +444,7 @@ private struct ManualGameEditorSection: View {
                     }
                 )
 
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    HStack {
-                        Text("Complexity")
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        Spacer()
-                        Text(String(format: "%.1f / 5", game.complexity))
-                            .font(Theme.Typography.calloutMedium)
-                            .foregroundColor(Theme.Colors.complexity(game.complexity))
-                    }
-
-                    Slider(
-                        value: Binding(
-                            get: { game.complexity },
-                            set: { game.complexity = min(max($0, 0), 5) }
-                        ),
-                        in: 0...5,
-                        step: 0.1
-                    )
-                    .tint(Theme.Colors.complexity(game.complexity))
-
-                    Text(game.complexityLabel)
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
+                ComplexitySliderPicker(complexity: $game.complexity)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     HStack {

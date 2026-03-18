@@ -46,7 +46,7 @@ struct GameInfoCompact: View {
                 .padding(.vertical, 1)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Theme.Colors.textPrimary.opacity(0.08))
+                        .fill(Theme.Colors.gameHighlight)
                 )
 
             Text("\u{00B7}")
@@ -76,7 +76,7 @@ struct GameInfoCompact: View {
                 .padding(.vertical, 1)
                 .background(
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Theme.Colors.textPrimary.opacity(0.08))
+                        .fill(Theme.Colors.gameHighlight)
                 )
             ComplexityDot(weight: game.complexity)
             Text(game.playtimeDisplay)

@@ -1,5 +1,40 @@
 import SwiftUI
 
+struct ComplexitySliderPicker: View {
+    @Binding var complexity: Double
+    var titleFont: Font = Theme.Typography.bodyMedium
+    var valueFont: Font = Theme.Typography.calloutMedium
+    var detailFont: Font = Theme.Typography.caption
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack {
+                Text("Complexity")
+                    .font(titleFont)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Spacer()
+                Text(String(format: "%.1f / 5", complexity))
+                    .font(valueFont)
+                    .foregroundColor(Theme.Colors.complexity(complexity))
+            }
+
+            Slider(
+                value: Binding(
+                    get: { complexity },
+                    set: { complexity = min(max($0, 0), 5) }
+                ),
+                in: 0...5,
+                step: 0.1
+            )
+            .tint(Theme.Colors.complexity(complexity))
+
+            Text(Theme.Colors.complexityLabel(complexity))
+                .font(detailFont)
+                .foregroundColor(Theme.Colors.textTertiary)
+        }
+    }
+}
+
 struct StarRatingPicker: View {
     @Binding var rating: Double
     let maxRating: Int = 5
