@@ -10,8 +10,14 @@ struct CreateEventDetailsStep: View {
     @State private var showRSVPOptions = false
     @State private var showPlayerCountDetail = false
 
+    private enum Layout {
+        static let sectionSpacing: CGFloat = 20
+        static let controlClusterSpacing: CGFloat = Theme.Spacing.md
+        static let compactSectionSpacing: CGFloat = Theme.Spacing.sm
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
+        VStack(alignment: .leading, spacing: Layout.sectionSpacing) {
             Text("Event Details")
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
@@ -30,17 +36,19 @@ struct CreateEventDetailsStep: View {
                     )
             }
 
-            // Schedule (date/time)
-            scheduleSection
+            VStack(alignment: .leading, spacing: Layout.controlClusterSpacing) {
+                // Schedule (date/time)
+                scheduleSection
 
-            // Player Count (compact expandable)
-            playerCountSection
+                // Player Count (compact expandable)
+                playerCountSection
 
-            // Location (compact row)
-            locationRow
+                // Location (compact row)
+                locationRow
 
-            // RSVP Options (expandable)
-            rsvpOptionsSection
+                // RSVP Options (expandable)
+                rsvpOptionsSection
+            }
 
             // Privacy
             privacySection
@@ -358,7 +366,7 @@ struct CreateEventDetailsStep: View {
     // MARK: - Privacy Section
 
     private var privacySection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Layout.compactSectionSpacing) {
             Text("Privacy")
                 .font(Theme.Typography.label)
                 .foregroundColor(Theme.Colors.textSecondary)
@@ -468,7 +476,7 @@ struct CreateEventDetailsStep: View {
     // MARK: - Schedule Section
 
     private var scheduleSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        VStack(alignment: .leading, spacing: Layout.compactSectionSpacing) {
             Text("When is it?")
                 .font(Theme.Typography.label)
                 .foregroundColor(Theme.Colors.textSecondary)
