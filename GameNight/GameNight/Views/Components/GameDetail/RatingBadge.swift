@@ -31,7 +31,7 @@ struct RatingBadge: View {
             .padding(size.padding)
             .background(
                 RoundedRectangle(cornerRadius: size == .small ? 6 : 12)
-                    .fill(Theme.Colors.success)
+                    .fill(Theme.Colors.ratingColor(rating))
             )
     }
 }

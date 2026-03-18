@@ -34,15 +34,24 @@ struct GameDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                // 1. Hero image with rating badge
-                DetailHeroImage(
-                    imageUrl: displayedGame.imageUrl,
-                    badge: displayedGame.bggRating,
-                    fallbackInitials: gameInitials,
-                    gradientColors: isManualGame
-                        ? [Theme.Colors.primary.opacity(0.65), Theme.Colors.accent.opacity(0.45)]
-                        : [Theme.Colors.accent.opacity(0.5), Theme.Colors.primary.opacity(0.5)]
-                )
+                ZStack(alignment: .bottomLeading) {
+                    DetailHeroImage(
+                        imageUrl: displayedGame.imageUrl,
+                        badge: displayedGame.bggRating,
+                        fallbackInitials: gameInitials,
+                        gradientColors: isManualGame
+                            ? [Theme.Colors.primary.opacity(0.65), Theme.Colors.accent.opacity(0.45)]
+                            : [Theme.Colors.accent.opacity(0.5), Theme.Colors.primary.opacity(0.5)]
+                    )
+                    if let rating = displayedGame.bggRating {
+                        RatingBadge(rating: rating, size: .large)
+                            .offset(x: Theme.Spacing.xl * 0.5, y: Theme.Spacing.sm * 0.5)
+                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.top, Theme.Spacing.lg)
+                .padding(.bottom, -Theme.Spacing.xl)
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     // 2. Title cluster
@@ -287,7 +296,7 @@ struct GameDetailView: View {
         viewModel.game = updatedGame
 
         do {
-            try await SupabaseService.shared.updateGame(updatedGame)
+            _ = try await SupabaseService.shared.upsertGame(updatedGame)
         } catch {
             // Non-critical — local state is already updated
         }

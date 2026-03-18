@@ -327,6 +327,15 @@ struct Theme {
             default: return "Heavy"
             }
         }
+
+        static func ratingColor(_ rating: Double) -> Color {
+            switch rating {
+            case ..<4: return warning
+            case 4..<7: return accent
+            case 7..<8.5: return success
+            default: return Colors.primary
+            }
+        }
     }
 
     // MARK: - Gradients
