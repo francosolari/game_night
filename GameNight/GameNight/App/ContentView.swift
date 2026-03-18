@@ -4,12 +4,22 @@ struct MainTabView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var themeManager: ThemeManager
     @State private var showCreateEvent = false
+    @State private var homeNavigationPath = NavigationPath()
+    @State private var previousTab: AppState.Tab = .home
 
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $appState.selectedTab) {
-                HomeView()
-                    .tag(AppState.Tab.home)
+                NavigationStack(path: $homeNavigationPath) {
+                    HomeView(navigationPath: $homeNavigationPath)
+                        .navigationDestination(for: GameEvent.self) { event in
+                            EventDetailView(eventId: event.id)
+                        }
+                        .navigationDestination(for: CalendarDestination.self) { _ in
+                            CalendarView(navigationPath: $homeNavigationPath)
+                        }
+                }
+                .tag(AppState.Tab.home)
 
                 GameLibraryView()
                     .tag(AppState.Tab.games)
@@ -34,12 +44,16 @@ struct MainTabView: View {
             CreateEventView()
                 .environmentObject(appState)
         }
-        .onChange(of: appState.selectedTab) { _, newTab in
+        .onChange(of: appState.selectedTab) { oldTab, newTab in
             if newTab == .create {
                 showCreateEvent = true
-                // Reset to previous tab
                 appState.selectedTab = .home
+                return
             }
+            if newTab == .home && oldTab == .home {
+                homeNavigationPath = NavigationPath()
+            }
+            previousTab = newTab
         }
     }
 }

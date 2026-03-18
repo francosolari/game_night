@@ -75,6 +75,10 @@ final class HomeViewModel: ObservableObject {
         myInvites.first { $0.eventId == eventId }
     }
 
+    func confirmedCount(for eventId: UUID) -> Int {
+        myInvites.filter { $0.eventId == eventId && $0.status == .accepted }.count
+    }
+
     private func mergeUpcomingEvents(_ base: [GameEvent], with additional: [GameEvent]) -> [GameEvent] {
         var mergedById = Dictionary(uniqueKeysWithValues: base.map { ($0.id, $0) })
         for event in additional {

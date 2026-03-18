@@ -3,12 +3,18 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @EnvironmentObject var appState: AppState
-    @State private var selectedEvent: GameEvent?
+    @Binding var navigationPath: NavigationPath
     @State private var draftToResume: GameEvent?
 
+    private var carouselCardWidth: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        let padding = Theme.Spacing.xl * 2
+        let spacing = Theme.Spacing.md
+        return (screenWidth - padding - spacing) / 2.15
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: Theme.Spacing.xxl) {
                     // Header
                     HStack {
@@ -111,23 +117,30 @@ struct HomeView: View {
                             }
                         }
 
-                        // Upcoming Events
+                        // Next Up — horizontal carousel
                         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            SectionHeader(title: "Upcoming")
-                                .padding(.horizontal, Theme.Spacing.xl)
-
-                            LazyVStack(spacing: Theme.Spacing.lg) {
-                                ForEach(viewModel.upcomingEvents) { event in
-                                    EventCard(
-                                        event: event,
-                                        myInvite: viewModel.invite(for: event.id)
-                                    ) {
-                                        selectedEvent = event
-                                    }
-                                    .fadeIn(delay: Double(viewModel.upcomingEvents.firstIndex(where: { $0.id == event.id }) ?? 0) * 0.1)
-                                }
+                            SectionHeader(title: "Next Up", action: "View all") {
+                                navigationPath.append(CalendarDestination())
                             }
                             .padding(.horizontal, Theme.Spacing.xl)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    ForEach(viewModel.upcomingEvents) { event in
+                                        CompactEventCard(
+                                            event: event,
+                                            myInvite: viewModel.invite(for: event.id),
+                                            confirmedCount: viewModel.confirmedCount(for: event.id)
+                                        ) {
+                                            navigationPath.append(event)
+                                        }
+                                        .frame(width: carouselCardWidth)
+                                    }
+                                }
+                                .padding(.horizontal, Theme.Spacing.xl)
+                                .scrollTargetLayout()
+                            }
+                            .scrollTargetBehavior(.viewAligned)
                         }
                     }
                 }
@@ -137,17 +150,8 @@ struct HomeView: View {
             .refreshable {
                 await viewModel.loadData()
             }
-            .navigationDestination(item: $selectedEvent) { event in
-                EventDetailView(eventId: event.id)
-            }
-        }
         .task {
             await viewModel.loadData()
-        }
-        .onChange(of: selectedEvent) { _, newValue in
-            if newValue == nil {
-                Task { await viewModel.loadData() }
-            }
         }
         .sheet(item: $draftToResume) { draft in
             CreateEventView(eventToEdit: draft) { _ in
@@ -298,3 +302,6 @@ extension GameEvent: Hashable {
         hasher.combine(id)
     }
 }
+
+// MARK: - Calendar Navigation Destination
+struct CalendarDestination: Hashable {}
