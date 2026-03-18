@@ -116,7 +116,7 @@ struct EventCard: View {
     private var gameCollage: some View {
         let games = event.games.prefix(3)
         if games.isEmpty {
-            GenerativeEventCover(title: event.title, eventId: event.id)
+            GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
         } else {
             HStack(spacing: 1) {
                 ForEach(Array(games.enumerated()), id: \.offset) { index, eventGame in

@@ -26,6 +26,7 @@ struct GameEvent: Identifiable, Codable {
     var allowMaybeRSVP: Bool
     var requirePlusOneNames: Bool
     var coverImageUrl: String?
+    var coverVariant: Int
     var draftInvitees: [DraftInvitee]?
     var deletedAt: Date?
     var createdAt: Date
@@ -57,6 +58,7 @@ struct GameEvent: Identifiable, Codable {
         case allowMaybeRSVP = "allow_maybe_rsvp"
         case requirePlusOneNames = "require_plus_one_names"
         case coverImageUrl = "cover_image_url"
+        case coverVariant = "cover_variant"
         case draftInvitees = "draft_invitees"
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
@@ -89,6 +91,7 @@ struct GameEvent: Identifiable, Codable {
         allowMaybeRSVP: Bool = true,
         requirePlusOneNames: Bool = false,
         coverImageUrl: String? = nil,
+        coverVariant: Int = 0,
         draftInvitees: [DraftInvitee]? = nil,
         deletedAt: Date? = nil,
         createdAt: Date,
@@ -119,6 +122,7 @@ struct GameEvent: Identifiable, Codable {
         self.allowMaybeRSVP = allowMaybeRSVP
         self.requirePlusOneNames = requirePlusOneNames
         self.coverImageUrl = coverImageUrl
+        self.coverVariant = coverVariant
         self.draftInvitees = draftInvitees
         self.deletedAt = deletedAt
         self.createdAt = createdAt
@@ -152,6 +156,7 @@ struct GameEvent: Identifiable, Codable {
         allowMaybeRSVP = try container.decodeIfPresent(Bool.self, forKey: .allowMaybeRSVP) ?? true
         requirePlusOneNames = try container.decodeIfPresent(Bool.self, forKey: .requirePlusOneNames) ?? false
         coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
+        coverVariant = try container.decodeIfPresent(Int.self, forKey: .coverVariant) ?? 0
         draftInvitees = try container.decodeIfPresent([DraftInvitee].self, forKey: .draftInvitees)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
@@ -184,6 +189,7 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(allowMaybeRSVP, forKey: .allowMaybeRSVP)
         try container.encode(requirePlusOneNames, forKey: .requirePlusOneNames)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
+        try container.encode(coverVariant, forKey: .coverVariant)
         try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)
         try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         try container.encode(createdAt, forKey: .createdAt)

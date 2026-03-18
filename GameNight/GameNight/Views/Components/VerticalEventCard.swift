@@ -107,10 +107,10 @@ struct VerticalEventCard: View {
             AsyncImage(url: url) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
-                GenerativeEventCover(title: event.title, eventId: event.id)
+                GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
             }
         } else {
-            GenerativeEventCover(title: event.title, eventId: event.id)
+            GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
         }
     }
 }

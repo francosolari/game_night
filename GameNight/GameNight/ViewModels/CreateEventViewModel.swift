@@ -30,6 +30,9 @@ final class CreateEventViewModel: ObservableObject {
     @Published var plusOneLimit: Int = 0
     @Published var allowMaybeRSVP: Bool = true
     @Published var requirePlusOneNames: Bool = false
+    @Published var coverVariant: Int = 0
+    /// Stable ID for generative cover preview during creation
+    let previewEventId: UUID = UUID()
     @Published var selectedGroup: GameGroup?
     @Published var invitees: [InviteeEntry] = []
     @Published var isSaving = false
@@ -96,6 +99,7 @@ final class CreateEventViewModel: ObservableObject {
             plusOneLimit = eventToEdit.plusOneLimit
             allowMaybeRSVP = eventToEdit.allowMaybeRSVP
             requirePlusOneNames = eventToEdit.requirePlusOneNames
+            coverVariant = eventToEdit.coverVariant
 
             if eventToEdit.scheduleMode == .fixed {
                 if let fixedOption = eventToEdit.timeOptions.first {
@@ -605,6 +609,7 @@ final class CreateEventViewModel: ObservableObject {
             allowMaybeRSVP: allowMaybeRSVP,
             requirePlusOneNames: requirePlusOneNames,
             coverImageUrl: existingEvent?.coverImageUrl,
+            coverVariant: coverVariant,
             draftInvitees: status == .draft ? orderedInvitees().map { entry in
                 DraftInvitee(
                     id: entry.id,

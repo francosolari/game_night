@@ -9,6 +9,11 @@ struct CreateEventReviewStep: View {
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
+            // Cover art preview (only when no custom image)
+            if viewModel.eventToEdit?.coverImageUrl == nil {
+                coverArtSection
+            }
+
             // Preview card
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 Text(viewModel.title)
@@ -135,6 +140,49 @@ struct CreateEventReviewStep: View {
                             .fill(Theme.Colors.error.opacity(0.1))
                     )
             }
+        }
+    }
+
+    // MARK: - Cover Art Section
+
+    private var coverArtSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack {
+                Text("Cover Art")
+                    .font(Theme.Typography.label)
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        viewModel.coverVariant += 1
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 12))
+                        Text("Shuffle")
+                            .font(Theme.Typography.caption)
+                    }
+                    .foregroundColor(Theme.Colors.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Theme.Colors.primary.opacity(0.12))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            GenerativeEventCover(
+                title: viewModel.title,
+                eventId: viewModel.eventToEdit?.id ?? viewModel.previewEventId,
+                variant: viewModel.coverVariant
+            )
+            .frame(height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
         }
     }
 }

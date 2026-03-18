@@ -3,13 +3,16 @@ import SwiftUI
 /// Generates a deterministic, visually interesting cover from an event title
 /// when no custom cover image is set. Uses the theme palette and the title's
 /// hash to produce a unique but stable pattern per event.
+///
+/// Pass `variant` to cycle through different styles for the same event.
 struct GenerativeEventCover: View {
     let title: String
     let eventId: UUID
+    var variant: Int = 0
 
-    /// Stable seed derived from event ID so the pattern never changes per event
+    /// Stable seed derived from event ID + variant offset
     private var seed: Int {
-        abs(eventId.hashValue)
+        abs(eventId.hashValue &+ variant)
     }
 
     private var patternIndex: Int {
@@ -20,61 +23,83 @@ struct GenerativeEventCover: View {
         Pattern.allCases[patternIndex]
     }
 
-    // Extended palette — derived tints that complement the warm craft theme
-    // but add variety beyond sage/terracotta/yellow
+    // MARK: - Extended palette (cream-compatible from reference + warm craft tones)
+
+    // Blues & teals
     private static let dustyBlue = Color(red: 0.45, green: 0.55, blue: 0.65)
     private static let slate = Color(red: 0.35, green: 0.40, blue: 0.45)
+    private static let ocean = Color(red: 0.30, green: 0.48, blue: 0.55)
+    private static let teal = Color(hex: "00AFB9")        // bright teal
+    private static let deepTeal = Color(hex: "13525F")     // dark teal-green
+
+    // Greens
+    private static let forest = Color(hex: "006B4C")       // deep emerald
+    private static let moss = Color(red: 0.40, green: 0.50, blue: 0.35)
+    private static let olive = Color(hex: "97A87C")        // muted olive sage
+    private static let lime = Color(hex: "DAF07A")         // bright lime
+
+    // Purples & plums
     private static let warmPlum = Color(red: 0.55, green: 0.35, blue: 0.45)
     private static let deepPlum = Color(red: 0.40, green: 0.22, blue: 0.35)
-    private static let forest = Color(red: 0.25, green: 0.42, blue: 0.35)
-    private static let moss = Color(red: 0.40, green: 0.50, blue: 0.35)
+    private static let lavender = Color(hex: "9178B6")     // soft lavender
+    private static let dusk = Color(red: 0.50, green: 0.40, blue: 0.55)
+
+    // Warm tones
     private static let clay = Color(red: 0.65, green: 0.45, blue: 0.35)
     private static let copper = Color(red: 0.60, green: 0.38, blue: 0.25)
-    private static let dusk = Color(red: 0.50, green: 0.40, blue: 0.55)
-    private static let ocean = Color(red: 0.30, green: 0.48, blue: 0.55)
+    private static let burgundy = Color(hex: "8B2A1A")     // deep wine
+    private static let blush = Color(hex: "F4C4D9")        // soft pink
+    private static let orange = Color(hex: "F7B544")       // warm amber-orange
 
-    /// Background gradient colors and a contrasting text color
-    /// Each tuple: (gradient start, gradient end, text color)
+    // Neutrals
+    private static let charcoal = Color(hex: "3B3B3B")     // rich dark
+    private static let espresso = Color(hex: "343D2A")     // dark olive-brown
+
+    /// Background gradient colors and a contrasting text color.
+    /// Each tuple: (gradient start, gradient end, text color).
     /// Text color is always chosen to contrast with the gradient.
     private var colorScheme: (gradient0: Color, gradient1: Color, text: Color) {
         let schemes: [(Color, Color, Color)] = [
-            // Sage gradient → terracotta text
+            // Sage → terracotta text
             (Theme.Colors.primary, Theme.Colors.primaryLight, Theme.Colors.accent),
-            // Terracotta gradient → dark sage text
+            // Terracotta → dark sage text
             (Theme.Colors.accent, Theme.Colors.accentLight, Theme.Colors.primaryDark),
-            // Dusty blue gradient → espresso text
+            // Dusty blue / slate → espresso text
             (Self.dustyBlue, Self.slate, Theme.Colors.textPrimary),
-            // Warm plum gradient → cream/light text
-            (Self.warmPlum, Self.deepPlum, Theme.Colors.accentLight),
-            // Forest/moss gradient → terracotta text
-            (Self.forest, Self.moss, Theme.Colors.accent),
-            // Clay/copper gradient → dark sage text
+            // Warm plum / deep plum → blush text
+            (Self.warmPlum, Self.deepPlum, Self.blush),
+            // Forest / moss → orange text
+            (Self.forest, Self.moss, Self.orange),
+            // Clay / copper → dark sage text
             (Self.clay, Self.copper, Theme.Colors.primaryDark),
-            // Dusk purple gradient → highlight text
-            (Self.dusk, Self.warmPlum, Theme.Colors.highlight),
-            // Ocean gradient → clay text
-            (Self.ocean, Self.dustyBlue, Self.clay),
-            // Yellow-warm gradient → espresso text
-            (Theme.Colors.highlight.opacity(0.6), Theme.Colors.accentLight, Theme.Colors.textPrimary),
-            // Sage/terracotta split → espresso text
-            (Theme.Colors.primary, Theme.Colors.accent, Theme.Colors.textPrimary),
-            // Slate/ocean gradient → terracotta text
-            (Self.slate, Self.ocean, Theme.Colors.accent),
-            // Moss/clay earthy gradient → deep plum text
-            (Self.moss, Self.clay, Self.deepPlum),
+            // Dusk / lavender → cream text
+            (Self.dusk, Self.lavender, Theme.Colors.accentLight),
+            // Ocean / teal → clay text
+            (Self.ocean, Self.teal, Self.clay),
+            // Burgundy / warm plum → blush text
+            (Self.burgundy, Self.warmPlum, Self.blush),
+            // Deep teal / forest → lime text
+            (Self.deepTeal, Self.forest, Self.lime),
+            // Charcoal / slate → teal text
+            (Self.charcoal, Self.slate, Self.teal),
+            // Olive / moss → burgundy text
+            (Self.olive, Self.moss, Self.burgundy),
+            // Lavender / blush → deep plum text
+            (Self.lavender, Self.blush, Self.deepPlum),
+            // Orange / clay → espresso text
+            (Self.orange, Self.clay, Self.espresso),
+            // Teal / ocean → orange text
+            (Self.teal, Self.ocean, Self.orange),
+            // Espresso / charcoal → lime text
+            (Self.espresso, Self.charcoal, Self.lime),
         ]
         let scheme = schemes[seed % schemes.count]
         return (gradient0: scheme.0, gradient1: scheme.1, text: scheme.2)
     }
 
-    // Keep colorPair for pattern drawing
+    // Used by pattern drawing functions
     private var colorPair: (Color, Color) {
         (colorScheme.gradient0, colorScheme.gradient1)
-    }
-
-    private var rotationAngle: Double {
-        let angles = [0.0, 15.0, 30.0, 45.0, -15.0, -30.0]
-        return angles[(seed / 6) % angles.count]
     }
 
     var body: some View {
@@ -203,14 +228,65 @@ struct GenerativeEventCover: View {
 
     // MARK: - Title decoration
 
-    private var titleDesign: Font.Design {
-        let designs: [Font.Design] = [.rounded, .serif, .monospaced, .default, .rounded, .serif]
-        return designs[(seed / 5) % designs.count]
+    /// Font options mixing system designs with named iOS typefaces for variety
+    private enum TitleFont: CaseIterable {
+        case systemBlackRounded
+        case systemHeavySerif
+        case systemBoldMono
+        case condensedBold       // Avenir Next Condensed
+        case didot               // Classic high-contrast serif
+        case futura              // Geometric sans
+        case copperplate         // Engraved small-caps feel
+        case papyrus             // Playful/adventurous (game night vibe)
+        case snellRoundhand      // Script/cursive
+        case americanTypewriter  // Retro slab
+        case rockwell            // Bold slab serif
+        case georgia             // Elegant serif
+        case impact              // Ultra-condensed bold
+        case chalkboard          // Casual hand-drawn
+        case markerFelt          // Marker pen feel
+        case zapfino             // Calligraphic flourish
+
+        func font(size: CGFloat) -> Font {
+            switch self {
+            case .systemBlackRounded:
+                return .system(size: size, weight: .black, design: .rounded)
+            case .systemHeavySerif:
+                return .system(size: size, weight: .heavy, design: .serif)
+            case .systemBoldMono:
+                return .system(size: size, weight: .bold, design: .monospaced)
+            case .condensedBold:
+                return .custom("AvenirNextCondensed-Bold", size: size)
+            case .didot:
+                return .custom("Didot-Bold", size: size)
+            case .futura:
+                return .custom("Futura-Bold", size: size)
+            case .copperplate:
+                return .custom("Copperplate-Bold", size: size)
+            case .papyrus:
+                return .custom("Papyrus", size: size)
+            case .snellRoundhand:
+                return .custom("SnellRoundhand-Black", size: size)
+            case .americanTypewriter:
+                return .custom("AmericanTypewriter-Bold", size: size)
+            case .rockwell:
+                return .custom("Rockwell-Bold", size: size)
+            case .georgia:
+                return .custom("Georgia-Bold", size: size)
+            case .impact:
+                return .custom("Impact", size: size)
+            case .chalkboard:
+                return .custom("ChalkboardSE-Bold", size: size)
+            case .markerFelt:
+                return .custom("MarkerFelt-Wide", size: size)
+            case .zapfino:
+                return .custom("Zapfino", size: size * 0.6)
+            }
+        }
     }
 
-    private var titleWeight: Font.Weight {
-        let weights: [Font.Weight] = [.black, .heavy, .bold, .semibold, .black, .heavy]
-        return weights[(seed / 3) % weights.count]
+    private var titleFont: TitleFont {
+        TitleFont.allCases[(seed / 3) % TitleFont.allCases.count]
     }
 
     private var titleRotation: Double {
@@ -221,18 +297,15 @@ struct GenerativeEventCover: View {
     private func titleDecoration(size: CGSize) -> some View {
         let displayTitle = title.isEmpty ? "Game Night" : title
 
-        // Scale font to fit width with some overflow allowed
-        // Longer titles get smaller font, short titles get big dramatic font
         let charCount = max(displayTitle.count, 1)
         let baseFontSize = size.width * 0.38
         let scaledSize = min(baseFontSize, size.width * 6.0 / CGFloat(charCount))
         let fontSize = max(scaledSize, 16)
 
-        // Vertical offset: nudge down so text is centered-to-bottom, partially clipped
         let yOffset = size.height * 0.12
 
         return Text(displayTitle.uppercased())
-            .font(.system(size: fontSize, weight: titleWeight, design: titleDesign))
+            .font(titleFont.font(size: fontSize))
             .foregroundColor(colorScheme.text.opacity(0.42))
             .multilineTextAlignment(.center)
             .lineLimit(3)
