@@ -1,0 +1,140 @@
+import SwiftUI
+
+struct EventCalendarGridView: View {
+    @ObservedObject var viewModel: CalendarViewModel
+    let onEventTap: (GameEvent) -> Void
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+    private let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            // Weekday headers
+            LazyVGrid(columns: columns, spacing: 0) {
+                ForEach(weekdays, id: \.self) { day in
+                    Text(day)
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            // Day cells
+            LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
+                ForEach(daysInMonth(), id: \.self) { date in
+                    if let date {
+                        dayCellView(date: date)
+                    } else {
+                        Color.clear.frame(height: 44)
+                    }
+                }
+            }
+
+            // Selected day detail
+            if let selectedDate = viewModel.selectedDate {
+                let dayEvents = viewModel.events(for: selectedDate)
+                if !dayEvents.isEmpty {
+                    CalendarDayDetailView(
+                        date: selectedDate,
+                        events: dayEvents,
+                        viewModel: viewModel,
+                        onEventTap: onEventTap
+                    )
+                }
+            }
+        }
+    }
+
+    private func dayCellView(date: Date) -> some View {
+        let calendar = Calendar.current
+        let isToday = calendar.isDateInToday(date)
+        let isSelected = viewModel.selectedDate.map { calendar.isDate($0, inSameDayAs: date) } ?? false
+        let dayEvents = viewModel.events(for: date)
+
+        return Button {
+            withAnimation(Theme.Animation.snappy) {
+                viewModel.selectedDate = isSelected ? nil : date
+            }
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(calendar.component(.day, from: date))")
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(isToday ? Theme.Colors.primary : Theme.Colors.textPrimary)
+                    .frame(width: 32, height: 32)
+                    .background {
+                        if isToday {
+                            Circle().stroke(Theme.Colors.primary, lineWidth: 1.5)
+                        }
+                        if isSelected {
+                            Circle().fill(Theme.Colors.primary.opacity(0.15))
+                        }
+                    }
+
+                if let firstEvent = dayEvents.first {
+                    Image(systemName: gameCategoryIcon(for: firstEvent))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.Colors.textSecondary)
+
+                    Circle()
+                        .fill(rsvpDotColor(for: firstEvent))
+                        .frame(width: 4, height: 4)
+                } else {
+                    Color.clear.frame(height: 14)
+                    Color.clear.frame(height: 4)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Helpers
+
+    private func daysInMonth() -> [Date?] {
+        let calendar = Calendar.current
+        let month = viewModel.currentMonth
+
+        guard let range = calendar.range(of: .day, in: .month, for: month),
+              let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: month))
+        else { return [] }
+
+        let weekday = calendar.component(.weekday, from: firstDay)
+        let leadingBlanks = weekday - 1
+
+        var days: [Date?] = Array(repeating: nil, count: leadingBlanks)
+
+        for day in range {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay) {
+                days.append(date)
+            }
+        }
+
+        return days
+    }
+
+    private func gameCategoryIcon(for event: GameEvent) -> String {
+        guard let primaryGame = event.games.first(where: { $0.isPrimary })?.game ?? event.games.first?.game else {
+            return "gamecontroller.fill"
+        }
+
+        for category in primaryGame.categories {
+            let lower = category.lowercased()
+            if lower.contains("strategy") || lower.contains("board") { return "dice.fill" }
+            if lower.contains("card") { return "suit.spade.fill" }
+            if lower.contains("puzzle") || lower.contains("escape") { return "puzzlepiece.fill" }
+            if lower.contains("party") || lower.contains("social") { return "person.3.fill" }
+        }
+
+        return "gamecontroller.fill"
+    }
+
+    private func rsvpDotColor(for event: GameEvent) -> Color {
+        let isHost = event.hostId == SupabaseService.shared.client.auth.currentSession?.user.id
+        if isHost { return Theme.Colors.success }
+
+        guard let invite = viewModel.invite(for: event.id) else {
+            return Theme.Colors.dateAccent
+        }
+
+        return invite.status.color
+    }
+}

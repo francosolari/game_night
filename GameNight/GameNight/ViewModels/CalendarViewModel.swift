@@ -145,6 +145,20 @@ final class CalendarViewModel: ObservableObject {
         selectedDate = Date()
     }
 
+    func previousMonth() {
+        if let newMonth = Calendar.current.date(byAdding: .month, value: -1, to: currentMonth) {
+            currentMonth = newMonth
+            selectedDate = nil
+        }
+    }
+
+    func nextMonth() {
+        if let newMonth = Calendar.current.date(byAdding: .month, value: 1, to: currentMonth) {
+            currentMonth = newMonth
+            selectedDate = nil
+        }
+    }
+
     // MARK: - Helpers
 
     private func eventSortDate(_ event: GameEvent) -> Date {

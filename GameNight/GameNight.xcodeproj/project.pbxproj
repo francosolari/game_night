@@ -16,6 +16,8 @@
 		094E8C89690D6D3D45CE77F4 /* HomeViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11C09C50D5F989BB36A2F66 /* HomeViewModelTests.swift */; };
 		0959401BA2FD1AED38E45306 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4B7E019A65A2A6BCF7278492 /* Supabase */; };
 		0B1B53A086B2D5C634FB2153 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5438E24E75BD13B48ABCAD82 /* EventDetailView.swift */; };
+		0E38F9EBB95F5422929C287D /* CalendarFilterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3751C5A4132D75CEB6B2E6F1 /* CalendarFilterSheet.swift */; };
+		130DF8D981F9DDFC406409A0 /* CalendarGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 475EA5D2D276767BCB3F5408 /* CalendarGridView.swift */; };
 		133E52FC137BE4A2BBF26C08 /* CreateEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E428E34778C2894B35484021 /* CreateEventView.swift */; };
 		15F3B27DCB2A87D462265798 /* CompactEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DFD0C7C31279717AFB963F /* CompactEventCard.swift */; };
 		160BF49B9AE94EDA37D53FFE /* GameVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DCF17A5CC08E893A25FFA /* GameVotingView.swift */; };
@@ -32,15 +34,18 @@
 		4982AD9960217BBC3F7C9B26 /* CreateEventInvitesStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F19B2EBE4FA39FFF00CB52 /* CreateEventInvitesStep.swift */; };
 		4A1723223C6DAEE61DFF0741 /* CreateEventReviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56CDA418C3C4E5AC101F1657 /* CreateEventReviewStep.swift */; };
 		52828E31ED83EE3FEC20F3BC /* EventVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0894C4BB42056BC43902A7B2 /* EventVisibility.swift */; };
+		581A7EB52A1D861724F70540 /* CalendarDayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 059F5F33292722AB593021DA /* CalendarDayDetailView.swift */; };
 		5D9567252A269FA92FA85E95 /* ComponentSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FAF372645B9F5ED14FEEEC0 /* ComponentSize.swift */; };
 		60CC436E8F6F5AE4F7D37C44 /* SplashScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F58FAF1005984504C7F8AD /* SplashScreen.swift */; };
 		6401D5AD802EEA80679F6ECC /* UserProfileSummaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 396DCF1E62F331CA5E9BB8ED /* UserProfileSummaryTests.swift */; };
 		65532079AE877CE01667566E /* FixtureFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6B8635260E038104AE269E /* FixtureFactory.swift */; };
+		684BCA9E5D292D55BF6B6F6D /* CalendarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E9894CC10DABAA8C33BED0 /* CalendarListView.swift */; };
 		69A66D4BC0C5C14C12D41F6F /* TriStateVoteButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */; };
 		7124447E48FB168EA905F827 /* LocationPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82822A1740DFB720E14F4CCC /* LocationPickerSheet.swift */; };
 		767F1544BB3B4EF53FECFD0D /* ContactPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F47B45C3BEB73A0CAF96C797 /* ContactPickerService.swift */; };
 		7782918D6C4C803001CDF01A /* HomeDataLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0A8DBBF814B763C287ADCF /* HomeDataLoaderTests.swift */; };
 		785011C763AEC050BBD859D5 /* CreateEventViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFCD7292A0C4E019CD712C73 /* CreateEventViewModelTests.swift */; };
+		7F6CC417800B4B6AE2205B33 /* CalendarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */; };
 		852C2866929B8119FA39E880 /* EventVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F5B4B3EBDB251A97CB87F4 /* EventVisibilityTests.swift */; };
 		88286AB6BCD7CFB53E204C68 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3CF6DCAC2DD0381444E8466 /* LocationService.swift */; };
 		8EBFE0CD5C9F9E0FADEB8B66 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35ACFC5CF2D84146F1B0E5B2 /* OnboardingView.swift */; };
@@ -106,6 +111,7 @@
 /* Begin PBXFileReference section */
 		04110B31ED9823F8D8CB1290 /* GameNightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameNightApp.swift; sourceTree = "<group>"; };
 		056DCF17A5CC08E893A25FFA /* GameVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameVotingView.swift; sourceTree = "<group>"; };
+		059F5F33292722AB593021DA /* CalendarDayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDayDetailView.swift; sourceTree = "<group>"; };
 		06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupPickerSheet.swift; sourceTree = "<group>"; };
 		07F39EDF744F365C61B43544 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 		0894C4BB42056BC43902A7B2 /* EventVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventVisibility.swift; sourceTree = "<group>"; };
@@ -118,6 +124,7 @@
 		226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriStateVoteButton.swift; sourceTree = "<group>"; };
 		2469983DA1CC14996701E0FE /* EventViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventViewModel.swift; sourceTree = "<group>"; };
 		24832623E66C268D9044E240 /* EventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCard.swift; sourceTree = "<group>"; };
+		28E9894CC10DABAA8C33BED0 /* CalendarListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarListView.swift; sourceTree = "<group>"; };
 		2D0EA42EA853AC67A97206DA /* PlayerCountIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCountIndicator.swift; sourceTree = "<group>"; };
 		31434809C693D97EB052C01B /* GameNightTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = GameNightTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		320F17AF3B5B3C150DC53B6F /* ShimmerLayoutMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShimmerLayoutMetrics.swift; sourceTree = "<group>"; };
@@ -125,6 +132,7 @@
 		33A8894EED32ECCDD900B4DE /* GameLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLibraryView.swift; sourceTree = "<group>"; };
 		3493414C1EA4EA910807E03E /* SearchBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBar.swift; sourceTree = "<group>"; };
 		35ACFC5CF2D84146F1B0E5B2 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		3751C5A4132D75CEB6B2E6F1 /* CalendarFilterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarFilterSheet.swift; sourceTree = "<group>"; };
 		38CD0AF08CE4B5CEF7E0D505 /* CreateGroupFromAttendeesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateGroupFromAttendeesSheet.swift; sourceTree = "<group>"; };
 		3926C65D6513E68EE254B8FC /* GuestListTabsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestListTabsView.swift; sourceTree = "<group>"; };
 		396DCF1E62F331CA5E9BB8ED /* UserProfileSummaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileSummaryTests.swift; sourceTree = "<group>"; };
@@ -132,6 +140,7 @@
 		40B98058A22740B7FDCB059A /* CreateEventGamesStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventGamesStep.swift; sourceTree = "<group>"; };
 		40CDC4EFE6713EAE4B33C26B /* TestError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestError.swift; sourceTree = "<group>"; };
 		46C66541A70C31BA98A29D18 /* Group.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Group.swift; sourceTree = "<group>"; };
+		475EA5D2D276767BCB3F5408 /* CalendarGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarGridView.swift; sourceTree = "<group>"; };
 		491C5BC61EA3E94B1EA73171 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		496016CC950DC5C5F6E75729 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		4D5EB8337036912A556D1B42 /* HomeDataProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDataProviding.swift; sourceTree = "<group>"; };
@@ -161,6 +170,7 @@
 		8C6F1688E19ADDD90168EF36 /* GameInfoCompact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameInfoCompact.swift; sourceTree = "<group>"; };
 		8EDAABF8B93412395C477350 /* ViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModifiers.swift; sourceTree = "<group>"; };
 		95B0C917F3210D3DEE57EA0F /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		9AB1A89107DC5915629A148C /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTestHelpers.swift; sourceTree = "<group>"; };
 		AFAFBC98FCB83FD971A6F753 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -272,6 +282,7 @@
 		406E7A27D654D0E51AF7305C /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */,
 				CEE44D563D71CBA8608FAF99 /* CreateEventViewModel.swift */,
 				2469983DA1CC14996701E0FE /* EventViewModel.swift */,
 				6D3FEEC34A1373C0210242FC /* GameLibraryViewModel.swift */,
@@ -435,6 +446,10 @@
 		ED6255B17A27F7B6590541A3 /* Calendar */ = {
 			isa = PBXGroup;
 			children = (
+				059F5F33292722AB593021DA /* CalendarDayDetailView.swift */,
+				3751C5A4132D75CEB6B2E6F1 /* CalendarFilterSheet.swift */,
+				475EA5D2D276767BCB3F5408 /* CalendarGridView.swift */,
+				28E9894CC10DABAA8C33BED0 /* CalendarListView.swift */,
 				9AB1A89107DC5915629A148C /* CalendarView.swift */,
 			);
 			path = Calendar;
@@ -583,7 +598,12 @@
 				F94FB46D73A94B95CAAB4410 /* AppState.swift in Sources */,
 				B8CB9F46799095CFDF66F26E /* BGGService.swift in Sources */,
 				1F834BF50C8D07CCF689978E /* BrandGuide.swift in Sources */,
+				581A7EB52A1D861724F70540 /* CalendarDayDetailView.swift in Sources */,
+				0E38F9EBB95F5422929C287D /* CalendarFilterSheet.swift in Sources */,
+				130DF8D981F9DDFC406409A0 /* CalendarGridView.swift in Sources */,
+				684BCA9E5D292D55BF6B6F6D /* CalendarListView.swift in Sources */,
 				C7C5E2B1648C0A2488DE0E29 /* CalendarView.swift in Sources */,
+				7F6CC417800B4B6AE2205B33 /* CalendarViewModel.swift in Sources */,
 				15F3B27DCB2A87D462265798 /* CompactEventCard.swift in Sources */,
 				5D9567252A269FA92FA85E95 /* ComponentSize.swift in Sources */,
 				98081CC0AB972190D03DABD9 /* ContactListSheet.swift in Sources */,
