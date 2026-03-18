@@ -10,82 +10,115 @@ struct PlayerCountIndicator: View {
         maxPlayers ?? minPlayers
     }
 
-    private var useMeepleMode: Bool {
-        effectiveMax <= 6
+    private var hasQuorum: Bool {
+        confirmedCount >= minPlayers
+    }
+
+    private var isFull: Bool {
+        confirmedCount >= effectiveMax
+    }
+
+    private var statusColor: Color {
+        if isFull { return Theme.Colors.textTertiary }
+        if hasQuorum { return Theme.Colors.success }
+        return Theme.Colors.warning
     }
 
     var body: some View {
-        if useMeepleMode {
-            meepleView
-        } else {
-            compactTextView
-        }
-    }
-
-    private var meepleIconSize: CGFloat {
         switch size {
-        case .compact: return 12
-        case .standard: return 16
-        case .expanded: return 20
+        case .compact:
+            compactView
+        case .standard, .expanded:
+            standardView
         }
     }
 
-    private var meepleView: some View {
-        HStack(spacing: size == .compact ? 1 : 2) {
-            ForEach(0..<effectiveMax, id: \.self) { index in
-                Image(systemName: index < confirmedCount ? "person.fill" : "person")
-                    .font(.system(size: meepleIconSize))
-                    .foregroundColor(meepleColor(for: index))
-            }
-        }
-    }
-
-    private func meepleColor(for index: Int) -> Color {
-        if index < confirmedCount {
-            return Theme.Colors.success
-        } else if index < minPlayers {
-            return Theme.Colors.success.opacity(0.4)
-        } else {
-            return Theme.Colors.textTertiary.opacity(0.4)
-        }
-    }
-
-    private var compactTextView: some View {
-        VStack(alignment: .leading, spacing: 2) {
+    // MARK: - Compact: minimal footprint for carousel cards
+    // Shows "2/4–6" with a thin progress bar
+    private var compactView: some View {
+        VStack(alignment: .trailing, spacing: 2) {
             HStack(spacing: 0) {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor(statusColor)
+                    .padding(.trailing, 2)
+
                 Text("\(confirmedCount)")
-                    .foregroundColor(Theme.Colors.textPrimary)
-                Text("/")
+                    .foregroundColor(statusColor)
+                    .fontWeight(.semibold)
+                Text("/\(minPlayers)")
                     .foregroundColor(Theme.Colors.textTertiary)
-                Text("\(minPlayers)")
-                    .foregroundColor(Theme.Colors.success)
                 if let max = maxPlayers, max != minPlayers {
-                    Text("-\(max)")
+                    Text("–\(max)")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+            }
+            .font(Theme.Typography.caption2)
+
+            progressBar
+                .frame(width: 40, height: 3)
+        }
+    }
+
+    // MARK: - Standard: fuller display for list cards and detail views
+    private var standardView: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            HStack(spacing: 2) {
+                Image(systemName: "person.fill")
+                    .font(.system(size: size == .expanded ? 12 : 10))
+                    .foregroundColor(statusColor)
+
+                Text("\(confirmedCount)")
+                    .foregroundColor(statusColor)
+                    .fontWeight(.semibold)
+                Text("/ \(minPlayers)")
+                    .foregroundColor(Theme.Colors.textTertiary)
+                if let max = maxPlayers, max != minPlayers {
+                    Text("– \(max)")
                         .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
             .font(size.captionFont)
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Theme.Colors.textTertiary.opacity(0.2))
-                        .frame(height: 3)
+            if !hasQuorum {
+                Text("\(minPlayers - confirmedCount) more needed")
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.warning)
+            } else if isFull {
+                Text("Full")
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            } else {
+                Text("\(effectiveMax - confirmedCount) spots left")
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.success)
+            }
 
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Theme.Colors.success)
-                        .frame(width: fillWidth(totalWidth: geo.size.width), height: 3)
+            progressBar
+                .frame(width: size == .expanded ? 60 : 48, height: 3)
+        }
+    }
 
-                    if effectiveMax > 0 {
-                        let minPosition = CGFloat(minPlayers) / CGFloat(effectiveMax) * geo.size.width
-                        Rectangle()
-                            .fill(Theme.Colors.success.opacity(0.5))
-                            .frame(width: 1, height: 5)
-                            .offset(x: minPosition)
-                    }
+    // MARK: - Progress bar
+    private var progressBar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Theme.Colors.textTertiary.opacity(0.2))
+
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(statusColor)
+                    .frame(width: fillWidth(totalWidth: geo.size.width))
+
+                // Min-players marker
+                if effectiveMax > 0 && effectiveMax != minPlayers {
+                    let minPos = CGFloat(minPlayers) / CGFloat(effectiveMax) * geo.size.width
+                    Rectangle()
+                        .fill(Theme.Colors.textTertiary.opacity(0.5))
+                        .frame(width: 1, height: 5)
+                        .offset(x: minPos)
                 }
             }
-            .frame(height: 5)
         }
     }
 

@@ -9,6 +9,9 @@ final class HomeViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var error: String?
 
+    /// Accepted invite counts per event (does NOT include host)
+    private var inviteCounts: [UUID: Int] = [:]
+
     private let supabase: any HomeDataProviding
 
     init(supabase: any HomeDataProviding) {
@@ -59,7 +62,17 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
-        self.upcomingEvents = upcomingEvents
+        // Fetch accepted invite counts for all events
+        let allEventIds = upcomingEvents.map(\.id)
+        do {
+            inviteCounts = try await supabase.fetchAcceptedInviteCounts(eventIds: allEventIds)
+        } catch {
+            // Non-fatal — counts will just show 0
+            inviteCounts = [:]
+        }
+
+        // Sort by event date ascending (soonest first)
+        self.upcomingEvents = sortByEventDate(upcomingEvents)
         self.myInvites = snapshot.myInvites
         self.drafts = snapshot.drafts
         self.error = errorMessage
@@ -75,8 +88,10 @@ final class HomeViewModel: ObservableObject {
         myInvites.first { $0.eventId == eventId }
     }
 
+    /// Returns confirmed player count: accepted invites + 1 for the host
     func confirmedCount(for eventId: UUID) -> Int {
-        myInvites.filter { $0.eventId == eventId && $0.status == .accepted }.count
+        let acceptedInvites = inviteCounts[eventId] ?? 0
+        return acceptedInvites + 1 // +1 for the host who is always attending
     }
 
     private func mergeUpcomingEvents(_ base: [GameEvent], with additional: [GameEvent]) -> [GameEvent] {
@@ -84,7 +99,14 @@ final class HomeViewModel: ObservableObject {
         for event in additional {
             mergedById[event.id] = event
         }
+        return sortByEventDate(Array(mergedById.values))
+    }
 
-        return mergedById.values.sorted { $0.createdAt > $1.createdAt }
+    private func sortByEventDate(_ events: [GameEvent]) -> [GameEvent] {
+        events.sorted { a, b in
+            let dateA = a.timeOptions.first?.date ?? a.createdAt
+            let dateB = b.timeOptions.first?.date ?? b.createdAt
+            return dateA < dateB
+        }
     }
 }

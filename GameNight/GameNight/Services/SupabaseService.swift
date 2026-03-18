@@ -210,6 +210,32 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return events
     }
 
+    func fetchAcceptedInviteCounts(eventIds: [UUID]) async throws -> [UUID: Int] {
+        guard !eventIds.isEmpty else { return [:] }
+
+        struct InviteRow: Decodable {
+            let eventId: UUID
+            enum CodingKeys: String, CodingKey {
+                case eventId = "event_id"
+            }
+        }
+
+        let ids = eventIds.map { $0.uuidString }
+        let invites: [InviteRow] = try await client
+            .from("invites")
+            .select("event_id")
+            .in("event_id", values: ids)
+            .eq("status", value: InviteStatus.accepted.rawValue)
+            .execute()
+            .value
+
+        var counts: [UUID: Int] = [:]
+        for invite in invites {
+            counts[invite.eventId, default: 0] += 1
+        }
+        return counts
+    }
+
     func fetchEvent(id: UUID) async throws -> GameEvent {
         let event: GameEvent = try await client
             .from("events")

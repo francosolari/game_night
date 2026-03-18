@@ -32,48 +32,50 @@ struct VerticalEventCard: View {
     var body: some View {
         Button(action: { onTap?() }) {
             VStack(alignment: .leading, spacing: 0) {
-                // Top Cover Section
+                // Cover image with optional invite status overlay
                 ZStack(alignment: .topTrailing) {
                     coverImage
-                        .frame(height: 120)
+                        .frame(height: 100)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
 
                     if let invite = myInvite {
                         InviteStatusBadge(status: invite.status, isPast: eventIsPast)
-                            .scaleEffect(0.85)
-                            .padding(Theme.Spacing.sm)
+                            .scaleEffect(0.8)
+                            .padding(6)
                             .shadow(color: Color.black.opacity(0.1), radius: 2)
                     }
                 }
                 .padding(Theme.Spacing.xs)
 
-                // Info Section
-                VStack(alignment: .leading, spacing: size.spacing) {
+                // Content section
+                VStack(alignment: .leading, spacing: 6) {
+                    // Date badge (two-line compact format)
                     EventDateLabel(event: event, size: .compact)
 
+                    // Title
                     Text(event.title)
-                        .font(size.titleFont)
+                        .font(Theme.Typography.calloutMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.9)
-                        .frame(height: size.titleFont == Theme.Typography.calloutMedium ? 36 : 44, alignment: .topLeading)
+                        .fixedSize(horizontal: false, vertical: true)
 
+                    // Location
                     EventLocationLabel(event: event, viewerRole: viewerRole, size: .compact)
 
+                    // Game info (name + playtime, no complexity in compact)
                     if !event.games.isEmpty {
                         GameInfoCompact(games: event.games, size: .compact)
-                            .padding(.top, 2)
                     }
 
-                    Spacer(minLength: Theme.Spacing.sm)
+                    Spacer(minLength: 4)
 
-                    Divider()
-                        .opacity(0.5)
-                        .padding(.vertical, 2)
+                    // Footer: Host avatar + Player count
+                    Divider().opacity(0.4)
 
-                    HStack {
+                    HStack(alignment: .center) {
                         HostBadge(host: event.host, isCurrentUserHost: isCurrentUserHost, size: .compact)
-                        Spacer()
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
                         PlayerCountIndicator(
                             confirmedCount: confirmedCount,
                             minPlayers: event.minPlayers,
@@ -82,8 +84,9 @@ struct VerticalEventCard: View {
                         )
                     }
                 }
-                .padding([.horizontal, .bottom], Theme.Spacing.md)
-                .padding(.top, Theme.Spacing.xs)
+                .padding(.horizontal, Theme.Spacing.sm)
+                .padding(.bottom, Theme.Spacing.sm)
+                .padding(.top, 2)
             }
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)

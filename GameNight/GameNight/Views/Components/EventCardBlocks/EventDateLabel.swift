@@ -53,6 +53,15 @@ struct EventDateLabel: View {
         return event.timeOptions.first
     }
 
+    private func formatTime(_ timeOption: TimeOption) -> String {
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mma"
+        timeFormatter.amSymbol = "am"
+        timeFormatter.pmSymbol = "pm"
+        let timeStr = timeFormatter.string(from: timeOption.startTime)
+        return timeStr.replacingOccurrences(of: ":00", with: "")
+    }
+
     private func formatRelativeDate(_ timeOption: TimeOption) -> String {
         let calendar = Calendar.current
         let now = Date()
@@ -60,45 +69,59 @@ struct EventDateLabel: View {
         let startOfTarget = calendar.startOfDay(for: timeOption.date)
         let dayDiff = calendar.dateComponents([.day], from: startOfToday, to: startOfTarget).day ?? 0
 
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "h:mma"
-        timeFormatter.amSymbol = "am"
-        timeFormatter.pmSymbol = "pm"
-        let timeStr = timeFormatter.string(from: timeOption.startTime)
+        let timeStr = formatTime(timeOption)
 
-        let cleanTime = timeStr.replacingOccurrences(of: ":00", with: "")
+        // Compact: use short abbreviations to prevent truncation
+        if size == .compact {
+            if dayDiff == 0 {
+                return timeStr
+            } else if dayDiff == 1 {
+                return "Tom \u{00B7} \(timeStr)"
+            } else if dayDiff == -1 {
+                return "Yest \u{00B7} \(timeStr)"
+            } else if dayDiff > 1 && dayDiff < 7 {
+                let f = DateFormatter()
+                f.dateFormat = "EEE"
+                return "\(f.string(from: timeOption.date)) \u{00B7} \(timeStr)"
+            } else if dayDiff >= 7 && dayDiff < 14 {
+                let f = DateFormatter()
+                f.dateFormat = "EEE"
+                return "Next \(f.string(from: timeOption.date)) \u{00B7} \(timeStr)"
+            } else if dayDiff < 0 {
+                let f = DateFormatter()
+                f.dateFormat = "M/d"
+                return "\(f.string(from: timeOption.date)) \u{00B7} \(timeStr)"
+            } else {
+                let f = DateFormatter()
+                f.dateFormat = "EEE M/d"
+                return "\(f.string(from: timeOption.date)) \u{00B7} \(timeStr)"
+            }
+        }
 
+        // Standard/expanded: full format
         if dayDiff == 0 {
-            return "Today \u{00B7} \(cleanTime)"
+            return "Today \u{00B7} \(timeStr)"
         } else if dayDiff == 1 {
-            return "Tomorrow \u{00B7} \(cleanTime)"
+            return "Tomorrow \u{00B7} \(timeStr)"
         } else if dayDiff > 1 && dayDiff < 7 {
             let dayFormatter = DateFormatter()
             dayFormatter.dateFormat = "EEE"
-            return "\(dayFormatter.string(from: timeOption.date)) \u{00B7} \(cleanTime)"
+            return "\(dayFormatter.string(from: timeOption.date)) \u{00B7} \(timeStr)"
         } else if dayDiff >= 7 && dayDiff < 14 {
             let dayFormatter = DateFormatter()
             dayFormatter.dateFormat = "EEE"
-            return "Next \(dayFormatter.string(from: timeOption.date)) \u{00B7} \(cleanTime)"
+            return "Next \(dayFormatter.string(from: timeOption.date)) \u{00B7} \(timeStr)"
         } else if dayDiff < 0 {
             if dayDiff == -1 {
-                return "Yesterday \u{00B7} \(cleanTime)"
+                return "Yesterday \u{00B7} \(timeStr)"
             }
             let dayFormatter = DateFormatter()
-            if size == .compact {
-                dayFormatter.dateFormat = "M/d"
-            } else {
-                dayFormatter.dateFormat = "EEE, MMM d"
-            }
-            return "Past \(dayFormatter.string(from: timeOption.date)) \u{00B7} \(cleanTime)"
+            dayFormatter.dateFormat = "EEE, MMM d"
+            return "\(dayFormatter.string(from: timeOption.date)) \u{00B7} \(timeStr)"
         } else {
             let dayFormatter = DateFormatter()
-            if size == .compact {
-                dayFormatter.dateFormat = "EEE M/d"
-            } else {
-                dayFormatter.dateFormat = "EEE, MMM d"
-            }
-            return "\(dayFormatter.string(from: timeOption.date)) \u{00B7} \(cleanTime)"
+            dayFormatter.dateFormat = "EEE, MMM d"
+            return "\(dayFormatter.string(from: timeOption.date)) \u{00B7} \(timeStr)"
         }
     }
 }

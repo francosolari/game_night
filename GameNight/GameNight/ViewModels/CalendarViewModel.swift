@@ -8,6 +8,7 @@ final class CalendarViewModel: ObservableObject {
     @Published var invitesByEventId: [UUID: Invite] = [:]
     @Published var isLoading = true
     @Published var error: String?
+    private var inviteCounts: [UUID: Int] = [:]
 
     // MARK: - UI State
     @Published var selectedDate: Date? = Date()
@@ -69,6 +70,10 @@ final class CalendarViewModel: ObservableObject {
 
             self.allEvents = allFetched.sorted { eventSortDate($0) < eventSortDate($1) }
             self.invitesByEventId = Dictionary(uniqueKeysWithValues: invites.map { ($0.eventId, $0) })
+
+            // Fetch accepted invite counts
+            let allIds = allFetched.map(\.id)
+            self.inviteCounts = (try? await supabase.fetchAcceptedInviteCounts(eventIds: allIds)) ?? [:]
         } catch {
             self.error = error.localizedDescription
         }
@@ -127,11 +132,8 @@ final class CalendarViewModel: ObservableObject {
     }
 
     func confirmedCount(for eventId: UUID) -> Int {
-        // We only have the current user's invite locally.
-        // For full counts, the event detail view fetches all invites.
-        // Here we return 0 as a baseline — a future enhancement could
-        // include invite counts in the event query.
-        0
+        let acceptedInvites = inviteCounts[eventId] ?? 0
+        return acceptedInvites + 1 // +1 for the host
     }
 
     func invite(for eventId: UUID) -> Invite? {
