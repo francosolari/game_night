@@ -93,7 +93,7 @@ struct CustomTabBar: View {
         .padding(.bottom, 4)
         .background(
             Theme.Colors.cardBackground
-                .shadow(color: .black.opacity(0.3), radius: 20, y: -5)
+                .shadow(color: .black.opacity(ThemeManager.shared.isDark ? 0.3 : 0.08), radius: 20, y: -5)
                 .ignoresSafeArea()
         )
     }
@@ -110,11 +110,11 @@ struct TabBarButton: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundColor(isSelected ? Theme.Colors.primary : Theme.Colors.textTertiary)
+                    .foregroundColor(isSelected ? Theme.Colors.primary : Theme.Colors.tabInactive)
 
                 Text(label)
                     .font(Theme.Typography.caption2)
-                    .foregroundColor(isSelected ? Theme.Colors.primary : Theme.Colors.textTertiary)
+                    .foregroundColor(isSelected ? Theme.Colors.primary : Theme.Colors.tabInactive)
             }
             .frame(maxWidth: .infinity)
         }

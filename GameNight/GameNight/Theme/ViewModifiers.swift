@@ -28,7 +28,7 @@ struct GlassCardModifier: ViewModifier {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            .stroke(Theme.Colors.divider, lineWidth: 1)
                     )
             )
     }
@@ -128,7 +128,7 @@ struct ShimmerModifier: ViewModifier {
                         LinearGradient(
                             colors: [
                                 .clear,
-                                Color.white.opacity(0.1),
+                                Theme.Colors.shimmer,
                                 .clear
                             ],
                             startPoint: .leading,

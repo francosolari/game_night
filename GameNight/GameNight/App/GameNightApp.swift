@@ -4,7 +4,7 @@ import SwiftUI
 struct GameNightApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var supabase = SupabaseService.shared
-    @StateObject private var themeManager = ThemeManager()
+    @StateObject private var themeManager = ThemeManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -20,8 +20,11 @@ struct GameNightApp: App {
             .environmentObject(appState)
             .environmentObject(supabase)
             .environmentObject(themeManager)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(themeManager.preferredColorScheme)
             .tint(Theme.Colors.primary)
+            .onChange(of: themeManager.mode) { _, _ in
+                // Force tint update when theme changes
+            }
         }
     }
 }

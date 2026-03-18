@@ -194,7 +194,7 @@ struct EventDetailView: View {
             .disabled(viewModel.isDeleting)
 
             if viewModel.isDeleting {
-                Color.black.opacity(0.2)
+                Theme.Colors.overlay
                     .ignoresSafeArea()
 
                 VStack(spacing: Theme.Spacing.md) {
@@ -374,17 +374,9 @@ struct EventHeroHeader: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Background gradient
-            LinearGradient(
-                colors: [
-                    Theme.Colors.cardBackgroundHover,
-                    Theme.Colors.cardBackground,
-                    Theme.Colors.background
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 240)
+            // Clean background — flows naturally from page
+            Theme.Colors.background
+                .frame(height: 240)
 
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
@@ -501,7 +493,7 @@ struct DateBadge: View {
             VStack(spacing: 1) {
                 Text(dayOfWeek)
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Theme.Colors.error)
+                    .foregroundColor(Theme.Colors.dateAccent)
                 Text(dayNumber)
                     .font(.system(size: 26, weight: .heavy))
                     .foregroundColor(Theme.Colors.textPrimary)
@@ -518,7 +510,7 @@ struct DateBadge: View {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                             .stroke(Theme.Colors.divider, lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.1), radius: 4, y: 2)
+                    .shadow(color: .black.opacity(ThemeManager.shared.isDark ? 0.1 : 0.05), radius: 4, y: 2)
             )
 
             if let timeString {
@@ -535,10 +527,10 @@ struct DateBadge: View {
             if let relativeTime, !relativeTime.isEmpty {
                 Text(relativeTime.uppercased())
                     .font(.system(size: 10, weight: .heavy))
-                    .foregroundColor(Theme.Colors.background)
+                    .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(Theme.Colors.accent))
+                    .background(Capsule().fill(Theme.Colors.dateAccent))
             }
         }
     }

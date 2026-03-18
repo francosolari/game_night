@@ -72,15 +72,8 @@ struct ProfileView: View {
                             // TODO: Notification settings
                         }
 
-                        // Appearance
-                        SettingsRow(
-                            icon: "paintbrush.fill",
-                            title: "Appearance",
-                            subtitle: "Dark mode, accent color",
-                            color: Theme.Colors.warning
-                        ) {
-                            // TODO: Appearance settings
-                        }
+                        // Appearance — theme toggle
+                        ThemeToggleRow()
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
 
@@ -241,6 +234,45 @@ struct EditProfileSheet: View {
             displayName = appState.currentUser?.displayName ?? ""
             bio = appState.currentUser?.bio ?? ""
         }
+    }
+}
+
+// MARK: - Theme Toggle Row
+struct ThemeToggleRow: View {
+    @EnvironmentObject var themeManager: ThemeManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(spacing: Theme.Spacing.lg) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.dateAccent.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "paintbrush.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(Theme.Colors.dateAccent)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Appearance")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Text(themeManager.mode == .light ? "Light" : themeManager.mode == .dark ? "Dark" : "System")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+
+                Spacer()
+            }
+
+            Picker("Theme", selection: $themeManager.mode) {
+                ForEach(ThemeMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue.capitalized).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+        .cardStyle()
     }
 }
 

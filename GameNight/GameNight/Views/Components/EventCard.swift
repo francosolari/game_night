@@ -46,7 +46,7 @@ struct EventCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Cover / Header
                 ZStack(alignment: .bottomLeading) {
-                    // Gradient background
+                    // Gradient background with subtle warm tint
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                         .fill(Theme.Gradients.eventCard)
                         .frame(height: 140)
@@ -86,46 +86,44 @@ struct EventCard: View {
                         .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(1)
 
-                    // Time display
+                    // Time display — terracotta for dates
                     if let firstTime = event.timeOptions.first {
                         HStack(spacing: Theme.Spacing.sm) {
                             if event.scheduleMode == .fixed || event.timeOptions.count <= 1 {
-                                // Fixed: show date + time directly
                                 Image(systemName: "calendar")
                                     .font(.system(size: 13))
-                                    .foregroundColor(Theme.Colors.primary)
+                                    .foregroundColor(Theme.Colors.dateAccent)
 
                                 Text("\(firstTime.displayDate) \u{00B7} \(firstTime.displayTime)")
                                     .font(Theme.Typography.calloutMedium)
-                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .foregroundColor(Theme.Colors.dateAccent)
                             } else {
-                                // Poll: show option count
                                 Image(systemName: "chart.bar.fill")
                                     .font(.system(size: 13))
                                     .foregroundColor(Theme.Colors.accent)
 
                                 Text("\(event.timeOptions.count) time options")
                                     .font(Theme.Typography.calloutMedium)
-                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .foregroundColor(Theme.Colors.accent)
                             }
                         }
                     }
 
-                    // Location
+                    // Location — sage green
                     if let locationPresentation {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: "mappin")
                                 .font(.system(size: 13))
-                                .foregroundColor(Theme.Colors.secondary)
+                                .foregroundColor(Theme.Colors.primary)
 
                             Text(locationPresentation.title)
                                 .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textSecondary)
+                                .foregroundColor(Theme.Colors.primary)
                                 .lineLimit(1)
                         }
                     }
 
-                    // Games list
+                    // Games list — yellow star, colored complexity
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                         ForEach(event.games.prefix(2)) { eventGame in
                             if let game = eventGame.game {
@@ -133,7 +131,7 @@ struct EventCard: View {
                                     if eventGame.isPrimary {
                                         Image(systemName: "star.fill")
                                             .font(.system(size: 10))
-                                            .foregroundColor(Theme.Colors.warning)
+                                            .foregroundColor(Theme.Colors.highlight)
                                     }
                                     Text(game.name)
                                         .font(Theme.Typography.callout)

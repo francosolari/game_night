@@ -19,6 +19,7 @@
 		133E52FC137BE4A2BBF26C08 /* CreateEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E428E34778C2894B35484021 /* CreateEventView.swift */; };
 		160BF49B9AE94EDA37D53FFE /* GameVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DCF17A5CC08E893A25FFA /* GameVotingView.swift */; };
 		190119C668A74F1F6FE44FE1 /* HomeDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7662709E90472C3F5A6F3D9 /* HomeDataLoader.swift */; };
+		1F834BF50C8D07CCF689978E /* BrandGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C135DC91A4CA9B6DFFBC537 /* BrandGuide.swift */; };
 		200C8E68E07D69CF159A0223 /* SearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3493414C1EA4EA910807E03E /* SearchBar.swift */; };
 		2A0BF2968F29063F5E0CF737 /* GuestListTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3926C65D6513E68EE254B8FC /* GuestListTabsView.swift */; };
 		2AFFAA859950E22CF1030A51 /* PlayerCountIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0EA42EA853AC67A97206DA /* PlayerCountIndicator.swift */; };
@@ -105,6 +106,7 @@
 		15DEB0951CE98339F2E2354C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		16586A19CCD58B95C6E2F257 /* TimeOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeOptionTests.swift; sourceTree = "<group>"; };
 		1B6B8635260E038104AE269E /* FixtureFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureFactory.swift; sourceTree = "<group>"; };
+		1C135DC91A4CA9B6DFFBC537 /* BrandGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandGuide.swift; sourceTree = "<group>"; };
 		226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriStateVoteButton.swift; sourceTree = "<group>"; };
 		2469983DA1CC14996701E0FE /* EventViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventViewModel.swift; sourceTree = "<group>"; };
 		24832623E66C268D9044E240 /* EventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCard.swift; sourceTree = "<group>"; };
@@ -375,6 +377,7 @@
 		ADD85AC6B93155A12EA0D94A /* Theme */ = {
 			isa = PBXGroup;
 			children = (
+				1C135DC91A4CA9B6DFFBC537 /* BrandGuide.swift */,
 				320F17AF3B5B3C150DC53B6F /* ShimmerLayoutMetrics.swift */,
 				AFAFBC98FCB83FD971A6F753 /* Theme.swift */,
 				8EDAABF8B93412395C477350 /* ViewModifiers.swift */,
@@ -539,6 +542,7 @@
 				00AC9737F8B0CE07A7B7B450 /* ActivityFeedView.swift in Sources */,
 				F94FB46D73A94B95CAAB4410 /* AppState.swift in Sources */,
 				B8CB9F46799095CFDF66F26E /* BGGService.swift in Sources */,
+				1F834BF50C8D07CCF689978E /* BrandGuide.swift in Sources */,
 				98081CC0AB972190D03DABD9 /* ContactListSheet.swift in Sources */,
 				9B68501F3F9105CF25668A3A /* ContactPicker.swift in Sources */,
 				767F1544BB3B4EF53FECFD0D /* ContactPickerService.swift in Sources */,

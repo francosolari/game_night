@@ -17,7 +17,7 @@ struct HomeView: View {
                                 Text("Game Night")
                                     .font(Theme.Typography.displayLarge)
                                     .foregroundColor(Theme.Colors.textPrimary)
-                                
+
                                 Image("MeepleLogo")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
@@ -200,9 +200,14 @@ struct PendingInviteCard: View {
 
                 Spacer()
 
-                Text("RSVP")
-                    .font(Theme.Typography.label)
-                    .foregroundColor(Theme.Colors.primary)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Theme.Colors.highlight)
+                        .frame(width: 8, height: 8)
+                    Text("RSVP")
+                        .font(Theme.Typography.label)
+                        .foregroundColor(Theme.Colors.primary)
+                }
             }
 
             Text(invite.displayName ?? "Game Night")
@@ -216,7 +221,7 @@ struct PendingInviteCard: View {
                 Text("Respond soon")
                     .font(Theme.Typography.caption)
             }
-            .foregroundColor(Theme.Colors.warning)
+            .foregroundColor(Theme.Colors.dateAccent)
         }
         .cardStyle()
         .overlay(
@@ -257,12 +262,12 @@ struct DraftCard: View {
                     if !draft.games.isEmpty {
                         Label("\(draft.games.count)", systemImage: "gamecontroller")
                             .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textTertiary)
+                            .foregroundColor(Theme.Colors.primary)
                     }
                     if let invitees = draft.draftInvitees, !invitees.isEmpty {
                         Label("\(invitees.count)", systemImage: "person.2")
                             .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textTertiary)
+                            .foregroundColor(Theme.Colors.dateAccent)
                     }
                 }
 
