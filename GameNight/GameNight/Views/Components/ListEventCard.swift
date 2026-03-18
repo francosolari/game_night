@@ -19,6 +19,11 @@ struct ListEventCard: View {
         return .publicViewer
     }
 
+    private var eventIsPast: Bool {
+        let eventDate = event.timeOptions.first?.date ?? event.createdAt
+        return eventDate < Date()
+    }
+
     private var coverImageUrl: String? {
         event.coverImageUrl ?? event.games.first(where: { $0.isPrimary })?.game?.imageUrl ?? event.games.first?.game?.imageUrl
     }
@@ -32,7 +37,7 @@ struct ListEventCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
 
                     if let invite = myInvite {
-                        InviteStatusBadge(status: invite.status)
+                        InviteStatusBadge(status: invite.status, isPast: eventIsPast)
                             .scaleEffect(0.75)
                             .padding(2)
                     }

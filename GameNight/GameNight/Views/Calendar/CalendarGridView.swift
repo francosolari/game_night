@@ -33,7 +33,18 @@ struct EventCalendarGridView: View {
             // Selected day detail
             if let selectedDate = viewModel.selectedDate {
                 let dayEvents = viewModel.events(for: selectedDate)
-                if !dayEvents.isEmpty {
+                if dayEvents.isEmpty {
+                    VStack(spacing: Theme.Spacing.sm) {
+                        Text("No events this day")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                        Text("Why not schedule a game night?")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Spacing.xl)
+                } else {
                     CalendarDayDetailView(
                         date: selectedDate,
                         events: dayEvents,

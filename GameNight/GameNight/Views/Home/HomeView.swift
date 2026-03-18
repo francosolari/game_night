@@ -117,30 +117,66 @@ struct HomeView: View {
                             }
                         }
 
-                        // Next Up — horizontal carousel
-                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                            SectionHeader(title: "Next Up", action: "View all") {
-                                navigationPath.append(CalendarDestination())
-                            }
-                            .padding(.horizontal, Theme.Spacing.xl)
+                        // Next Up — horizontal carousel (future/today events only)
+                        let futureEvents = viewModel.upcomingEvents.filter { event in
+                            let eventDate = event.timeOptions.first?.date ?? event.createdAt
+                            return eventDate >= Calendar.current.startOfDay(for: Date())
+                        }
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: Theme.Spacing.md) {
-                                    ForEach(viewModel.upcomingEvents) { event in
-                                        CompactEventCard(
-                                            event: event,
-                                            myInvite: viewModel.invite(for: event.id),
-                                            confirmedCount: viewModel.confirmedCount(for: event.id)
-                                        ) {
-                                            navigationPath.append(event)
-                                        }
-                                        .frame(width: carouselCardWidth)
-                                    }
+                        if !futureEvents.isEmpty {
+                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                SectionHeader(title: "Next Up", action: "View all") {
+                                    navigationPath.append(CalendarDestination())
                                 }
                                 .padding(.horizontal, Theme.Spacing.xl)
-                                .scrollTargetLayout()
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: Theme.Spacing.md) {
+                                        ForEach(futureEvents) { event in
+                                            CompactEventCard(
+                                                event: event,
+                                                myInvite: viewModel.invite(for: event.id),
+                                                confirmedCount: viewModel.confirmedCount(for: event.id)
+                                            ) {
+                                                navigationPath.append(event)
+                                            }
+                                            .frame(width: carouselCardWidth)
+                                        }
+                                    }
+                                    .padding(.horizontal, Theme.Spacing.xl)
+                                    .scrollTargetLayout()
+                                }
+                                .scrollTargetBehavior(.viewAligned)
                             }
-                            .scrollTargetBehavior(.viewAligned)
+                        }
+
+                        // Hosting — events I'm hosting from upcoming
+                        let currentUserId = SupabaseService.shared.client.auth.currentSession?.user.id
+                        let hostingEvents = futureEvents.filter { $0.hostId == currentUserId }
+
+                        if !hostingEvents.isEmpty {
+                            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                                SectionHeader(title: "Hosting")
+                                    .padding(.horizontal, Theme.Spacing.xl)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: Theme.Spacing.md) {
+                                        ForEach(hostingEvents) { event in
+                                            CompactEventCard(
+                                                event: event,
+                                                myInvite: viewModel.invite(for: event.id),
+                                                confirmedCount: viewModel.confirmedCount(for: event.id)
+                                            ) {
+                                                navigationPath.append(event)
+                                            }
+                                            .frame(width: carouselCardWidth)
+                                        }
+                                    }
+                                    .padding(.horizontal, Theme.Spacing.xl)
+                                    .scrollTargetLayout()
+                                }
+                                .scrollTargetBehavior(.viewAligned)
+                            }
                         }
                     }
                 }

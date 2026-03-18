@@ -10,7 +10,7 @@ final class CalendarViewModel: ObservableObject {
     @Published var error: String?
 
     // MARK: - UI State
-    @Published var selectedDate: Date? = nil
+    @Published var selectedDate: Date? = Date()
     @Published var currentMonth: Date = Date()
     @Published var viewMode: ViewMode = .calendar
     @Published var searchQuery: String = ""
@@ -114,10 +114,12 @@ final class CalendarViewModel: ObservableObject {
 
     func events(for date: Date) -> [GameEvent] {
         let calendar = Calendar.current
-        return filteredEvents.filter { event in
-            guard let timeOption = event.timeOptions.first else { return false }
-            return calendar.isDate(timeOption.date, inSameDayAs: date)
-        }
+        return filteredEvents
+            .filter { event in
+                guard let timeOption = event.timeOptions.first else { return false }
+                return calendar.isDate(timeOption.date, inSameDayAs: date)
+            }
+            .sorted { eventSortDate($0) < eventSortDate($1) }
     }
 
     func hasEvents(on date: Date) -> Bool {
@@ -162,7 +164,7 @@ final class CalendarViewModel: ObservableObject {
     // MARK: - Helpers
 
     private func eventSortDate(_ event: GameEvent) -> Date {
-        event.timeOptions.first?.date ?? event.createdAt
+        event.timeOptions.first?.startTime ?? event.timeOptions.first?.date ?? event.createdAt
     }
 
     /// Returns events grouped by day for list mode
@@ -172,7 +174,7 @@ final class CalendarViewModel: ObservableObject {
             let eventDate = event.timeOptions.first?.date ?? event.createdAt
             return calendar.startOfDay(for: eventDate)
         }
-        return grouped.sorted { $0.key < $1.key }.map { (date: $0.key, events: $0.value) }
+        return grouped.sorted { $0.key < $1.key }.map { (date: $0.key, events: $0.value.sorted { eventSortDate($0) < eventSortDate($1) }) }
     }
 
     var todayIndex: Int? {

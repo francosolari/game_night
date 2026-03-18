@@ -181,12 +181,23 @@ struct EventCard: View {
 // MARK: - Invite Status Badge
 struct InviteStatusBadge: View {
     let status: InviteStatus
+    var isPast: Bool = false
+
+    private var displayLabel: String {
+        if isPast && status == .accepted { return "Went" }
+        return status.displayLabel
+    }
+
+    private var displayIcon: String {
+        if isPast && status == .accepted { return "checkmark.seal.fill" }
+        return status.icon
+    }
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: status.icon)
+            Image(systemName: displayIcon)
                 .font(.system(size: 10))
-            Text(status.displayLabel)
+            Text(displayLabel)
                 .font(Theme.Typography.caption2)
         }
         .foregroundColor(status.color)
