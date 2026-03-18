@@ -20,17 +20,56 @@ struct GenerativeEventCover: View {
         Pattern.allCases[patternIndex]
     }
 
-    /// Pick two theme-appropriate colors from a curated set
-    private var colorPair: (Color, Color) {
-        let pairs: [(Color, Color)] = [
-            (Theme.Colors.primary, Theme.Colors.primaryLight),
-            (Theme.Colors.accent, Theme.Colors.accentLight),
-            (Theme.Colors.primary, Theme.Colors.accent),
-            (Theme.Colors.accentLight, Theme.Colors.primaryLight),
-            (Theme.Colors.highlight.opacity(0.6), Theme.Colors.accent),
-            (Theme.Colors.primaryDark, Theme.Colors.primary),
+    // Extended palette — derived tints that complement the warm craft theme
+    // but add variety beyond sage/terracotta/yellow
+    private static let dustyBlue = Color(red: 0.45, green: 0.55, blue: 0.65)
+    private static let slate = Color(red: 0.35, green: 0.40, blue: 0.45)
+    private static let warmPlum = Color(red: 0.55, green: 0.35, blue: 0.45)
+    private static let deepPlum = Color(red: 0.40, green: 0.22, blue: 0.35)
+    private static let forest = Color(red: 0.25, green: 0.42, blue: 0.35)
+    private static let moss = Color(red: 0.40, green: 0.50, blue: 0.35)
+    private static let clay = Color(red: 0.65, green: 0.45, blue: 0.35)
+    private static let copper = Color(red: 0.60, green: 0.38, blue: 0.25)
+    private static let dusk = Color(red: 0.50, green: 0.40, blue: 0.55)
+    private static let ocean = Color(red: 0.30, green: 0.48, blue: 0.55)
+
+    /// Background gradient colors and a contrasting text color
+    /// Each tuple: (gradient start, gradient end, text color)
+    /// Text color is always chosen to contrast with the gradient.
+    private var colorScheme: (gradient0: Color, gradient1: Color, text: Color) {
+        let schemes: [(Color, Color, Color)] = [
+            // Sage gradient → terracotta text
+            (Theme.Colors.primary, Theme.Colors.primaryLight, Theme.Colors.accent),
+            // Terracotta gradient → dark sage text
+            (Theme.Colors.accent, Theme.Colors.accentLight, Theme.Colors.primaryDark),
+            // Dusty blue gradient → espresso text
+            (Self.dustyBlue, Self.slate, Theme.Colors.textPrimary),
+            // Warm plum gradient → cream/light text
+            (Self.warmPlum, Self.deepPlum, Theme.Colors.accentLight),
+            // Forest/moss gradient → terracotta text
+            (Self.forest, Self.moss, Theme.Colors.accent),
+            // Clay/copper gradient → dark sage text
+            (Self.clay, Self.copper, Theme.Colors.primaryDark),
+            // Dusk purple gradient → highlight text
+            (Self.dusk, Self.warmPlum, Theme.Colors.highlight),
+            // Ocean gradient → clay text
+            (Self.ocean, Self.dustyBlue, Self.clay),
+            // Yellow-warm gradient → espresso text
+            (Theme.Colors.highlight.opacity(0.6), Theme.Colors.accentLight, Theme.Colors.textPrimary),
+            // Sage/terracotta split → espresso text
+            (Theme.Colors.primary, Theme.Colors.accent, Theme.Colors.textPrimary),
+            // Slate/ocean gradient → terracotta text
+            (Self.slate, Self.ocean, Theme.Colors.accent),
+            // Moss/clay earthy gradient → deep plum text
+            (Self.moss, Self.clay, Self.deepPlum),
         ]
-        return pairs[seed % pairs.count]
+        let scheme = schemes[seed % schemes.count]
+        return (gradient0: scheme.0, gradient1: scheme.1, text: scheme.2)
+    }
+
+    // Keep colorPair for pattern drawing
+    private var colorPair: (Color, Color) {
+        (colorScheme.gradient0, colorScheme.gradient1)
     }
 
     private var rotationAngle: Double {
@@ -43,7 +82,7 @@ struct GenerativeEventCover: View {
             ZStack {
                 // Base gradient
                 LinearGradient(
-                    colors: [colorPair.0.opacity(0.3), colorPair.1.opacity(0.25)],
+                    colors: [colorScheme.gradient0.opacity(0.4), colorScheme.gradient1.opacity(0.35)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -170,7 +209,7 @@ struct GenerativeEventCover: View {
     }
 
     private var titleWeight: Font.Weight {
-        let weights: [Font.Weight] = [.black, .heavy, .bold, .ultraLight, .black, .heavy]
+        let weights: [Font.Weight] = [.black, .heavy, .bold, .semibold, .black, .heavy]
         return weights[(seed / 3) % weights.count]
     }
 
@@ -194,7 +233,7 @@ struct GenerativeEventCover: View {
 
         return Text(displayTitle.uppercased())
             .font(.system(size: fontSize, weight: titleWeight, design: titleDesign))
-            .foregroundColor(colorPair.0.opacity(0.22))
+            .foregroundColor(colorScheme.text.opacity(0.42))
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .minimumScaleFactor(0.4)
