@@ -164,20 +164,43 @@ struct GenerativeEventCover: View {
 
     // MARK: - Title decoration
 
+    private var titleDesign: Font.Design {
+        let designs: [Font.Design] = [.rounded, .serif, .monospaced, .default, .rounded, .serif]
+        return designs[(seed / 5) % designs.count]
+    }
+
+    private var titleWeight: Font.Weight {
+        let weights: [Font.Weight] = [.black, .heavy, .bold, .ultraLight, .black, .heavy]
+        return weights[(seed / 3) % weights.count]
+    }
+
+    private var titleRotation: Double {
+        let angles = [-8.0, -5.0, -3.0, 0.0, 3.0, 5.0, 8.0, -12.0, 6.0]
+        return angles[(seed / 7) % angles.count]
+    }
+
     private func titleDecoration(size: CGSize) -> some View {
         let displayTitle = title.isEmpty ? "Game Night" : title
-        let words = displayTitle.split(separator: " ")
-        let firstWord = String(words.first ?? "GN")
 
-        return Text(firstWord.uppercased())
-            .font(.system(size: size.width * 0.45, weight: .black, design: .rounded))
-            .foregroundColor(colorPair.0.opacity(0.12))
-            .rotationEffect(.degrees(rotationAngle))
-            .offset(
-                x: size.width * 0.05,
-                y: size.height * 0.05
-            )
-            .frame(width: size.width * 1.5, height: size.height * 1.5)
+        // Scale font to fit width with some overflow allowed
+        // Longer titles get smaller font, short titles get big dramatic font
+        let charCount = max(displayTitle.count, 1)
+        let baseFontSize = size.width * 0.38
+        let scaledSize = min(baseFontSize, size.width * 6.0 / CGFloat(charCount))
+        let fontSize = max(scaledSize, 16)
+
+        // Vertical offset: nudge down so text is centered-to-bottom, partially clipped
+        let yOffset = size.height * 0.12
+
+        return Text(displayTitle.uppercased())
+            .font(.system(size: fontSize, weight: titleWeight, design: titleDesign))
+            .foregroundColor(colorPair.0.opacity(0.22))
+            .multilineTextAlignment(.center)
+            .lineLimit(3)
+            .minimumScaleFactor(0.4)
+            .rotationEffect(.degrees(titleRotation))
+            .offset(y: yOffset)
+            .frame(width: size.width * 1.15, height: size.height * 1.1)
             .clipped()
     }
 }
