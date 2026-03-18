@@ -6,15 +6,10 @@ struct GameCard: View {
     var isPrimary: Bool = false
     var showAddButton: Bool = false
     var onAdd: (() -> Void)?
-    var onTap: (() -> Void)?
 
     var body: some View {
         content
             .cardStyle()
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onTap?()
-            }
     }
 
     private var content: some View {

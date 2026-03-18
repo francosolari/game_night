@@ -17,6 +17,9 @@ struct GameNightApp: App {
                     OnboardingView()
                 }
             }
+            .task {
+                await appState.checkAuthState()
+            }
             .environmentObject(appState)
             .environmentObject(supabase)
             .environmentObject(themeManager)

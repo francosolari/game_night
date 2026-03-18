@@ -103,7 +103,7 @@ struct GameLibraryView: View {
                             ForEach(viewModel.filteredEntries) { entry in
                                 if let game = entry.game {
                                     NavigationLink(value: game) {
-                                        GameCard(game: game, onTap: {})
+                                        GameCard(game: game)
                                     }
                                     .buttonStyle(.plain)
                                     .swipeActions(edge: .trailing) {
@@ -385,4 +385,3 @@ struct CreateCategorySheet: View {
         }
     }
 }
-
