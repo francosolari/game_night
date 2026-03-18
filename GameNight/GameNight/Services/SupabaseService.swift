@@ -28,6 +28,11 @@ protocol EventEditingProviding: AnyObject {
     func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws
 }
 
+private struct BetaUserPayload: Encodable {
+    let phone: String
+    let password: String
+}
+
 private struct EventSoftDeletePatch: Encodable {
     let deletedAt: Date
     let status: EventStatus
@@ -54,6 +59,42 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         )
     }
 
+    func ensureBetaUser(phoneNumber: String, password: String) async throws {
+        guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Beta shared secret or service role key not configured"]
+            )
+        }
+
+        var request = URLRequest(url: try betaEnsureUserURL())
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
+        request.httpBody = try JSONEncoder().encode(BetaUserPayload(phone: phoneNumber, password: password))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid beta ensure response"]
+            )
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let message = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
+            throw NSError(
+                domain: "SupabaseService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: message]
+            )
+        }
+    }
+
     // MARK: - Auth
 
     func currentUserId() async throws -> UUID {
@@ -76,10 +117,31 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     // MARK: - Password Auth (Beta Bypass)
 
     func signUpWithPassword(phoneNumber: String, password: String) async throws {
-        try await client.auth.signUp(
-            phone: phoneNumber,
-            password: password
-        )
+        do {
+            try await client.auth.signUp(
+                phone: phoneNumber,
+                password: password
+            )
+            print("✅ [SupabaseService] Successfully signed up user with phone: \(phoneNumber).")
+        } catch let errorCode as Auth.ErrorCode { // Catch Auth.ErrorCode directly and use switch
+            switch errorCode {
+            case .smsSendFailed:
+                // Log the bypass for beta sign-up due to SMS send failure.
+                // This is intended behavior for beta users to bypass OTP.
+                print("⚠️ [SupabaseService] SMS send failed for \(phoneNumber) (error: \(errorCode)). Bypassing OTP for beta sign-up.")
+                // We treat this as a success for the beta flow as OTP is intentionally bypassed.
+            // If there are other Auth.ErrorCode cases that should also be bypassed for beta, they can be added here.
+            default:
+                // Re-throw other Auth.ErrorCode cases
+                print("❌ [SupabaseService] Unhandled Supabase Auth Error Code during signUpWithPassword: \(errorCode)")
+                // Wrap the specific Auth.ErrorCode in a general Error for rethrowing
+                throw NSError(domain: "com.supabase.AuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unhandled Auth Error Code: \(errorCode)"])
+            }
+        } catch {
+            // Catch any other non-Auth.ErrorCode errors
+            print("❌ [SupabaseService] Unexpected error during signUpWithPassword: \(error)")
+            throw error
+        }
     }
 
     func signInWithPassword(phoneNumber: String, password: String) async throws {
@@ -154,6 +216,26 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             ),
             decoder: decoder
         )
+    }
+
+    private func betaEnsureUserURL() throws -> URL {
+        guard var components = URLComponents(url: Secrets.supabaseURL, resolvingAgainstBaseURL: false) else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid Supabase URL"]
+            )
+        }
+        components.path = "/functions/v1/beta-ensure-user"
+        components.query = nil
+        guard let url = components.url else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to build beta function URL"]
+            )
+        }
+        return url
     }
 
     // MARK: - Events

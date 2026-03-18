@@ -975,32 +975,31 @@ struct BetaAuthFlowView: View {
     private func signUpOrIn() async {
         isLoading = true
         error = nil
+
         do {
-            // Try sign in first (returning user)
+            try await SupabaseService.shared.ensureBetaUser(
+                phoneNumber: fullPhoneNumber,
+                password: correctPassword
+            )
             try await SupabaseService.shared.signInWithPassword(
                 phoneNumber: fullPhoneNumber,
                 password: correctPassword
             )
+
             if let existingUser = try? await SupabaseService.shared.fetchCurrentUser() {
                 appState.currentUser = existingUser
                 appState.isAuthenticated = true
                 dismiss()
+                isLoading = false
                 return
-            }
-            withAnimation(Theme.Animation.snappy) { step = .name }
-        } catch {
-            // Sign in failed — try sign up (new user)
-            do {
-                try await SupabaseService.shared.signUpWithPassword(
-                    phoneNumber: fullPhoneNumber,
-                    password: correctPassword
-                )
+            } else {
                 withAnimation(Theme.Animation.snappy) { step = .name }
-            } catch let signUpError {
-                print("❌ [betaAuth] signUp error: \(signUpError)")
-                self.error = "Something went wrong. Try again."
             }
+        } catch let signInError {
+            print("❌ [betaAuth] ensure/sign-in error: \(signInError)")
+            self.error = "Something went wrong. Please try again."
         }
+
         isLoading = false
     }
 
