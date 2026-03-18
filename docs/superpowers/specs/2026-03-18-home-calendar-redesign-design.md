@@ -52,16 +52,16 @@ Each building block uses this to control font size, icon size, spacing, and deta
 
 #### EventLocationLabel
 - **Input:** `GameEvent`, optional `Invite` (for RSVP status)
-- **Logic:**
+- **Logic:** Reuse existing `EventAccessPolicy` (in `Models/EventAccessPolicy.swift`) to determine location visibility. Specifically use `EventAccessPolicy.canViewFullAddress` to decide between city-only and full location display:
   - If no location set: show "TBD"
-  - If user has NOT RSVP'd (invite is nil, or status is `.pending`): extract and show city only from `location` or `locationAddress`
-  - If user HAS RSVP'd (`.accepted`, `.maybe`): show full `location` name
+  - If `canViewFullAddress` is false (not RSVP'd): extract and show city only from `location` or `locationAddress`
+  - If `canViewFullAddress` is true (accepted/maybe): show full `location` name
 - **Display:** Map pin icon + location text in `textSecondary`
 - **Compact:** Single line, truncated
 - **Standard:** Single line, slightly more room
 
 #### PlayerCountIndicator
-- **Input:** Current RSVP count (Int), `minPlayers` (Int), `maxPlayers` (Int?)
+- **Input:** Confirmed RSVP count (Int — count of `.accepted` invites only; `.maybe` does NOT count toward filled slots), `minPlayers` (Int), `maxPlayers` (Int?)
 - **Adaptive display based on max player count:**
   - **≤6 max players:** Row of meeple/person SF Symbol icons
     - Filled icons in `success` color (sage) = confirmed RSVPs
@@ -144,10 +144,10 @@ Two layout shells that compose the building blocks.
 ### 2.3 Inputs
 
 Both shells take:
-- `GameEvent` — the event data
+- `GameEvent` — the event data (includes `minPlayers`, `maxPlayers` fields used by `PlayerCountIndicator`)
 - `Invite?` — current user's invite (for RSVP status, location visibility)
 - `User?` — current user (to determine if hosting)
-- `Int` — RSVP count for player indicator (computed from invites)
+- `Int` — confirmed RSVP count for player indicator (count of `.accepted` invites, computed by the parent view/viewmodel)
 
 ---
 
@@ -170,7 +170,7 @@ When the Home tab bar button is tapped while already on the Home tab:
 - Reset the `NavigationPath` to empty, popping back to root `HomeView`
 - This ensures tapping Home always returns to the base Home page, even if the user is deep in an event detail or Calendar view
 
-**Implementation:** Track selected tab in `MainTabView`. On Home tab tap, check if already selected — if so, set `NavigationPath` to empty. The Home tab's `NavigationStack` uses this shared path.
+**Implementation:** Lift the `NavigationStack` out of `HomeView` (which currently owns it at line 10) and into `MainTabView`. `MainTabView` owns the `@State var homeNavigationPath: NavigationPath` and passes it as a binding to `HomeView`. Track selected tab — on Home tab tap, check if already selected; if so, set `homeNavigationPath` to empty. `HomeView` becomes a plain `ScrollView` content view without its own `NavigationStack`.
 
 ### 3.3 Sections Unchanged
 
@@ -200,12 +200,12 @@ When the Home tab bar button is tapped while already on the Home tab:
 - Swipe horizontally or vertically to navigate months
 - **Today** highlighted with a subtle accent ring/background
 - **Days with events** show:
-  - A small (~16pt) SF Symbol icon based on primary game's category:
-    - Board games: `dice` icon
-    - Card games: `suit.spade` or `rectangle.stack` icon
-    - Puzzle/escape: `puzzlepiece` icon
-    - Party/social: `person.3` icon
-    - Fallback: `gamecontroller` icon
+  - A small (~16pt) SF Symbol icon based on primary game's `categories` field (the `Game` model has `categories: [String]`). Map the first matching category string:
+    - Contains "Strategy" or "Board": `dice` icon
+    - Contains "Card": `suit.spade` icon
+    - Contains "Puzzle" or "Escape": `puzzlepiece` icon
+    - Contains "Party" or "Social": `person.3` icon
+    - Fallback (no match or no primary game): `gamecontroller` icon
   - A tiny RSVP-status colored dot underneath the icon:
     - Sage (success) = accepted/going
     - Terracotta (dateAccent) = pending/invited
@@ -223,7 +223,7 @@ Toggled via a floating button cluster in the bottom-right corner (two icons: cal
 - **"Today" divider:** A horizontal line with "Today" label centered, separating past from future events
 - **Auto-anchor:** On open, scrolls to the "Today" divider
 - **Past events:** Shown above Today with slightly reduced opacity (~0.7)
-- **Infinite scroll:** Loads more events in both directions as user scrolls
+- **Scrollable:** All events are loaded in-memory (CalendarViewModel fetches all events client-side), rendered in a single scrollable list — no pagination needed
 
 ### 4.4 Filter Sheet
 
@@ -237,7 +237,7 @@ Presented as a bottom sheet when the filter icon is tapped.
 | Attending | accepted |
 | Deciding | pending, maybe |
 | Waiting on host | waitlisted |
-| Not going (OFF by default) | declined, expired, cancelled |
+| Not going (OFF by default) | declined, expired (InviteStatus values); also includes events with EventStatus.cancelled |
 
 - **"Reset"** button (bottom-left) — restores defaults
 - **"Done"** button (bottom-right) — applies filters and dismisses
@@ -271,10 +271,11 @@ Presented as a bottom sheet when the filter icon is tapped.
 
 ### Navigation Path
 
-- `HomeView` wraps content in a `NavigationStack(path: $navigationPath)`
-- `CalendarView` is a navigation destination
+- `MainTabView` owns the `NavigationStack(path: $homeNavigationPath)` wrapping `HomeView`
+- `HomeView` receives `homeNavigationPath` as a `Binding` — it no longer creates its own `NavigationStack`
+- `CalendarView` is a navigation destination within that stack
 - Event detail pages are also navigation destinations (already exist)
-- Home tab reset clears `navigationPath`
+- Home tab reset clears `homeNavigationPath`
 
 ---
 
