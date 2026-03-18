@@ -196,12 +196,14 @@ struct AuthFlowView: View {
     @State private var phoneNumber = ""
     @State private var countryCode = "+1"
     @State private var otpDigits: [String] = Array(repeating: "", count: 6)
+    @State private var otpFullCode: String = ""
     @State private var displayName = ""
     @State private var isLoading = false
     @State private var error: String?
     @State private var otpTimer = 0
     @State private var timerTask: Task<Void, Never>?
     @FocusState private var focusedOTPIndex: Int?
+    @FocusState private var otpFieldFocused: Bool
     @FocusState private var phoneFieldFocused: Bool
     @FocusState private var nameFieldFocused: Bool
 
@@ -329,6 +331,7 @@ struct AuthFlowView: View {
 
                 TextField("(555) 123-4567", text: $phoneNumber)
                     .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
                     .font(Theme.Typography.headlineLarge)
                     .foregroundColor(Theme.Colors.textPrimary)
                     .focused($phoneFieldFocused)
@@ -388,31 +391,57 @@ struct AuthFlowView: View {
                     .foregroundColor(Theme.Colors.textSecondary)
             }
 
-            // OTP boxes
-            HStack(spacing: Theme.Spacing.sm) {
-                ForEach(0..<6, id: \.self) { index in
-                    OTPDigitBox(
-                        digit: $otpDigits[index],
-                        isFocused: focusedOTPIndex == index,
-                        onType: { char in
-                            otpDigits[index] = String(char.prefix(1))
-                            if !char.isEmpty && index < 5 {
-                                focusedOTPIndex = index + 1
+            // Hidden TextField for autocomplete
+            ZStack {
+                // Visual OTP boxes
+                HStack(spacing: Theme.Spacing.sm) {
+                    ForEach(0..<6, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(Theme.Colors.fieldBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                    .stroke(
+                                        otpFieldFocused ? Theme.Colors.primary : (otpDigits[index].isEmpty ? Theme.Colors.divider : Theme.Colors.primary.opacity(0.3)),
+                                        lineWidth: otpFieldFocused ? 2 : 1
+                                    )
+                            )
+                            .frame(width: 48, height: 56)
+                            .overlay(
+                                Text(otpDigits[index])
+                                    .font(Theme.Typography.displaySmall)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+                            )
+                    }
+                }
+                
+                // Hidden TextField for autocomplete
+                TextField("", text: $otpFullCode)
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .focused($otpFieldFocused)
+                    .opacity(0.01)
+                    .onChange(of: otpFullCode) { _, newValue in
+                        let filtered = String(newValue.filter(\.isNumber).prefix(6))
+                        if filtered.count <= 6 {
+                            otpFullCode = filtered
+                            // Split the code into individual digits
+                            for i in 0..<6 {
+                                if i < filtered.count {
+                                    let index = filtered.index(filtered.startIndex, offsetBy: i)
+                                    otpDigits[i] = String(filtered[index])
+                                } else {
+                                    otpDigits[i] = ""
+                                }
                             }
                             // Auto-submit when all filled
-                            if otpDigits.allSatisfy({ !$0.isEmpty }) {
+                            if filtered.count == 6 {
                                 Task { await verifyCode() }
                             }
-                        },
-                        onBackspace: {
-                            if otpDigits[index].isEmpty && index > 0 {
-                                focusedOTPIndex = index - 1
-                            }
-                            otpDigits[index] = ""
                         }
-                    )
-                    .focused($focusedOTPIndex, equals: index)
-                }
+                    }
+                    .onTapGesture {
+                        otpFieldFocused = true
+                    }
             }
 
             if let error {
@@ -449,7 +478,7 @@ struct AuthFlowView: View {
             }
         }
         .onAppear {
-            focusedOTPIndex = 0
+            otpFieldFocused = true
             startResendTimer()
         }
     }
@@ -527,7 +556,7 @@ struct AuthFlowView: View {
     }
 
     private var otpCode: String {
-        otpDigits.joined()
+        otpFullCode.isEmpty ? otpDigits.joined() : otpFullCode
     }
 
     // MARK: - Actions
@@ -565,7 +594,8 @@ struct AuthFlowView: View {
             print("❌ [verifyCode] \(err)")
             self.error = "Invalid code. Please try again."
             otpDigits = Array(repeating: "", count: 6)
-            focusedOTPIndex = 0
+            otpFullCode = ""
+            otpFieldFocused = true
         }
         isLoading = false
     }
@@ -644,6 +674,7 @@ struct OTPDigitBox: View {
 
             TextField("", text: $fieldText)
                 .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
                 .multilineTextAlignment(.center)
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)

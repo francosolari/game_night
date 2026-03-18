@@ -37,7 +37,7 @@ struct PlayerCountIndicator: View {
     private var compactView: some View {
         VStack(alignment: .trailing, spacing: 2) {
             HStack(spacing: 3) {
-                Image(systemName: "person.fill")
+                Image(systemName: hasQuorum ? "checkmark.circle.fill" : "person.fill")
                     .font(.system(size: 9))
                     .foregroundColor(statusColor)
 
@@ -59,7 +59,7 @@ struct PlayerCountIndicator: View {
     private var standardView: some View {
         VStack(alignment: .trailing, spacing: 3) {
             HStack(spacing: 3) {
-                Image(systemName: "person.fill")
+                Image(systemName: hasQuorum ? "checkmark.circle.fill" : "person.fill")
                     .font(.system(size: size == .expanded ? 12 : 10))
                     .foregroundColor(statusColor)
 
@@ -126,11 +126,11 @@ struct PlayerCountIndicator: View {
             // Filled — player confirmed
             return statusColor
         } else if index < minPlayers {
-            // Unfilled but needed — show as faded status color
-            return statusColor.opacity(0.25)
+            // Unfilled but needed — clearly visible as required slots
+            return statusColor.opacity(0.45)
         } else {
             // Optional slot beyond minimum
-            return Theme.Colors.textTertiary.opacity(0.15)
+            return Theme.Colors.textTertiary.opacity(0.25)
         }
     }
 }
