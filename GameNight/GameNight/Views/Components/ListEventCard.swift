@@ -99,24 +99,10 @@ struct ListEventCard: View {
             AsyncImage(url: url) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
-                gradientPlaceholder
+                GenerativeEventCover(title: event.title, eventId: event.id)
             }
         } else {
-            gradientPlaceholder
+            GenerativeEventCover(title: event.title, eventId: event.id)
         }
-    }
-
-    private var gradientPlaceholder: some View {
-        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-            .fill(Theme.Gradients.eventCard)
-            .overlay {
-                if let game = event.games.first?.game {
-                    GameThumbnail(url: game.thumbnailUrl, size: 32)
-                } else {
-                    Image(systemName: "dice.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Theme.Colors.textTertiary.opacity(0.5))
-                }
-            }
     }
 }
