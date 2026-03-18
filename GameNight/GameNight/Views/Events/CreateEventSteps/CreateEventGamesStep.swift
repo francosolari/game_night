@@ -29,7 +29,7 @@ struct CreateEventGamesStep: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.backgroundElevated)
+                                .fill(Theme.Colors.fieldBackground)
                         )
 
                     Button {

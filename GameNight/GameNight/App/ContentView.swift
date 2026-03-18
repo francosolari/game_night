@@ -71,7 +71,7 @@ struct CustomTabBar: View {
 
                     Image(systemName: "plus")
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.Colors.primaryActionText)
                 }
             }
             .offset(y: -16)
@@ -92,7 +92,7 @@ struct CustomTabBar: View {
         .padding(.top, 8)
         .padding(.bottom, 4)
         .background(
-            Theme.Colors.cardBackground
+            Theme.Colors.tabBarBackground
                 .shadow(color: .black.opacity(ThemeManager.shared.isDark ? 0.3 : 0.08), radius: 20, y: -5)
                 .ignoresSafeArea()
         )

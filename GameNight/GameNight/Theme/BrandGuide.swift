@@ -51,40 +51,52 @@ struct BrandGuide {
     // MARK: - Dark Palette (Original)
     struct Dark {
         // Backgrounds
-        static let background        = "#08090A"
-        static let backgroundElevated = "#121316"
-        static let cardBackground    = "#1C1D21"
-        static let cardBackgroundHover = "#25262B"
+        static let background         = "#14110F"  // warm near-black
+        static let backgroundElevated = "#1B1714"  // slightly lifted base
+        static let cardBackground     = "#231E1A"  // primary card surface
+        static let cardBackgroundHover = "#2A241F" // pressed/hover surface
 
-        // Primary — electric blue
-        static let primary      = "#3B82F6"
-        static let primaryLight = "#60A5FA"
-        static let primaryDark  = "#2563EB"
+        // Surface details
+        static let inputBackground    = "#2B2520"
+        static let chipBackground     = "#312A24"
+        static let border             = "#3A312B"
+        static let divider            = "#332B25"
 
-        // Secondary — slate
-        static let secondary      = "#64748B"
-        static let secondaryLight = "#94A3B8"
+        // Brand accents
+        static let primary      = "#8FA576"  // luminous sage
+        static let primaryLight = "#A5BA8D"
+        static let primaryDark  = "#73885E"
 
-        // Accent — teal
-        static let accent      = "#14B8A6"
-        static let accentLight = "#2DD4BF"
+        static let secondaryAccent      = "#D08A68" // softened terracotta
+        static let secondaryAccentLight = "#DEA081"
+        static let secondaryAccentDark  = "#B87454"
 
-        // Status
-        static let success = "#10B981"
-        static let warning = "#F59E0B"
-        static let error   = "#EF4444"
+        static let highlight    = "#D7C86A" // antique brass, use sparingly
 
         // Text
-        static let textPrimary   = "#F8FAFC"
-        static let textSecondary = "#94A3B8"
-        static let textTertiary  = "#64748B"
+        static let textPrimary   = "#F3EDE3" // warm ivory
+        static let textSecondary = "#C7B8A6" // muted warm beige
+        static let textTertiary  = "#9F8D7A" // metadata
+        static let textDisabled  = "#766759"
+
+        // Status
+        static let success = "#8FA576"
+        static let warning = "#D08A68"
+        static let error   = "#C56B5C"
 
         // Complexity scale
-        static let complexityLight       = "#10B981"
-        static let complexityMediumLight = "#84CC16"
-        static let complexityMedium      = "#F59E0B"
-        static let complexityMediumHeavy = "#F97316"
-        static let complexityHeavy       = "#EF4444"
+        static let complexityLight       = "#8FA576"
+        static let complexityMediumLight = "#A7B56A"
+        static let complexityMedium      = "#C9A35B"
+        static let complexityMediumHeavy = "#D08A68"
+        static let complexityHeavy       = "#C56B5C"
+
+        // Special surfaces
+        static let headerBackground = "#181310"
+        static let headerText       = "#F3EDE3"
+        static let tabBarBackground = "#1A1512"
+        static let tabIconInactive  = "#A28F7A"
+        static let tabIconActive    = "#8FA576"
     }
 
     // MARK: - Color Roles

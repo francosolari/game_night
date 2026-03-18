@@ -218,7 +218,7 @@ struct LocationDetailsView: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.cardBackgroundHover)
+                                .fill(Theme.Colors.fieldBackground)
                         )
                 }
                 
@@ -231,7 +231,7 @@ struct LocationDetailsView: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.cardBackgroundHover)
+                                .fill(Theme.Colors.fieldBackground)
                         )
                 }
             }
@@ -448,7 +448,7 @@ struct CustomLocationEditSheet: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.cardBackgroundHover)
+                                .fill(Theme.Colors.fieldBackground)
                         )
                 }
 
@@ -461,7 +461,7 @@ struct CustomLocationEditSheet: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.cardBackgroundHover)
+                                .fill(Theme.Colors.fieldBackground)
                         )
                 }
             }

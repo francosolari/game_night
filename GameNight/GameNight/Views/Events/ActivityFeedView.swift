@@ -279,7 +279,7 @@ private struct CommentInputBar: View {
                     .padding(.vertical, Theme.Spacing.sm)
                     .background(
                         Capsule()
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                             .overlay(
                                 Capsule()
                                     .stroke(Theme.Colors.divider, lineWidth: 1)

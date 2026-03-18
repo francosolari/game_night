@@ -501,7 +501,7 @@ struct AddInviteeField: View {
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                     )
 
                 TextField("Phone", text: $phone)
@@ -510,7 +510,7 @@ struct AddInviteeField: View {
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                     )
 
                 Button {

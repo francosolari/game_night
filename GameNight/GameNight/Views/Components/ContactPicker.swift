@@ -24,7 +24,7 @@ struct ContactRow: View {
                             .overlay(
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(Theme.Colors.primaryActionText)
                             )
                     }
                 }

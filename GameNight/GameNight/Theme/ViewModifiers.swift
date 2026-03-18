@@ -46,7 +46,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.Typography.bodySemibold)
-            .foregroundColor(.white)
+            .foregroundColor(Theme.Colors.primaryActionText)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background(
@@ -85,16 +85,21 @@ struct SageSegmentedStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                let sage = UIColor(Theme.Colors.primary)
-                let sand = UIColor(Theme.Colors.backgroundElevated)
-                UISegmentedControl.appearance().selectedSegmentTintColor = sage
-                UISegmentedControl.appearance().backgroundColor = sand
+                let appearance = UISegmentedControl.appearance()
+                let isDark = ThemeManager.shared.isDark
+                let selectedTint = UIColor(isDark ? Theme.Colors.selectedSegmentBackground : Theme.Colors.primaryAction)
+                let background = UIColor(isDark ? Theme.Colors.fieldBackground : Theme.Colors.elevatedBackground)
+                let selectedText = UIColor(isDark ? Theme.Colors.textPrimary : Theme.Colors.primaryActionText)
+                let normalText = UIColor(isDark ? Theme.Colors.tabInactive : Theme.Colors.textSecondary)
+
+                appearance.selectedSegmentTintColor = selectedTint
+                appearance.backgroundColor = background
                 UISegmentedControl.appearance().setTitleTextAttributes(
-                    [.foregroundColor: UIColor.white],
+                    [.foregroundColor: selectedText],
                     for: .selected
                 )
                 UISegmentedControl.appearance().setTitleTextAttributes(
-                    [.foregroundColor: UIColor(Theme.Colors.textSecondary)],
+                    [.foregroundColor: normalText],
                     for: .normal
                 )
             }

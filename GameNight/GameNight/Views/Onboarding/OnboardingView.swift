@@ -335,7 +335,7 @@ struct AuthFlowView: View {
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                             .overlay(
                                 RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                                     .stroke(phoneFieldFocused ? Theme.Colors.primary.opacity(0.5) : .clear, lineWidth: 1.5)
@@ -477,7 +477,7 @@ struct AuthFlowView: View {
                 .padding(Theme.Spacing.lg)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                        .fill(Theme.Colors.backgroundElevated)
+                        .fill(Theme.Colors.fieldBackground)
                         .overlay(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                                 .stroke(nameFieldFocused ? Theme.Colors.primary.opacity(0.5) : .clear, lineWidth: 1.5)
@@ -632,7 +632,7 @@ struct OTPDigitBox: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .fill(Theme.Colors.backgroundElevated)
+                .fill(Theme.Colors.fieldBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                         .stroke(

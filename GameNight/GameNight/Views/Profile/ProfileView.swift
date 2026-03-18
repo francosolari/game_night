@@ -184,7 +184,7 @@ struct EditProfileSheet: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.backgroundElevated)
+                                .fill(Theme.Colors.fieldBackground)
                         )
                 }
 
@@ -198,7 +198,7 @@ struct EditProfileSheet: View {
                         .padding(Theme.Spacing.md)
                         .background(
                             RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.backgroundElevated)
+                                .fill(Theme.Colors.fieldBackground)
                         )
                 }
 
@@ -271,6 +271,7 @@ struct ThemeToggleRow: View {
                 }
             }
             .pickerStyle(.segmented)
+            .sageSegmented()
         }
         .cardStyle()
     }
@@ -303,7 +304,7 @@ struct LinkBGGSheet: View {
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                     )
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)

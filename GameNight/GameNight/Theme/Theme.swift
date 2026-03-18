@@ -11,23 +11,23 @@ enum ThemeMode: String, CaseIterable {
 /// Defines all semantic colors that both light and dark themes must provide.
 protocol Palette {
     // Backgrounds
-    var background: Color { get }
-    var backgroundElevated: Color { get }
+    var pageBackground: Color { get }
+    var elevatedBackground: Color { get }
     var cardBackground: Color { get }
     var cardBackgroundHover: Color { get }
+    var fieldBackground: Color { get }
+    var selectedSegmentBackground: Color { get }
+    var tabBarBackground: Color { get }
 
-    // Primary accent (CTA, links, active states)
-    var primary: Color { get }
-    var primaryLight: Color { get }
-    var primaryDark: Color { get }
+    // Actions
+    var primaryAction: Color { get }
+    var primaryActionLight: Color { get }
+    var primaryActionPressed: Color { get }
+    var primaryActionText: Color { get }
 
-    // Secondary
-    var secondary: Color { get }
-    var secondaryLight: Color { get }
-
-    // Accent (secondary interactive)
-    var accent: Color { get }
-    var accentLight: Color { get }
+    // Accent
+    var accentWarm: Color { get }
+    var accentWarmLight: Color { get }
 
     // Status
     var success: Color { get }
@@ -38,13 +38,13 @@ protocol Palette {
     var textPrimary: Color { get }
     var textSecondary: Color { get }
     var textTertiary: Color { get }
+    var textDisabled: Color { get }
 
     // Divider & overlay
-    var divider: Color { get }
+    var border: Color { get }
     var overlay: Color { get }
 
     // Semantic roles
-    var dateAccent: Color { get }         // Dates, times, urgency
     var highlight: Color { get }          // Yellow — dots, stars, emphasis
     var tabInactive: Color { get }        // Inactive tab icon/label
     var headerBackground: Color { get }   // Bold header bar
@@ -65,96 +65,117 @@ protocol Palette {
     var accentSubtle: Color { get }
 }
 
+extension Palette {
+    // Compatibility aliases for the existing app theme API.
+    var background: Color { pageBackground }
+    var backgroundElevated: Color { elevatedBackground }
+
+    var primary: Color { primaryAction }
+    var primaryLight: Color { primaryActionLight }
+    var primaryDark: Color { primaryActionPressed }
+
+    var secondary: Color { textTertiary }
+    var secondaryLight: Color { textDisabled }
+
+    var accent: Color { accentWarm }
+    var accentLight: Color { accentWarmLight }
+
+    var divider: Color { border }
+    var dateAccent: Color { accentWarm }
+}
+
 // MARK: - Light Palette (Warm Craft)
 struct LightPalette: Palette {
-    let background = Color(hex: "FAF7F2")          // Cream
-    let backgroundElevated = Color(hex: "EDE6DA")   // Sand
-    let cardBackground = Color(hex: "EDE6DA")       // Sand
-    let cardBackgroundHover = Color(hex: "E3DACB")  // Deeper sand
+    let pageBackground = Color(hex: BrandGuide.Warm.cream)
+    let elevatedBackground = Color(hex: BrandGuide.Warm.sand)
+    let cardBackground = Color(hex: BrandGuide.Warm.sand)
+    let cardBackgroundHover = Color(hex: BrandGuide.Warm.deepSand)
+    let fieldBackground = Color(hex: BrandGuide.Warm.sand)
+    let selectedSegmentBackground = Color(hex: BrandGuide.Warm.sage)
+    let tabBarBackground = Color(hex: BrandGuide.Warm.sand)
 
-    let primary = Color(hex: "7E9163")              // Sage green
-    let primaryLight = Color(hex: "95A87A")
-    let primaryDark = Color(hex: "6A7D50")
+    let primaryAction = Color(hex: BrandGuide.Warm.sage)
+    let primaryActionLight = Color(hex: BrandGuide.Warm.sageLight)
+    let primaryActionPressed = Color(hex: BrandGuide.Warm.sageDark)
+    let primaryActionText = Color.white
 
-    let secondary = Color(hex: "8B6F4E")            // Cardboard
-    let secondaryLight = Color(hex: "B09A7D")       // Tan
+    let accentWarm = Color(hex: BrandGuide.Warm.terracotta)
+    let accentWarmLight = Color(hex: BrandGuide.Warm.terracottaLight)
 
-    let accent = Color(hex: "C4704B")               // Terracotta
-    let accentLight = Color(hex: "D4886A")
+    let success = Color(hex: BrandGuide.Warm.success)
+    let warning = Color(hex: BrandGuide.Warm.warning)
+    let error = Color(hex: BrandGuide.Warm.error)
 
-    let success = Color(hex: "7E9163")              // Sage
-    let warning = Color(hex: "C4704B")              // Terracotta
-    let error = Color(hex: "B5433A")                // Warm red
+    let textPrimary = Color(hex: BrandGuide.Warm.espresso)
+    let textSecondary = Color(hex: BrandGuide.Warm.mediumBrown)
+    let textTertiary = Color(hex: BrandGuide.Warm.cardboard)
+    let textDisabled = Color(hex: BrandGuide.Warm.mutedTan)
 
-    let textPrimary = Color(hex: "2C1F14")          // Dark espresso
-    let textSecondary = Color(hex: "5C4433")        // Medium brown
-    let textTertiary = Color(hex: "8B6F4E")         // Cardboard
-
-    let divider = Color(hex: "DDD3C3")              // Border sand
+    let border = Color(hex: BrandGuide.Warm.borderSand)
     let overlay = Color.black.opacity(0.3)
 
-    let dateAccent = Color(hex: "C4704B")           // Terracotta
-    let highlight = Color(hex: "F8E945")            // Yellow
-    let tabInactive = Color(hex: "B09A7D")          // Muted tan
-    let headerBackground = Color(hex: "2C1F14")     // Dark espresso
-    let headerText = Color(hex: "FAF7F2")           // Cream
+    let highlight = Color(hex: BrandGuide.Warm.yellow)
+    let tabInactive = Color(hex: BrandGuide.Warm.mutedTan)
+    let headerBackground = Color(hex: BrandGuide.Warm.headerBackground)
+    let headerText = Color(hex: BrandGuide.Warm.headerText)
 
-    let complexityLight = Color(hex: "7E9163")       // Sage
-    let complexityMediumLight = Color(hex: "A3B048") // Olive-lime
-    let complexityMedium = Color(hex: "D4A843")      // Warm amber
-    let complexityMediumHeavy = Color(hex: "C4704B") // Terracotta
-    let complexityHeavy = Color(hex: "B5433A")       // Warm red
+    let complexityLight = Color(hex: BrandGuide.Warm.complexityLight)
+    let complexityMediumLight = Color(hex: BrandGuide.Warm.complexityMediumLight)
+    let complexityMedium = Color(hex: BrandGuide.Warm.complexityMedium)
+    let complexityMediumHeavy = Color(hex: BrandGuide.Warm.complexityMediumHeavy)
+    let complexityHeavy = Color(hex: BrandGuide.Warm.complexityHeavy)
 
     let shimmer = Color.black.opacity(0.06)
 
-    let primarySubtle = Color(hex: "7E9163").opacity(0.12)
-    let accentSubtle = Color(hex: "C4704B").opacity(0.10)
+    let primarySubtle = Color(hex: BrandGuide.Warm.sage).opacity(0.12)
+    let accentSubtle = Color(hex: BrandGuide.Warm.terracotta).opacity(0.10)
 }
 
-// MARK: - Dark Palette (Original)
+// MARK: - Dark Palette (Warm Night)
 struct DarkPalette: Palette {
-    let background = Color(hex: "08090A")
-    let backgroundElevated = Color(hex: "121316")
-    let cardBackground = Color(hex: "1C1D21")
-    let cardBackgroundHover = Color(hex: "25262B")
+    let pageBackground = Color(hex: BrandGuide.Dark.background)
+    let elevatedBackground = Color(hex: BrandGuide.Dark.backgroundElevated)
+    let cardBackground = Color(hex: BrandGuide.Dark.cardBackground)
+    let cardBackgroundHover = Color(hex: BrandGuide.Dark.cardBackgroundHover)
+    let fieldBackground = Color(hex: BrandGuide.Dark.inputBackground)
+    let selectedSegmentBackground = Color(hex: BrandGuide.Dark.chipBackground)
+    let tabBarBackground = Color(hex: BrandGuide.Dark.tabBarBackground)
 
-    let primary = Color(hex: "3B82F6")              // Blue 500
-    let primaryLight = Color(hex: "60A5FA")         // Blue 400
-    let primaryDark = Color(hex: "2563EB")          // Blue 600
+    let primaryAction = Color(hex: BrandGuide.Dark.primary)
+    let primaryActionLight = Color(hex: BrandGuide.Dark.primaryLight)
+    let primaryActionPressed = Color(hex: BrandGuide.Dark.primaryDark)
+    let primaryActionText = Color(hex: BrandGuide.Dark.textPrimary)
 
-    let secondary = Color(hex: "64748B")            // Slate 500
-    let secondaryLight = Color(hex: "94A3B8")       // Slate 400
+    let accentWarm = Color(hex: BrandGuide.Dark.secondaryAccent)
+    let accentWarmLight = Color(hex: BrandGuide.Dark.secondaryAccentLight)
 
-    let accent = Color(hex: "14B8A6")               // Teal 500
-    let accentLight = Color(hex: "2DD4BF")          // Teal 400
+    let success = Color(hex: BrandGuide.Dark.success)
+    let warning = Color(hex: BrandGuide.Dark.warning)
+    let error = Color(hex: BrandGuide.Dark.error)
 
-    let success = Color(hex: "10B981")              // Emerald 500
-    let warning = Color(hex: "F59E0B")              // Amber 500
-    let error = Color(hex: "EF4444")                // Red 500
+    let textPrimary = Color(hex: BrandGuide.Dark.textPrimary)
+    let textSecondary = Color(hex: BrandGuide.Dark.textSecondary)
+    let textTertiary = Color(hex: BrandGuide.Dark.textTertiary)
+    let textDisabled = Color(hex: BrandGuide.Dark.textDisabled)
 
-    let textPrimary = Color(hex: "F8FAFC")          // Slate 50
-    let textSecondary = Color(hex: "94A3B8")        // Slate 400
-    let textTertiary = Color(hex: "64748B")         // Slate 500
-
-    let divider = Color.white.opacity(0.08)
+    let border = Color(hex: BrandGuide.Dark.border)
     let overlay = Color.black.opacity(0.6)
 
-    let dateAccent = Color(hex: "3B82F6")           // Same as primary in dark
-    let highlight = Color(hex: "F8E945")            // Yellow
-    let tabInactive = Color(hex: "64748B")          // Slate 500
-    let headerBackground = Color(hex: "1C1D21")     // Card background
-    let headerText = Color(hex: "F8FAFC")           // Slate 50
+    let highlight = Color(hex: BrandGuide.Dark.highlight)
+    let tabInactive = Color(hex: BrandGuide.Dark.tabIconInactive)
+    let headerBackground = Color(hex: BrandGuide.Dark.headerBackground)
+    let headerText = Color(hex: BrandGuide.Dark.headerText)
 
-    let complexityLight = Color(hex: "10B981")
-    let complexityMediumLight = Color(hex: "84CC16")
-    let complexityMedium = Color(hex: "F59E0B")
-    let complexityMediumHeavy = Color(hex: "F97316")
-    let complexityHeavy = Color(hex: "EF4444")
+    let complexityLight = Color(hex: BrandGuide.Dark.complexityLight)
+    let complexityMediumLight = Color(hex: BrandGuide.Dark.complexityMediumLight)
+    let complexityMedium = Color(hex: BrandGuide.Dark.complexityMedium)
+    let complexityMediumHeavy = Color(hex: BrandGuide.Dark.complexityMediumHeavy)
+    let complexityHeavy = Color(hex: BrandGuide.Dark.complexityHeavy)
 
     let shimmer = Color.white.opacity(0.1)
 
-    let primarySubtle = Color(hex: "3B82F6").opacity(0.15)
-    let accentSubtle = Color(hex: "14B8A6").opacity(0.12)
+    let primarySubtle = Color(hex: BrandGuide.Dark.primary).opacity(0.15)
+    let accentSubtle = Color(hex: BrandGuide.Dark.secondaryAccent).opacity(0.12)
 }
 
 // MARK: - ThemeManager
@@ -216,22 +237,37 @@ struct Theme {
     struct Colors {
         private static var p: any Palette { ThemeManager.shared.activePalette }
 
-        // Backgrounds
-        static var background: Color { p.background }
-        static var backgroundElevated: Color { p.backgroundElevated }
+        // Semantic backgrounds
+        static var pageBackground: Color { p.pageBackground }
+        static var elevatedBackground: Color { p.elevatedBackground }
         static var cardBackground: Color { p.cardBackground }
         static var cardBackgroundHover: Color { p.cardBackgroundHover }
+        static var fieldBackground: Color { p.fieldBackground }
+        static var selectedSegmentBackground: Color { p.selectedSegmentBackground }
+        static var tabBarBackground: Color { p.tabBarBackground }
 
-        // Primary (sage / blue)
+        // Compatibility backgrounds
+        static var background: Color { p.background }
+        static var backgroundElevated: Color { p.backgroundElevated }
+
+        // Semantic actions
+        static var primaryAction: Color { p.primaryAction }
+        static var primaryActionLight: Color { p.primaryActionLight }
+        static var primaryActionPressed: Color { p.primaryActionPressed }
+        static var primaryActionText: Color { p.primaryActionText }
+
+        // Compatibility actions
         static var primary: Color { p.primary }
         static var primaryLight: Color { p.primaryLight }
         static var primaryDark: Color { p.primaryDark }
-
-        // Secondary
         static var secondary: Color { p.secondary }
         static var secondaryLight: Color { p.secondaryLight }
 
-        // Accent (terracotta / teal)
+        // Semantic accent
+        static var accentWarm: Color { p.accentWarm }
+        static var accentWarmLight: Color { p.accentWarmLight }
+
+        // Compatibility accent
         static var accent: Color { p.accent }
         static var accentLight: Color { p.accentLight }
 
@@ -244,8 +280,10 @@ struct Theme {
         static var textPrimary: Color { p.textPrimary }
         static var textSecondary: Color { p.textSecondary }
         static var textTertiary: Color { p.textTertiary }
+        static var textDisabled: Color { p.textDisabled }
 
-        // Divider & overlay
+        // Borders & overlay
+        static var border: Color { p.border }
         static var divider: Color { p.divider }
         static var overlay: Color { p.overlay }
 

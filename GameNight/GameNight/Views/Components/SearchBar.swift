@@ -34,7 +34,7 @@ struct SearchBar: View {
         .padding(.vertical, 12) // Slightly taller
         .background(
             RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .fill(Theme.Colors.cardBackground) // Use card background
+                .fill(Theme.Colors.fieldBackground)
                 .shadow(color: .black.opacity(ThemeManager.shared.isDark ? 0.2 : 0.06), radius: 4, x: 0, y: 2)
         )
         .overlay(

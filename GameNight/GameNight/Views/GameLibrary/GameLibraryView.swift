@@ -276,7 +276,7 @@ struct ImportBGGSheet: View {
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                     )
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
@@ -327,7 +327,7 @@ struct CreateCategorySheet: View {
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.backgroundElevated)
+                            .fill(Theme.Colors.fieldBackground)
                     )
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
