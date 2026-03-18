@@ -578,6 +578,7 @@ struct DateBadge: View {
 
 // MARK: - Primary Game Card with Pills
 struct PrimaryGameCard: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let game: Game
     let eventGame: EventGame
     var otherGames: [EventGame] = []

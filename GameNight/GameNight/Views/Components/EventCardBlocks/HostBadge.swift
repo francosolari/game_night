@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HostBadge: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let host: User?
     let isCurrentUserHost: Bool
     var size: ComponentSize = .standard

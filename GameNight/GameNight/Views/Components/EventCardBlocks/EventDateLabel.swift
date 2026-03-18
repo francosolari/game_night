@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct EventDateLabel: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let event: GameEvent
     var size: ComponentSize = .standard
 

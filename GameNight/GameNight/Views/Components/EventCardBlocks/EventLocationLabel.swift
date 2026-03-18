@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct EventLocationLabel: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let event: GameEvent
     let viewerRole: EventViewerRole
     var size: ComponentSize = .standard

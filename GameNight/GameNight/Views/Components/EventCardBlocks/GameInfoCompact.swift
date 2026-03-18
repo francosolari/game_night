@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GameInfoCompact: View {
+    @EnvironmentObject var themeManager: ThemeManager
     let games: [EventGame]
     var size: ComponentSize = .standard
 
