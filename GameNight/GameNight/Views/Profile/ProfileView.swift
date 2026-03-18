@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var showEditProfile = false
     @State private var showBGGLink = false
     @State private var showPrivacy = false
@@ -47,7 +48,7 @@ struct ProfileView: View {
                             icon: "lock.shield.fill",
                             title: "Privacy & Safety",
                             subtitle: "Phone visibility, blocking, your data",
-                            color: Theme.Colors.accent
+                            color: Theme.Colors.accentWarm
                         ) {
                             showPrivacy = true
                         }
@@ -57,7 +58,7 @@ struct ProfileView: View {
                             icon: "dice.fill",
                             title: "BoardGameGeek",
                             subtitle: appState.currentUser?.bggUsername ?? "Link your account",
-                            color: Theme.Colors.secondary
+                            color: Theme.Colors.textSecondary
                         ) {
                             showBGGLink = true
                         }
@@ -67,7 +68,7 @@ struct ProfileView: View {
                             icon: "bell.fill",
                             title: "Notifications",
                             subtitle: "Push & SMS preferences",
-                            color: Theme.Colors.primary
+                            color: Theme.Colors.primaryAction
                         ) {
                             // TODO: Notification settings
                         }
@@ -141,14 +142,14 @@ struct SettingsRow: View {
                         .foregroundColor(Theme.Colors.textPrimary)
                     Text(subtitle)
                         .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        .foregroundColor(Theme.Colors.textSecondary)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14))
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .foregroundColor(Theme.Colors.textSecondary)
             }
             .cardStyle()
         }
