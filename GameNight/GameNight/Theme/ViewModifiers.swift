@@ -3,6 +3,7 @@ import UIKit
 
 // MARK: - Card Style
 struct CardModifier: ViewModifier {
+    @ObservedObject private var themeManager = ThemeManager.shared
     var padding: CGFloat = Theme.Spacing.lg
 
     func body(content: Content) -> some View {
@@ -21,6 +22,8 @@ struct CardModifier: ViewModifier {
 
 // MARK: - Glass Card Style
 struct GlassCardModifier: ViewModifier {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     func body(content: Content) -> some View {
         content
             .padding(Theme.Spacing.lg)
@@ -82,27 +85,35 @@ struct SecondaryButtonStyle: ButtonStyle {
 
 // MARK: - Sage Segmented Picker Style
 struct SageSegmentedStyle: ViewModifier {
+    @ObservedObject private var themeManager = ThemeManager.shared
+
     func body(content: Content) -> some View {
         content
             .onAppear {
-                let appearance = UISegmentedControl.appearance()
-                let isDark = ThemeManager.shared.isDark
-                let selectedTint = UIColor(isDark ? Theme.Colors.selectedSegmentBackground : Theme.Colors.primaryAction)
-                let background = UIColor(isDark ? Theme.Colors.fieldBackground : Theme.Colors.elevatedBackground)
-                let selectedText = UIColor(isDark ? Theme.Colors.textPrimary : Theme.Colors.primaryActionText)
-                let normalText = UIColor(isDark ? Theme.Colors.tabInactive : Theme.Colors.textSecondary)
-
-                appearance.selectedSegmentTintColor = selectedTint
-                appearance.backgroundColor = background
-                UISegmentedControl.appearance().setTitleTextAttributes(
-                    [.foregroundColor: selectedText],
-                    for: .selected
-                )
-                UISegmentedControl.appearance().setTitleTextAttributes(
-                    [.foregroundColor: normalText],
-                    for: .normal
-                )
+                applyAppearance()
             }
+            .onChange(of: themeManager.mode) { _, _ in applyAppearance() }
+            .onChange(of: themeManager.systemColorScheme) { _, _ in applyAppearance() }
+    }
+
+    private func applyAppearance() {
+        let appearance = UISegmentedControl.appearance()
+        let isDark = themeManager.isDark
+        let selectedTint = UIColor(isDark ? Theme.Colors.selectedSegmentBackground : Theme.Colors.primaryAction)
+        let background = UIColor(isDark ? Theme.Colors.fieldBackground : Theme.Colors.elevatedBackground)
+        let selectedText = UIColor(isDark ? Theme.Colors.textPrimary : Theme.Colors.primaryActionText)
+        let normalText = UIColor(isDark ? Theme.Colors.tabInactive : Theme.Colors.textSecondary)
+
+        appearance.selectedSegmentTintColor = selectedTint
+        appearance.backgroundColor = background
+        appearance.setTitleTextAttributes(
+            [.foregroundColor: selectedText],
+            for: .selected
+        )
+        appearance.setTitleTextAttributes(
+            [.foregroundColor: normalText],
+            for: .normal
+        )
     }
 }
 

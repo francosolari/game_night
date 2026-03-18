@@ -273,6 +273,7 @@ struct ThemeToggleRow: View {
             }
             .pickerStyle(.segmented)
             .sageSegmented()
+            .id(themeManager.isDark)
         }
         .cardStyle()
     }

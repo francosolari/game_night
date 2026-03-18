@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var showCreateEvent = false
 
     var body: some View {
@@ -44,6 +45,7 @@ struct MainTabView: View {
 }
 
 struct CustomTabBar: View {
+    @EnvironmentObject var themeManager: ThemeManager
     @Binding var selectedTab: AppState.Tab
     let onCreateTap: () -> Void
 
