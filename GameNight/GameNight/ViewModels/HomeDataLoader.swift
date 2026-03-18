@@ -38,6 +38,9 @@ enum HomeDataLoader {
     ) async -> CapturedResult<Value> {
         do {
             return CapturedResult(value: try await operation(), errorDescription: nil)
+        } catch is CancellationError {
+            // Task cancelled (e.g. SwiftUI .refreshable releasing) — not a real failure
+            return CapturedResult(value: nil, errorDescription: nil)
         } catch {
             let detail = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
             return CapturedResult(value: nil, errorDescription: "\(label): \(detail)")

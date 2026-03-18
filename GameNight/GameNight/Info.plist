@@ -29,6 +29,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>CardboardWithMe can add game night events to your calendar so you never miss a session.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>CardboardWithMe uses your contacts to help you invite friends to game nights. Only the contacts you select are stored.</string>
 	<key>UILaunchScreen</key>

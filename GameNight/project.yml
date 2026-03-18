@@ -30,6 +30,7 @@ targets:
           - CFBundleURLSchemes:
               - gamenight
         NSContactsUsageDescription: "CardboardWithMe uses your contacts to help you invite friends to game nights. Only the contacts you select are stored."
+        NSCalendarsFullAccessUsageDescription: "CardboardWithMe can add game night events to your calendar so you never miss a session."
         CFBundleDisplayName: CWM
         CFBundleName: CardboardWithMe
     settings:

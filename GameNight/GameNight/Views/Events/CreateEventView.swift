@@ -232,6 +232,7 @@ struct CreateEventView: View {
                     }
                 }
                 Button("Discard", role: .destructive) {
+                    viewModel.discardCreateSession()
                     dismiss()
                 }
                 Button("Keep Editing", role: .cancel) { }

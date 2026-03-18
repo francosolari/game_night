@@ -37,6 +37,82 @@ struct Invite: Identifiable, Codable {
         case smsDeliveryStatus = "sms_delivery_status"
         case createdAt = "created_at"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        eventId = try container.decode(UUID.self, forKey: .eventId)
+        hostUserId = try container.decodeIfPresent(UUID.self, forKey: .hostUserId)
+        userId = try container.decodeIfPresent(UUID.self, forKey: .userId)
+        phoneNumber = try container.decode(String.self, forKey: .phoneNumber)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        status = try container.decodeIfPresent(InviteStatus.self, forKey: .status) ?? .pending
+        tier = try container.decodeIfPresent(Int.self, forKey: .tier) ?? 1
+        tierPosition = try container.decodeIfPresent(Int.self, forKey: .tierPosition) ?? 0
+        isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive) ?? true
+        respondedAt = try container.decodeIfPresent(Date.self, forKey: .respondedAt)
+        selectedTimeOptionIds = (try? container.decodeIfPresent([UUID].self, forKey: .selectedTimeOptionIds)) ?? []
+        suggestedTimes = try container.decodeIfPresent([TimeOption].self, forKey: .suggestedTimes)
+        sentVia = try container.decodeIfPresent(DeliveryMethod.self, forKey: .sentVia) ?? .sms
+        smsDeliveryStatus = try container.decodeIfPresent(SMSStatus.self, forKey: .smsDeliveryStatus)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+
+    init(
+        id: UUID,
+        eventId: UUID,
+        hostUserId: UUID? = nil,
+        userId: UUID? = nil,
+        phoneNumber: String,
+        displayName: String? = nil,
+        status: InviteStatus,
+        tier: Int,
+        tierPosition: Int,
+        isActive: Bool,
+        respondedAt: Date? = nil,
+        selectedTimeOptionIds: [UUID],
+        suggestedTimes: [TimeOption]? = nil,
+        sentVia: DeliveryMethod,
+        smsDeliveryStatus: SMSStatus? = nil,
+        createdAt: Date
+    ) {
+        self.id = id
+        self.eventId = eventId
+        self.hostUserId = hostUserId
+        self.userId = userId
+        self.phoneNumber = phoneNumber
+        self.displayName = displayName
+        self.status = status
+        self.tier = tier
+        self.tierPosition = tierPosition
+        self.isActive = isActive
+        self.respondedAt = respondedAt
+        self.selectedTimeOptionIds = selectedTimeOptionIds
+        self.suggestedTimes = suggestedTimes
+        self.sentVia = sentVia
+        self.smsDeliveryStatus = smsDeliveryStatus
+        self.createdAt = createdAt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(eventId, forKey: .eventId)
+        try container.encodeIfPresent(hostUserId, forKey: .hostUserId)
+        try container.encodeIfPresent(userId, forKey: .userId)
+        try container.encode(phoneNumber, forKey: .phoneNumber)
+        try container.encodeIfPresent(displayName, forKey: .displayName)
+        try container.encode(status, forKey: .status)
+        try container.encode(tier, forKey: .tier)
+        try container.encode(tierPosition, forKey: .tierPosition)
+        try container.encode(isActive, forKey: .isActive)
+        try container.encodeIfPresent(respondedAt, forKey: .respondedAt)
+        try container.encode(selectedTimeOptionIds, forKey: .selectedTimeOptionIds)
+        try container.encodeIfPresent(suggestedTimes, forKey: .suggestedTimes)
+        try container.encode(sentVia, forKey: .sentVia)
+        try container.encodeIfPresent(smsDeliveryStatus, forKey: .smsDeliveryStatus)
+        try container.encode(createdAt, forKey: .createdAt)
+    }
 }
 
 enum InviteStatus: String, Codable, CaseIterable {

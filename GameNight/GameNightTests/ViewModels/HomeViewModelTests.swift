@@ -124,4 +124,8 @@ private final class StubHomeDataProvider: HomeDataProviding {
         fetchedEventIds = ids
         return try fetchedEventsResult.get()
     }
+
+    func fetchAcceptedInviteCounts(eventIds: [UUID]) async throws -> [UUID: Int] {
+        [:]
+    }
 }

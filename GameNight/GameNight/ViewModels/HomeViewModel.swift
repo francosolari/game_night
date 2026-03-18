@@ -23,7 +23,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     func loadData() async {
-        isLoading = true
+        // Only show skeleton on initial load, not on pull-to-refresh
+        let isInitialLoad = upcomingEvents.isEmpty && myInvites.isEmpty && drafts.isEmpty
+        if isInitialLoad {
+            isLoading = true
+        }
         error = nil
 
         let snapshot = await HomeDataLoader.load(
@@ -38,8 +42,15 @@ final class HomeViewModel: ObservableObject {
             }
         )
 
+        // If the task was cancelled (e.g. SwiftUI .refreshable releasing),
+        // don't overwrite existing good data with empty results.
+        guard !Task.isCancelled else {
+            if isInitialLoad { isLoading = false }
+            return
+        }
+
         var upcomingEvents = snapshot.upcomingEvents
-        var errorMessage = snapshot.errorMessage
+        let errorMessage = snapshot.errorMessage
 
         let existingEventIds = Set(upcomingEvents.map(\.id))
         let acceptedInviteEventIds = Set(
@@ -53,12 +64,11 @@ final class HomeViewModel: ObservableObject {
             do {
                 let inviteEvents = try await supabase.fetchEvents(ids: Array(missingInviteEventIds))
                 upcomingEvents = mergeUpcomingEvents(upcomingEvents, with: inviteEvents)
+            } catch is CancellationError {
+                // Ignore — don't treat cancellation as a failure
             } catch {
-                let detail = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
-                let inviteEventsError = "Invite Events: \(detail)"
-                errorMessage = [errorMessage, inviteEventsError]
-                    .compactMap { $0 }
-                    .joined(separator: "\n")
+                // Non-fatal — accepted invite events are supplemental data
+                print("🏠 [HomeViewModel] Invite events fetch failed: \(error)")
             }
         }
 
@@ -81,7 +91,9 @@ final class HomeViewModel: ObservableObject {
             print("🏠 [HomeViewModel] \(error)")
         }
 
-        isLoading = false
+        if isInitialLoad {
+            isLoading = false
+        }
     }
 
     func invite(for eventId: UUID) -> Invite? {

@@ -30,9 +30,13 @@ final class CreateEventViewModel: ObservableObject {
     @Published var plusOneLimit: Int = 0
     @Published var allowMaybeRSVP: Bool = true
     @Published var requirePlusOneNames: Bool = false
-    @Published var coverVariant: Int = 0
+    @Published var coverVariant: Int = 0 {
+        didSet {
+            persistLocalCoverPreviewStateIfNeeded()
+        }
+    }
     /// Stable ID for generative cover preview during creation
-    let previewEventId: UUID = UUID()
+    let previewEventId: UUID
     @Published var selectedGroup: GameGroup?
     @Published var invitees: [InviteeEntry] = []
     @Published var isSaving = false
@@ -69,16 +73,29 @@ final class CreateEventViewModel: ObservableObject {
 
     private let supabase: EventEditingProviding
     private let bgg: BGGService
+    private let userDefaults: UserDefaults
+
+    private enum LocalCoverPreviewStorage {
+        static let previewEventIdKey = "create_event.preview_event_id"
+        static let coverVariantKey = "create_event.cover_variant"
+    }
 
     init(
         eventToEdit: GameEvent? = nil,
         initialInvites: [Invite] = [],
         supabase: EventEditingProviding? = nil,
-        bgg: BGGService = .shared
+        bgg: BGGService = .shared,
+        userDefaults: UserDefaults = .standard
     ) {
         self.eventToEdit = eventToEdit
         self.supabase = supabase ?? SupabaseService.shared
         self.bgg = bgg
+        self.userDefaults = userDefaults
+        self.previewEventId = eventToEdit?.id ?? Self.loadPreviewEventId(from: userDefaults) ?? UUID()
+        if eventToEdit == nil {
+            coverVariant = userDefaults.object(forKey: LocalCoverPreviewStorage.coverVariantKey) as? Int ?? 0
+            persistLocalCoverPreviewStateIfNeeded()
+        }
 
         if let eventToEdit {
             title = eventToEdit.title
@@ -163,10 +180,13 @@ final class CreateEventViewModel: ObservableObject {
         case .saveChanges:
             return "Save Changes"
         case .submit:
-            return "Send Invites"
+            return invitees.isEmpty ? "Create Event" : "Send Invites"
         case .next:
             if currentStep == .games && selectedGames.isEmpty {
                 return "Add Game Later"
+            }
+            if currentStep == .invites && invitees.isEmpty {
+                return "Invite Later"
             }
             return "Next"
         }
@@ -175,8 +195,8 @@ final class CreateEventViewModel: ObservableObject {
     var canProceed: Bool {
         switch currentStep {
         case .details: return !title.isEmpty && (scheduleMode == .fixed || !timeOptions.isEmpty)
-        case .games: return !selectedGames.isEmpty
-        case .invites: return !invitees.isEmpty
+        case .games: return true  // optional — can skip and add later
+        case .invites: return true  // optional — can skip and invite later
         case .review: return true
         }
     }
@@ -270,6 +290,19 @@ final class CreateEventViewModel: ObservableObject {
             )
             selectedGames.append(eventGame)
             manualGameName = ""
+
+            // Persist to user's game library
+            try? await supabase.addGameToLibrary(gameId: saved.id, categoryId: nil)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func updateManualGameSettings(at index: Int, game: Game) async {
+        guard index >= 0, index < selectedGames.count else { return }
+        selectedGames[index].game = game
+        do {
+            try await supabase.updateGame(game)
         } catch {
             self.error = error.localizedDescription
         }
@@ -503,6 +536,7 @@ final class CreateEventViewModel: ObservableObject {
             }
 
             createdEvent = try await supabase.fetchEvent(id: event.id)
+            clearLocalCoverPreviewStateIfNeeded()
         } catch {
             self.error = error.localizedDescription
         }
@@ -574,6 +608,7 @@ final class CreateEventViewModel: ObservableObject {
             try await createInviteRecords(eventId: created.id, hostId: hostId)
 
             createdEvent = created
+            clearLocalCoverPreviewStateIfNeeded()
         } catch {
             self.error = error.localizedDescription
         }
@@ -626,6 +661,10 @@ final class CreateEventViewModel: ObservableObject {
             createdAt: existingEvent?.createdAt ?? Date(),
             updatedAt: Date()
         )
+    }
+
+    func discardCreateSession() {
+        clearLocalCoverPreviewStateIfNeeded(force: true)
     }
 
     private func createInviteRecords(eventId: UUID, hostId: UUID) async throws {
@@ -686,6 +725,25 @@ final class CreateEventViewModel: ObservableObject {
         }
 
         try await supabase.createInvites(newInvites)
+    }
+
+    private static func loadPreviewEventId(from userDefaults: UserDefaults) -> UUID? {
+        guard let storedValue = userDefaults.string(forKey: LocalCoverPreviewStorage.previewEventIdKey) else {
+            return nil
+        }
+        return UUID(uuidString: storedValue)
+    }
+
+    private func persistLocalCoverPreviewStateIfNeeded() {
+        guard !isEditing else { return }
+        userDefaults.set(previewEventId.uuidString, forKey: LocalCoverPreviewStorage.previewEventIdKey)
+        userDefaults.set(coverVariant, forKey: LocalCoverPreviewStorage.coverVariantKey)
+    }
+
+    private func clearLocalCoverPreviewStateIfNeeded(force: Bool = false) {
+        guard force || !isEditing else { return }
+        userDefaults.removeObject(forKey: LocalCoverPreviewStorage.previewEventIdKey)
+        userDefaults.removeObject(forKey: LocalCoverPreviewStorage.coverVariantKey)
     }
 
     private func syncEventGames(eventId: UUID) async throws {

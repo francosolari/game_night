@@ -9,17 +9,18 @@ struct SplashScreen: View {
             Theme.Colors.background
                 .ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                Image(systemName: "dice.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(Theme.Gradients.primary)
+            VStack(spacing: 20) {
+                Image("MeepleLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
                     .scaleEffect(scale)
 
-                Text("Game Night")
+                Text("CardboardWithMe")
                     .font(Theme.Typography.displayLarge)
                     .foregroundColor(Theme.Colors.textPrimary)
 
-                Text("Roll the dice on plans")
+                Text("Gather around the table")
                     .font(Theme.Typography.body)
                     .foregroundColor(Theme.Colors.textSecondary)
             }

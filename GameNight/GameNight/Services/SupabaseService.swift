@@ -21,6 +21,8 @@ protocol EventEditingProviding: AnyObject {
     func deleteInvites(ids: [UUID]) async throws
     func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact]
     func upsertGame(_ game: Game) async throws -> Game
+    func updateGame(_ game: Game) async throws
+    func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
 }
 
 private struct EventSoftDeletePatch: Encodable {
@@ -65,6 +67,22 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             phone: phoneNumber,
             token: code,
             type: .sms
+        )
+    }
+
+    // MARK: - Password Auth (Beta Bypass)
+
+    func signUpWithPassword(phoneNumber: String, password: String) async throws {
+        try await client.auth.signUp(
+            phone: phoneNumber,
+            password: password
+        )
+    }
+
+    func signInWithPassword(phoneNumber: String, password: String) async throws {
+        try await client.auth.signIn(
+            phone: phoneNumber,
+            password: password
         )
     }
 
@@ -573,6 +591,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 .value
             return saved
         }
+    }
+
+    func updateGame(_ game: Game) async throws {
+        try await client
+            .from("games")
+            .update(game)
+            .eq("id", value: game.id.uuidString)
+            .execute()
     }
 
     // MARK: - Categories

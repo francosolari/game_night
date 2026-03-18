@@ -10,9 +10,15 @@ struct GenerativeEventCover: View {
     let eventId: UUID
     var variant: Int = 0
 
-    /// Stable seed derived from event ID + variant offset
+    /// Stable seed derived from event ID bytes + variant offset.
+    /// Uses UUID bytes instead of hashValue (which is randomized per process since Swift 4.2).
     private var seed: Int {
-        abs(eventId.hashValue &+ variant)
+        let uuid = eventId.uuid
+        let stableHash = Int(uuid.0) &+ Int(uuid.1) << 8
+            &+ Int(uuid.2) << 16 &+ Int(uuid.3) << 4
+            &+ Int(uuid.4) &+ Int(uuid.5) << 12
+            &+ Int(uuid.6) << 8 &+ Int(uuid.7)
+        return abs(stableHash &+ variant)
     }
 
     private var patternIndex: Int {
@@ -264,7 +270,7 @@ struct GenerativeEventCover: View {
             case .copperplate:
                 return .custom("Copperplate-Bold", size: size)
             case .papyrus:
-                return .custom("Papyrus", size: size)
+                return .custom("Menlo", size: size)
             case .snellRoundhand:
                 return .custom("SnellRoundhand-Black", size: size)
             case .americanTypewriter:
@@ -276,7 +282,7 @@ struct GenerativeEventCover: View {
             case .impact:
                 return .custom("Impact", size: size)
             case .chalkboard:
-                return .custom("ChalkboardSE-Bold", size: size)
+                return .custom("Optima-Bold", size: size)
             case .markerFelt:
                 return .custom("MarkerFelt-Wide", size: size)
             case .zapfino:

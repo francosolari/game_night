@@ -510,6 +510,40 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertTrue(sut.completedSteps.contains(.details))
     }
 
+    func testNewEventCoverPreviewPersistsAcrossViewModelRecreation() {
+        let suiteName = "CreateEventViewModelTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let service = StubEventEditorService(currentUserId: UUID())
+        let first = CreateEventViewModel(supabase: service, userDefaults: defaults)
+        first.coverVariant = 4
+
+        let second = CreateEventViewModel(supabase: service, userDefaults: defaults)
+
+        XCTAssertEqual(second.previewEventId, first.previewEventId)
+        XCTAssertEqual(second.coverVariant, 4)
+    }
+
+    func testDiscardingNewEventClearsPersistedCoverPreview() {
+        let suiteName = "CreateEventViewModelTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let service = StubEventEditorService(currentUserId: UUID())
+        let first = CreateEventViewModel(supabase: service, userDefaults: defaults)
+        first.coverVariant = 4
+
+        first.discardCreateSession()
+
+        let second = CreateEventViewModel(supabase: service, userDefaults: defaults)
+
+        XCTAssertNotEqual(second.previewEventId, first.previewEventId)
+        XCTAssertEqual(second.coverVariant, 0)
+    }
+
     // MARK: - Draft initialization
 
     func testDraftEditPreloadsCompletedStepsAndNavigatesToFirstIncomplete() {
@@ -925,6 +959,10 @@ private final class StubEventEditorService: EventEditingProviding {
     func upsertGame(_ game: Game) async throws -> Game {
         game
     }
+
+    func updateGame(_ game: Game) async throws {}
+
+    func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {}
 
     func fetchInvites(eventId: UUID) async throws -> [Invite] {
         existingInvites

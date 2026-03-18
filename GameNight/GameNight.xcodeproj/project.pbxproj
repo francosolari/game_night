@@ -61,6 +61,7 @@
 		A830ED73A705ED199878F0A6 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07F39EDF744F365C61B43544 /* ToastView.swift */; };
 		AAEBF5B0D069816F69AEA013 /* GroupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C545563F575388D3D5C55CE1 /* GroupsView.swift */; };
 		AAF2A54602E475E661783223 /* GroupsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC84F6FC769179A0CD26F1F /* GroupsViewModel.swift */; };
+		AB2F06ADADF08E33D7304AC9 /* AddToCalendarButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F7FE54EBEFBB78137AB34A /* AddToCalendarButton.swift */; };
 		AB7731B722DD26CABD4F1FBA /* TimeOptionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */; };
 		AC515052761705D145044420 /* InviteStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10D15DC103DFCD52CFA34A05 /* InviteStatusTests.swift */; };
 		AE3564D983C3D4EF7CD2D08E /* R2StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E17D8ED351C14A7B0F10823 /* R2StorageService.swift */; };
@@ -79,6 +80,7 @@
 		CE3591329288EDA893958F12 /* GameNightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04110B31ED9823F8D8CB1290 /* GameNightApp.swift */; };
 		CE4FDB177DFFB003A88F9AA9 /* EventDateLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBB6994E14D9CDD49FD2251B /* EventDateLabel.swift */; };
 		CEDCDEA3B706763399C908FC /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C8D2CD62321FDE27933183 /* HomeViewModel.swift */; };
+		CF081B4F29C9ABB849634129 /* StarRatingPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86CE311BFA4DA7766B8EF356 /* StarRatingPicker.swift */; };
 		CF4B2A2254450EBC277CB06D /* GameInfoCompact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6F1688E19ADDD90168EF36 /* GameInfoCompact.swift */; };
 		D64C5C08692476E0E5786CB9 /* Secrets.swift.example in Resources */ = {isa = PBXBuildFile; fileRef = BFCE44DB7F63902750892756 /* Secrets.swift.example */; };
 		D8BA6CA0E91A2ABEAEF147C0 /* GameEventDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F38EB39579296EB1CC1BD9F /* GameEventDecodingTests.swift */; };
@@ -169,8 +171,10 @@
 		82822A1740DFB720E14F4CCC /* LocationPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPickerSheet.swift; sourceTree = "<group>"; };
 		828D232229F9583147DE35B5 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		844AF0B6BF7809B3F49C0A28 /* EventLocationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLocationPresentation.swift; sourceTree = "<group>"; };
+		86CE311BFA4DA7766B8EF356 /* StarRatingPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingPicker.swift; sourceTree = "<group>"; };
 		8C6F1688E19ADDD90168EF36 /* GameInfoCompact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameInfoCompact.swift; sourceTree = "<group>"; };
 		8EDAABF8B93412395C477350 /* ViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModifiers.swift; sourceTree = "<group>"; };
+		91F7FE54EBEFBB78137AB34A /* AddToCalendarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCalendarButton.swift; sourceTree = "<group>"; };
 		95B0C917F3210D3DEE57EA0F /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		9AB1A89107DC5915629A148C /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
@@ -301,6 +305,7 @@
 		4497D62AF38CB04640B78258 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				91F7FE54EBEFBB78137AB34A /* AddToCalendarButton.swift */,
 				AC348B1DF846B0EA1FED19F6 /* CommonComponents.swift */,
 				FAC2A9C1BB5C965C30B05BA8 /* ContactListSheet.swift */,
 				D392FFBFA41DB94F99E14E09 /* ContactPicker.swift */,
@@ -311,6 +316,7 @@
 				82822A1740DFB720E14F4CCC /* LocationPickerSheet.swift */,
 				2D0EA42EA853AC67A97206DA /* PlayerCountIndicator.swift */,
 				3493414C1EA4EA910807E03E /* SearchBar.swift */,
+				86CE311BFA4DA7766B8EF356 /* StarRatingPicker.swift */,
 				DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */,
 				07F39EDF744F365C61B43544 /* ToastView.swift */,
 				226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */,
@@ -599,6 +605,7 @@
 			files = (
 				E1A24080F898AF489326A98C /* ActivityFeedItem.swift in Sources */,
 				00AC9737F8B0CE07A7B7B450 /* ActivityFeedView.swift in Sources */,
+				AB2F06ADADF08E33D7304AC9 /* AddToCalendarButton.swift in Sources */,
 				F94FB46D73A94B95CAAB4410 /* AppState.swift in Sources */,
 				B8CB9F46799095CFDF66F26E /* BGGService.swift in Sources */,
 				1F834BF50C8D07CCF689978E /* BrandGuide.swift in Sources */,
@@ -664,6 +671,7 @@
 				E94EDB0E593B5C1084DCEE6B /* Secrets.swift in Sources */,
 				C50FC1236834BE18DCDDB3D1 /* ShimmerLayoutMetrics.swift in Sources */,
 				60CC436E8F6F5AE4F7D37C44 /* SplashScreen.swift in Sources */,
+				CF081B4F29C9ABB849634129 /* StarRatingPicker.swift in Sources */,
 				A145154DBEE35DEBC0B93B9D /* SupabaseService.swift in Sources */,
 				C490E51116FD132D9BDE3239 /* Theme.swift in Sources */,
 				AB7731B722DD26CABD4F1FBA /* TimeOptionPicker.swift in Sources */,

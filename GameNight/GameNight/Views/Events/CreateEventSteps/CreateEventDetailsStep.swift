@@ -29,6 +29,7 @@ struct CreateEventDetailsStep: View {
                     .foregroundColor(Theme.Colors.textSecondary)
                 TextField("e.g. Dune Imperium Night", text: $viewModel.title)
                     .font(Theme.Typography.body)
+                    .frame(maxWidth: .infinity)
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
@@ -61,6 +62,7 @@ struct CreateEventDetailsStep: View {
                 TextField("What's the plan?", text: $viewModel.description, axis: .vertical)
                     .lineLimit(3...6)
                     .font(Theme.Typography.body)
+                    .frame(maxWidth: .infinity)
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)

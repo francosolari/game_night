@@ -162,6 +162,17 @@ struct EventDetailView: View {
                                 .cardStyle()
                             }
 
+                            // Add to Calendar
+                            if let timeOption = calendarTimeOption(for: event) {
+                                AddToCalendarButton(
+                                    title: event.title,
+                                    startDate: timeOption.startTime,
+                                    endDate: timeOption.endTime,
+                                    location: event.locationAddress ?? event.location,
+                                    notes: event.description
+                                )
+                            }
+
                             // Guest List Tabs (inline, swipeable)
                             GuestListTabsView(
                                 summary: viewModel.inviteSummary,
@@ -333,6 +344,17 @@ struct EventDetailView: View {
         )
     }
 
+    private func calendarTimeOption(for event: GameEvent) -> TimeOption? {
+        if let confirmedId = event.confirmedTimeOptionId,
+           let confirmed = event.timeOptions.first(where: { $0.id == confirmedId }) {
+            return confirmed
+        }
+        if event.scheduleMode == .fixed, let first = event.timeOptions.first {
+            return first
+        }
+        return nil
+    }
+
     private func rsvpDeadlineText(for event: GameEvent) -> String? {
         guard let deadline = event.rsvpDeadline else { return nil }
         return RSVPDeadlineDisplay.label(for: deadline)
@@ -367,6 +389,8 @@ struct EventEditSavePresentation {
 struct EventHeroHeader: View {
     let event: GameEvent
     let locationPresentation: EventLocationPresentation?
+    @Environment(\.openURL) private var openURL
+    @State private var showMapPicker = false
 
     private var firstTimeOption: TimeOption? {
         event.timeOptions.first
@@ -453,11 +477,25 @@ struct EventHeroHeader: View {
             }
         }
 
-        if let mapsURL = locationPresentation.mapsURL {
-            Link(destination: mapsURL) {
+        if locationPresentation.mapsURL != nil {
+            Button {
+                showMapPicker = true
+            } label: {
                 content
             }
             .buttonStyle(.plain)
+            .confirmationDialog("Open in", isPresented: $showMapPicker, titleVisibility: .visible) {
+                if let url = locationPresentation.mapsURL {
+                    Button("Apple Maps") { openURL(url) }
+                }
+                if let url = locationPresentation.googleMapsURL {
+                    Button("Google Maps") { openURL(url) }
+                }
+                if let url = locationPresentation.wazeURL {
+                    Button("Waze") { openURL(url) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
         } else {
             content
         }

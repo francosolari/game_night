@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var showAuth = false
+    @State private var showBetaAuth = false
 
     var body: some View {
         ZStack {
@@ -29,7 +30,7 @@ struct OnboardingView: View {
                     .tag(1)
 
                     // Page 3: Privacy promise (inspired by Partiful)
-                    PrivacyPromisePage()
+                    PrivacyPromisePage(showBetaAuth: $showBetaAuth)
                         .tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -64,11 +65,17 @@ struct OnboardingView: View {
         .fullScreenCover(isPresented: $showAuth) {
             AuthFlowView()
         }
+        .fullScreenCover(isPresented: $showBetaAuth) {
+            BetaAuthFlowView()
+        }
     }
 }
 
 // MARK: - Privacy Promise Page (Partiful-inspired)
 struct PrivacyPromisePage: View {
+    @State private var tapCount = 0
+    @Binding var showBetaAuth: Bool
+
     var body: some View {
         VStack(spacing: Theme.Spacing.xxxl) {
             Spacer()
@@ -81,6 +88,13 @@ struct PrivacyPromisePage: View {
                 Image(systemName: "lock.shield.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(Theme.Gradients.accent)
+            }
+            .onTapGesture {
+                tapCount += 1
+                if tapCount >= 3 {
+                    tapCount = 0
+                    showBetaAuth = true
+                }
             }
 
             VStack(spacing: Theme.Spacing.lg) {
@@ -202,7 +216,6 @@ struct AuthFlowView: View {
     @State private var error: String?
     @State private var otpTimer = 0
     @State private var timerTask: Task<Void, Never>?
-    @FocusState private var focusedOTPIndex: Int?
     @FocusState private var otpFieldFocused: Bool
     @FocusState private var phoneFieldFocused: Bool
     @FocusState private var nameFieldFocused: Bool
@@ -335,6 +348,7 @@ struct AuthFlowView: View {
                     .font(Theme.Typography.headlineLarge)
                     .foregroundColor(Theme.Colors.textPrimary)
                     .focused($phoneFieldFocused)
+                    .frame(maxWidth: .infinity)
                     .padding(Theme.Spacing.md)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
@@ -414,33 +428,32 @@ struct AuthFlowView: View {
                     }
                 }
                 
-                // Hidden TextField for autocomplete
+                // Hidden TextField captures full OTP from autocomplete
                 TextField("", text: $otpFullCode)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
                     .focused($otpFieldFocused)
+                    .frame(maxWidth: .infinity, minHeight: 56)
                     .opacity(0.01)
                     .onChange(of: otpFullCode) { _, newValue in
                         let filtered = String(newValue.filter(\.isNumber).prefix(6))
-                        if filtered.count <= 6 {
-                            otpFullCode = filtered
-                            // Split the code into individual digits
-                            for i in 0..<6 {
-                                if i < filtered.count {
-                                    let index = filtered.index(filtered.startIndex, offsetBy: i)
-                                    otpDigits[i] = String(filtered[index])
-                                } else {
-                                    otpDigits[i] = ""
-                                }
-                            }
-                            // Auto-submit when all filled
-                            if filtered.count == 6 {
-                                Task { await verifyCode() }
+                        // Distribute digits to visual boxes
+                        for i in 0..<6 {
+                            if i < filtered.count {
+                                let idx = filtered.index(filtered.startIndex, offsetBy: i)
+                                otpDigits[i] = String(filtered[idx])
+                            } else {
+                                otpDigits[i] = ""
                             }
                         }
-                    }
-                    .onTapGesture {
-                        otpFieldFocused = true
+                        // Clamp to 6 digits without re-triggering onChange loop
+                        if newValue != filtered {
+                            otpFullCode = filtered
+                        }
+                        // Auto-submit when all 6 filled
+                        if filtered.count == 6 {
+                            Task { await verifyCode() }
+                        }
                     }
             }
 
@@ -503,6 +516,7 @@ struct AuthFlowView: View {
                 .foregroundColor(Theme.Colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .focused($nameFieldFocused)
+                .frame(maxWidth: .infinity)
                 .padding(Theme.Spacing.lg)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
@@ -647,6 +661,374 @@ struct AuthFlowView: View {
                 otpTimer -= 1
             }
         }
+    }
+}
+
+// MARK: - Beta Auth Flow (Password Bypass)
+struct BetaAuthFlowView: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+
+    @State private var step: BetaStep = .password
+    @State private var betaPassword = ""
+    @State private var phoneNumber = ""
+    @State private var countryCode = "+1"
+    @State private var displayName = ""
+    @State private var isLoading = false
+    @State private var error: String?
+    @FocusState private var passwordFieldFocused: Bool
+    @FocusState private var phoneFieldFocused: Bool
+    @FocusState private var nameFieldFocused: Bool
+
+    private let correctPassword = "francosfriend"
+
+    enum BetaStep {
+        case password, phone, name
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.Colors.background.ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    // Progress bar
+                    HStack(spacing: 4) {
+                        ForEach(0..<3, id: \.self) { i in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(stepIndex >= i ? Theme.Colors.accent : Theme.Colors.divider)
+                                .frame(height: 3)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.top, Theme.Spacing.md)
+
+                    ScrollView {
+                        VStack(spacing: Theme.Spacing.xxl) {
+                            Spacer().frame(height: Theme.Spacing.jumbo)
+
+                            Group {
+                                switch step {
+                                case .password: passwordStep
+                                case .phone: betaPhoneStep
+                                case .name: betaNameStep
+                                }
+                            }
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                        }
+                        .padding(.horizontal, Theme.Spacing.xl)
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if step != .password {
+                        Button {
+                            withAnimation(Theme.Animation.snappy) {
+                                switch step {
+                                case .phone: step = .password
+                                case .name: step = .phone
+                                case .password: break
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                        .font(Theme.Typography.calloutMedium)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+            }
+        }
+    }
+
+    private var stepIndex: Int {
+        switch step {
+        case .password: return 0
+        case .phone: return 1
+        case .name: return 2
+        }
+    }
+
+    // MARK: - Password Gate Step
+    private var passwordStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(Theme.Gradients.accent)
+
+                Text("Beta Access")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("Enter the password Franco gave you.")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            SecureField("Password", text: $betaPassword)
+                .font(Theme.Typography.headlineLarge)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .multilineTextAlignment(.center)
+                .focused($passwordFieldFocused)
+                .padding(Theme.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .fill(Theme.Colors.fieldBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .stroke(passwordFieldFocused ? Theme.Colors.accent.opacity(0.5) : .clear, lineWidth: 1.5)
+                        )
+                )
+                .submitLabel(.go)
+                .onSubmit { checkPassword() }
+
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
+                    .transition(.opacity)
+            }
+
+            Button("Continue") {
+                checkPassword()
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: !betaPassword.isEmpty))
+            .disabled(betaPassword.isEmpty)
+        }
+        .onAppear { passwordFieldFocused = true }
+    }
+
+    // MARK: - Phone Step (no OTP)
+    private var betaPhoneStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Text("What's your number?")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("We'll use this to identify your account.\nNo verification code needed.")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: Theme.Spacing.sm) {
+                Menu {
+                    Button("+1 US") { countryCode = "+1" }
+                    Button("+44 UK") { countryCode = "+44" }
+                    Button("+61 AU") { countryCode = "+61" }
+                    Button("+49 DE") { countryCode = "+49" }
+                    Button("+33 FR") { countryCode = "+33" }
+                    Button("+81 JP") { countryCode = "+81" }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(countryCode)
+                            .font(Theme.Typography.headlineLarge)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(Theme.Colors.backgroundElevated)
+                    )
+                }
+
+                TextField("(555) 123-4567", text: $phoneNumber)
+                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+                    .font(Theme.Typography.headlineLarge)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .focused($phoneFieldFocused)
+                    .frame(maxWidth: .infinity)
+                    .padding(Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(Theme.Colors.fieldBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                    .stroke(phoneFieldFocused ? Theme.Colors.accent.opacity(0.5) : .clear, lineWidth: 1.5)
+                            )
+                    )
+            }
+
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
+                    .transition(.opacity)
+            }
+
+            Button("Continue") {
+                Task { await signUpOrIn() }
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: isPhoneValid && !isLoading))
+            .disabled(!isPhoneValid || isLoading)
+
+            if isLoading {
+                ProgressView()
+                    .tint(Theme.Colors.accent)
+            }
+        }
+        .onAppear { phoneFieldFocused = true }
+    }
+
+    // MARK: - Name Step
+    private var betaNameStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Text("What should we\ncall you?")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("Pick any name, nickname, or alias.\nThis is what friends see on invites.")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            TextField("e.g. Alex, GameMaster, A.", text: $displayName)
+                .font(Theme.Typography.headlineLarge)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .multilineTextAlignment(.center)
+                .focused($nameFieldFocused)
+                .frame(maxWidth: .infinity)
+                .padding(Theme.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .fill(Theme.Colors.fieldBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .stroke(nameFieldFocused ? Theme.Colors.accent.opacity(0.5) : .clear, lineWidth: 1.5)
+                        )
+                )
+
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
+            }
+
+            Button("Let's Play!") {
+                Task { await createProfile() }
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: !displayName.trimmingCharacters(in: .whitespaces).isEmpty && !isLoading))
+            .disabled(displayName.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+
+            if isLoading {
+                ProgressView()
+                    .tint(Theme.Colors.accent)
+            }
+
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "theatermasks.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(Theme.Colors.primaryLight)
+                Text("No real name required — use whatever you like")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+        }
+        .onAppear { nameFieldFocused = true }
+    }
+
+    // MARK: - Validation
+
+    private var isPhoneValid: Bool {
+        let digits = phoneNumber.filter(\.isNumber)
+        return digits.count >= 7
+    }
+
+    private var fullPhoneNumber: String {
+        let digits = phoneNumber.filter(\.isNumber)
+        return "\(countryCode)\(digits)"
+    }
+
+    // MARK: - Actions
+
+    private func checkPassword() {
+        if betaPassword == correctPassword {
+            error = nil
+            withAnimation(Theme.Animation.snappy) { step = .phone }
+        } else {
+            error = "Wrong password."
+            betaPassword = ""
+        }
+    }
+
+    private func signUpOrIn() async {
+        isLoading = true
+        error = nil
+        do {
+            // Try sign in first (returning user)
+            try await SupabaseService.shared.signInWithPassword(
+                phoneNumber: fullPhoneNumber,
+                password: correctPassword
+            )
+            if let existingUser = try? await SupabaseService.shared.fetchCurrentUser() {
+                appState.currentUser = existingUser
+                appState.isAuthenticated = true
+                dismiss()
+                return
+            }
+            withAnimation(Theme.Animation.snappy) { step = .name }
+        } catch {
+            // Sign in failed — try sign up (new user)
+            do {
+                try await SupabaseService.shared.signUpWithPassword(
+                    phoneNumber: fullPhoneNumber,
+                    password: correctPassword
+                )
+                withAnimation(Theme.Animation.snappy) { step = .name }
+            } catch let signUpError {
+                print("❌ [betaAuth] signUp error: \(signUpError)")
+                self.error = "Something went wrong. Try again."
+            }
+        }
+        isLoading = false
+    }
+
+    private func createProfile() async {
+        isLoading = true
+        error = nil
+        do {
+            let session = try await SupabaseService.shared.client.auth.session
+            let user = User(
+                id: session.user.id,
+                phoneNumber: fullPhoneNumber,
+                displayName: displayName.trimmingCharacters(in: .whitespaces),
+                phoneVisible: false,
+                discoverableByPhone: true,
+                marketingOptIn: false,
+                contactsSynced: false,
+                phoneVerified: false,
+                privacyAcceptedAt: Date()
+            )
+            try await SupabaseService.shared.updateUser(user)
+            appState.currentUser = user
+            appState.isAuthenticated = true
+            dismiss()
+        } catch let err {
+            print("❌ [betaCreateProfile] \(err)")
+            self.error = "Something went wrong. Please try again."
+        }
+        isLoading = false
     }
 }
 

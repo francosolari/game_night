@@ -43,6 +43,24 @@ struct EventLocationPresentation {
 
         return URL(string: "http://maps.apple.com/?q=\(encodedAddress)")
     }
+
+    var googleMapsURL: URL? {
+        guard let fullAddress,
+              let encodedAddress = fullAddress.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else {
+            return nil
+        }
+        return URL(string: "https://www.google.com/maps/search/?api=1&query=\(encodedAddress)")
+    }
+
+    var wazeURL: URL? {
+        guard let fullAddress,
+              let encodedAddress = fullAddress.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else {
+            return nil
+        }
+        return URL(string: "https://waze.com/ul?q=\(encodedAddress)")
+    }
 }
 
 private struct ParsedEventAddress {
