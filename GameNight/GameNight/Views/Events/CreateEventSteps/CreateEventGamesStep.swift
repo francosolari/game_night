@@ -47,6 +47,57 @@ struct CreateEventGamesStep: View {
                 }
             }
 
+            // Library autocomplete (when typing)
+            if !viewModel.libraryAutocompleteResults.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("From Library")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.accent)
+
+                    ForEach(viewModel.libraryAutocompleteResults.prefix(4)) { game in
+                        Button {
+                            let eventGame = EventGame(
+                                id: UUID(),
+                                gameId: game.id,
+                                game: game,
+                                isPrimary: viewModel.selectedGames.isEmpty,
+                                sortOrder: viewModel.selectedGames.count
+                            )
+                            viewModel.selectedGames.append(eventGame)
+                            viewModel.manualGameName = ""
+                        } label: {
+                            HStack(spacing: Theme.Spacing.md) {
+                                GameThumbnail(url: game.thumbnailUrl, size: 40)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(game.name)
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    if let year = game.yearPublished {
+                                        Text("(\(String(year)))")
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(Theme.Colors.textTertiary)
+                                    }
+                                }
+                                Spacer()
+                                Text("Library")
+                                    .font(Theme.Typography.caption2)
+                                    .foregroundColor(Theme.Colors.accent)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Theme.Colors.accent.opacity(0.12)))
+                            }
+                            .padding(Theme.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                    .fill(Theme.Colors.backgroundElevated)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             // Search results
             if viewModel.isSearchingGames {
                 ProgressView()
@@ -93,6 +144,48 @@ struct CreateEventGamesStep: View {
                                     .fill(Theme.Colors.backgroundElevated)
                             )
                         }
+                    }
+                }
+            }
+
+            // From Your Library section (when no games selected)
+            if viewModel.selectedGames.isEmpty && !viewModel.libraryGames.isEmpty && viewModel.manualGameName.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    Text("From Your Library")
+                        .font(Theme.Typography.headlineMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    ForEach(viewModel.libraryGames.prefix(6)) { game in
+                        Button {
+                            let eventGame = EventGame(
+                                id: UUID(),
+                                gameId: game.id,
+                                game: game,
+                                isPrimary: viewModel.selectedGames.isEmpty,
+                                sortOrder: viewModel.selectedGames.count
+                            )
+                            viewModel.selectedGames.append(eventGame)
+                        } label: {
+                            HStack(spacing: Theme.Spacing.md) {
+                                GameThumbnail(url: game.thumbnailUrl, size: 40)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(game.name)
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    if let year = game.yearPublished {
+                                        Text("(\(String(year)))")
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(Theme.Colors.textTertiary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "plus.circle")
+                                    .foregroundColor(Theme.Colors.primary)
+                            }
+                            .padding(Theme.Spacing.sm)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -181,6 +274,7 @@ struct CreateEventGamesStep: View {
                 .cardStyle()
             }
         }
+        .task { await viewModel.loadLibrary() }
     }
 }
 

@@ -460,6 +460,81 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertTrue(sut.canProceed)
     }
 
+    func testAddGamePersistsBGGRelationsAndHydratedGame() async {
+        let primaryId = UUID()
+        let hydratedGame = Game(
+            id: primaryId,
+            bggId: 123,
+            name: "Dune: Imperium",
+            yearPublished: 2020,
+            thumbnailUrl: nil,
+            imageUrl: "https://example.com/dune.png",
+            minPlayers: 1,
+            maxPlayers: 4,
+            recommendedPlayers: [3, 4],
+            minPlaytime: 60,
+            maxPlaytime: 120,
+            complexity: 3.08,
+            bggRating: 8.4,
+            description: "Deck building on Arrakis.",
+            categories: ["Sci-Fi"],
+            mechanics: ["Deck Building"],
+            designers: ["Paul Dennen"],
+            publishers: ["Dire Wolf"],
+            artists: [],
+            minAge: 14,
+            bggRank: 6
+        )
+        let expansionGame = Game(
+            id: UUID(),
+            bggId: 456,
+            name: "Rise of Ix",
+            yearPublished: 2022,
+            thumbnailUrl: nil,
+            imageUrl: nil,
+            minPlayers: 1,
+            maxPlayers: 4,
+            recommendedPlayers: nil,
+            minPlaytime: 60,
+            maxPlaytime: 120,
+            complexity: 3.2,
+            bggRating: 8.0,
+            description: nil,
+            categories: [],
+            mechanics: [],
+            designers: [],
+            publishers: [],
+            artists: [],
+            minAge: nil,
+            bggRank: nil
+        )
+
+        let service = StubEventEditorService(currentUserId: UUID())
+        service.upsertGameResults = [
+            123: hydratedGame,
+            456: expansionGame
+        ]
+        let bgg = StubEventGameBGGProvider(
+            parseResult: BGGGameParseResult(
+                game: hydratedGame,
+                expansionLinks: [(bggId: 456, name: "Rise of Ix", isInbound: false)],
+                familyLinks: [(bggFamilyId: 999, name: "Dune")]
+            )
+        )
+        let sut = CreateEventViewModel(supabase: service, bgg: bgg)
+
+        await sut.addGame(bggId: 123, isPrimary: true)
+
+        XCTAssertEqual(bgg.requestedBGGIds, [123])
+        XCTAssertEqual(service.expansionLinkCalls.count, 1)
+        XCTAssertEqual(service.expansionLinkCalls.first?.baseGameId, hydratedGame.id)
+        XCTAssertEqual(service.expansionLinkCalls.first?.expansionGameIds, [expansionGame.id])
+        XCTAssertEqual(service.familyLinkCalls.count, 1)
+        XCTAssertEqual(service.familyLinkCalls.first?.gameId, hydratedGame.id)
+        XCTAssertEqual(sut.selectedGames.first?.game?.designers, ["Paul Dennen"])
+        XCTAssertEqual(sut.selectedGames.first?.game?.publishers, ["Dire Wolf"])
+    }
+
     func testNavigateToStepAllowsBackwardNavigation() {
         let sut = CreateEventViewModel(
             supabase: StubEventEditorService(currentUserId: UUID())
@@ -884,6 +959,7 @@ private final class StubEventEditorService: EventEditingProviding {
     let currentUserIdValue: UUID
     var storedEvent: GameEvent?
     var existingInvites: [Invite]
+    var upsertGameResults: [Int: Game] = [:]
     var createdEvents: [GameEvent] = []
     var updatedEvents: [GameEvent] = []
     var upsertedTimeOptions: [TimeOption] = []
@@ -891,6 +967,8 @@ private final class StubEventEditorService: EventEditingProviding {
     var createdInvites: [Invite] = []
     var updatedInvites: [Invite] = []
     var deletedInviteIds: [UUID] = []
+    var expansionLinkCalls: [(baseGameId: UUID, expansionGameIds: [UUID])] = []
+    var familyLinkCalls: [(gameId: UUID, families: [(bggFamilyId: Int, name: String)])] = []
 
     init(
         currentUserId: UUID,
@@ -957,12 +1035,27 @@ private final class StubEventEditorService: EventEditingProviding {
     }
 
     func upsertGame(_ game: Game) async throws -> Game {
-        game
+        if let bggId = game.bggId, let result = upsertGameResults[bggId] {
+            return result
+        }
+        return game
     }
 
     func updateGame(_ game: Game) async throws {}
 
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {}
+
+    func fetchGameLibrary() async throws -> [GameLibraryEntry] {
+        []
+    }
+
+    func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws {
+        expansionLinkCalls.append((baseGameId: baseGameId, expansionGameIds: expansionGameIds))
+    }
+
+    func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws {
+        familyLinkCalls.append((gameId: gameId, families: families))
+    }
 
     func fetchInvites(eventId: UUID) async throws -> [Invite] {
         existingInvites
@@ -983,5 +1076,184 @@ private final class StubEventEditorService: EventEditingProviding {
     func deleteInvites(ids: [UUID]) async throws {
         deletedInviteIds.append(contentsOf: ids)
         existingInvites.removeAll { ids.contains($0.id) }
+    }
+}
+
+private final class StubEventGameBGGProvider: EventGameBGGProviding {
+    let parseResult: BGGGameParseResult
+    private(set) var requestedBGGIds: [Int] = []
+
+    init(parseResult: BGGGameParseResult) {
+        self.parseResult = parseResult
+    }
+
+    func searchGames(query: String) async throws -> [BGGSearchResult] {
+        []
+    }
+
+    func fetchGameDetailsWithRelations(bggId: Int) async throws -> BGGGameParseResult {
+        requestedBGGIds.append(bggId)
+        return parseResult
+    }
+}
+
+@MainActor
+final class GameDetailViewModelTests: XCTestCase {
+    func testLoadRelatedDataHydratesBGGGameAndPersistsRelationLinks() async {
+        let originalGame = Game(
+            id: UUID(),
+            bggId: 123,
+            name: "Dune: Imperium",
+            yearPublished: 2020,
+            thumbnailUrl: nil,
+            imageUrl: nil,
+            minPlayers: 1,
+            maxPlayers: 4,
+            recommendedPlayers: nil,
+            minPlaytime: 60,
+            maxPlaytime: 120,
+            complexity: 3.0,
+            bggRating: 8.4,
+            description: nil,
+            categories: [],
+            mechanics: [],
+            designers: [],
+            publishers: [],
+            artists: [],
+            minAge: nil,
+            bggRank: nil
+        )
+
+        let hydratedGame = Game(
+            id: originalGame.id,
+            bggId: 123,
+            name: "Dune: Imperium",
+            yearPublished: 2020,
+            thumbnailUrl: nil,
+            imageUrl: "https://example.com/dune.png",
+            minPlayers: 1,
+            maxPlayers: 4,
+            recommendedPlayers: [3, 4],
+            minPlaytime: 60,
+            maxPlaytime: 120,
+            complexity: 3.08,
+            bggRating: 8.4,
+            description: "Deck building on Arrakis.",
+            categories: ["Sci-Fi"],
+            mechanics: ["Deck Building"],
+            designers: ["Paul Dennen"],
+            publishers: ["Dire Wolf"],
+            artists: ["Clay Brooks"],
+            minAge: 14,
+            bggRank: 6
+        )
+
+        let expansionGame = Game(
+            id: UUID(),
+            bggId: 456,
+            name: "Rise of Ix",
+            yearPublished: 2022,
+            thumbnailUrl: nil,
+            imageUrl: nil,
+            minPlayers: 1,
+            maxPlayers: 4,
+            recommendedPlayers: nil,
+            minPlaytime: 60,
+            maxPlaytime: 120,
+            complexity: 3.2,
+            bggRating: 8.0,
+            description: nil,
+            categories: [],
+            mechanics: [],
+            designers: [],
+            publishers: [],
+            artists: [],
+            minAge: nil,
+            bggRank: nil
+        )
+
+        let service = StubGameDetailDataProvider(
+            upsertResults: [
+                123: hydratedGame,
+                456: expansionGame
+            ],
+            expansions: [expansionGame]
+        )
+        let bgg = StubGameDetailBGGProvider(
+            result: BGGGameParseResult(
+                game: hydratedGame,
+                expansionLinks: [(bggId: 456, name: "Rise of Ix", isInbound: false)],
+                familyLinks: [(bggFamilyId: 999, name: "Dune")]
+            )
+        )
+
+        let sut = GameDetailViewModel(game: originalGame, supabase: service, bgg: bgg)
+
+        await sut.loadRelatedData()
+
+        XCTAssertEqual(bgg.requestedBGGIds, [123])
+        XCTAssertEqual(service.upsertedGames.map(\.bggId).compactMap { $0 }, [123, 456])
+        XCTAssertEqual(service.expansionLinkCalls.count, 1)
+        XCTAssertEqual(service.expansionLinkCalls.first?.baseGameId, originalGame.id)
+        XCTAssertEqual(service.expansionLinkCalls.first?.expansionGameIds, [expansionGame.id])
+        XCTAssertEqual(service.familyLinkCalls.count, 1)
+        XCTAssertEqual(service.familyLinkCalls.first?.gameId, originalGame.id)
+        XCTAssertEqual(service.familyLinkCalls.first?.families.first?.name, "Dune")
+        XCTAssertEqual(sut.game.designers, ["Paul Dennen"])
+    }
+}
+
+private final class StubGameDetailDataProvider: GameDetailDataProviding {
+    var upsertResults: [Int: Game]
+    var expansions: [Game]
+    var upsertedGames: [Game] = []
+    var expansionLinkCalls: [(baseGameId: UUID, expansionGameIds: [UUID])] = []
+    var familyLinkCalls: [(gameId: UUID, families: [(bggFamilyId: Int, name: String)])] = []
+
+    init(upsertResults: [Int: Game], expansions: [Game] = []) {
+        self.upsertResults = upsertResults
+        self.expansions = expansions
+    }
+
+    func upsertGame(_ game: Game) async throws -> Game {
+        upsertedGames.append(game)
+        if let bggId = game.bggId, let result = upsertResults[bggId] {
+            return result
+        }
+        return game
+    }
+
+    func fetchExpansions(gameId: UUID) async throws -> [Game] {
+        expansions
+    }
+
+    func fetchBaseGame(expansionGameId: UUID) async throws -> Game? {
+        nil
+    }
+
+    func fetchFamilyMembers(gameId: UUID) async throws -> [(family: GameFamily, games: [Game])] {
+        []
+    }
+
+    func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws {
+        expansionLinkCalls.append((baseGameId: baseGameId, expansionGameIds: expansionGameIds))
+    }
+
+    func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws {
+        familyLinkCalls.append((gameId: gameId, families: families))
+    }
+}
+
+private final class StubGameDetailBGGProvider: GameDetailBGGProviding {
+    let result: BGGGameParseResult
+    private(set) var requestedBGGIds: [Int] = []
+
+    init(result: BGGGameParseResult) {
+        self.result = result
+    }
+
+    func fetchGameDetailsWithRelations(bggId: Int) async throws -> BGGGameParseResult {
+        requestedBGGIds.append(bggId)
+        return result
     }
 }

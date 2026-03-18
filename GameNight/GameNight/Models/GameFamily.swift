@@ -27,3 +27,8 @@ struct GameFamilyMember: Identifiable, Codable {
         case createdAt = "created_at"
     }
 }
+
+struct GameFamilyDestination: Hashable {
+    let family: GameFamily
+    let games: [Game]
+}

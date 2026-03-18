@@ -24,6 +24,7 @@ final class GameLibraryViewModel: ObservableObject {
     private let supabase = SupabaseService.shared
     private let bgg = BGGService.shared
     private var searchTask: Task<Void, Never>?
+    private var selectedGameParseResult: BGGGameParseResult?
 
     var filteredEntries: [GameLibraryEntry] {
         var entries = libraryEntries
@@ -90,7 +91,9 @@ final class GameLibraryViewModel: ObservableObject {
     func loadGameDetail(bggId: Int) async {
         isLoadingDetail = true
         do {
-            selectedGameDetail = try await bgg.fetchGameDetails(bggId: bggId)
+            let parseResult = try await bgg.fetchGameDetailsWithRelations(bggId: bggId)
+            selectedGameParseResult = parseResult
+            selectedGameDetail = parseResult.game
         } catch {
             self.error = error.localizedDescription
         }
@@ -99,8 +102,15 @@ final class GameLibraryViewModel: ObservableObject {
 
     func addGameToLibrary(game: Game, categoryId: UUID?) async {
         do {
-            let saved = try await supabase.upsertGame(game)
+            let saved: Game
+            if let parseResult = selectedGameParseResult, parseResult.game.bggId == game.bggId {
+                saved = try await persistBGGGame(parseResult)
+            } else {
+                saved = try await supabase.upsertGame(game)
+            }
             try await supabase.addGameToLibrary(gameId: saved.id, categoryId: categoryId)
+            selectedGameParseResult = nil
+            selectedGameDetail = nil
             await loadLibrary()
         } catch {
             self.error = error.localizedDescription
@@ -141,12 +151,11 @@ final class GameLibraryViewModel: ObservableObject {
         isLoading = true
         do {
             let collection = try await bgg.fetchUserCollection(username: username)
-            // Fetch details for all games
             let bggIds = collection.map(\.id)
-            let games = try await bgg.fetchMultipleGameDetails(bggIds: bggIds)
+            let parseResults = try await bgg.fetchMultipleGameDetailsWithRelations(bggIds: bggIds)
 
-            for game in games {
-                let saved = try await supabase.upsertGame(game)
+            for parseResult in parseResults {
+                let saved = try await persistBGGGame(parseResult)
                 try await supabase.addGameToLibrary(gameId: saved.id, categoryId: nil)
             }
 
@@ -155,5 +164,42 @@ final class GameLibraryViewModel: ObservableObject {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func persistBGGGame(_ parseResult: BGGGameParseResult) async throws -> Game {
+        let savedGame = try await supabase.upsertGame(parseResult.game)
+
+        var outboundExpansionIds: [UUID] = []
+        var inboundBaseIds: [UUID] = []
+
+        for link in parseResult.expansionLinks {
+            let linkedGame = try await supabase.upsertGame(
+                Game(
+                    id: UUID(),
+                    bggId: link.bggId,
+                    name: link.name
+                )
+            )
+
+            if link.isInbound {
+                inboundBaseIds.append(linkedGame.id)
+            } else {
+                outboundExpansionIds.append(linkedGame.id)
+            }
+        }
+
+        if !outboundExpansionIds.isEmpty {
+            try await supabase.upsertExpansionLinks(baseGameId: savedGame.id, expansionGameIds: outboundExpansionIds)
+        }
+
+        for baseGameId in inboundBaseIds {
+            try await supabase.upsertExpansionLinks(baseGameId: baseGameId, expansionGameIds: [savedGame.id])
+        }
+
+        if !parseResult.familyLinks.isEmpty {
+            try await supabase.upsertFamilyLinks(gameId: savedGame.id, families: parseResult.familyLinks)
+        }
+
+        return savedGame
     }
 }

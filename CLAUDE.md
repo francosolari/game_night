@@ -23,7 +23,7 @@ The Xcode project is at `GameNight/GameNight.xcodeproj`. It uses XcodeGen (`proj
 cd GameNight && xcodegen generate
 
 # Build from command line
-xcodebuild -project GameNight/GameNight.xcodeproj -scheme GameNight -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project GameNight/GameNight.xcodeproj -scheme GameNight -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
 - **Deployment target:** iOS 17.0

@@ -23,6 +23,9 @@ protocol EventEditingProviding: AnyObject {
     func upsertGame(_ game: Game) async throws -> Game
     func updateGame(_ game: Game) async throws
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
+    func fetchGameLibrary() async throws -> [GameLibraryEntry]
+    func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws
+    func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws
 }
 
 private struct EventSoftDeletePatch: Encodable {
@@ -599,6 +602,183 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .update(game)
             .eq("id", value: game.id.uuidString)
             .execute()
+    }
+
+    // MARK: - Game Relations
+
+    func fetchExpansions(gameId: UUID) async throws -> [Game] {
+        struct ExpansionLink: Decodable {
+            let expansionGameId: String
+            enum CodingKeys: String, CodingKey {
+                case expansionGameId = "expansion_game_id"
+            }
+        }
+        let links: [ExpansionLink] = try await client
+            .from("game_expansions")
+            .select("expansion_game_id")
+            .eq("base_game_id", value: gameId.uuidString)
+            .execute()
+            .value
+        guard !links.isEmpty else { return [] }
+        let ids = links.map(\.expansionGameId)
+        let games: [Game] = try await client
+            .from("games")
+            .select()
+            .in("id", values: ids)
+            .execute()
+            .value
+        return games
+    }
+
+    func fetchBaseGame(expansionGameId: UUID) async throws -> Game? {
+        struct BaseLink: Decodable {
+            let baseGameId: String
+            enum CodingKeys: String, CodingKey {
+                case baseGameId = "base_game_id"
+            }
+        }
+        let links: [BaseLink] = try await client
+            .from("game_expansions")
+            .select("base_game_id")
+            .eq("expansion_game_id", value: expansionGameId.uuidString)
+            .execute()
+            .value
+        guard let link = links.first, let baseId = UUID(uuidString: link.baseGameId) else { return nil }
+        let game: Game = try await client
+            .from("games")
+            .select()
+            .eq("id", value: baseId.uuidString)
+            .single()
+            .execute()
+            .value
+        return game
+    }
+
+    func fetchFamilyMembers(gameId: UUID) async throws -> [(family: GameFamily, games: [Game])] {
+        struct FamilyLink: Decodable {
+            let familyId: String
+            enum CodingKeys: String, CodingKey {
+                case familyId = "family_id"
+            }
+        }
+        let links: [FamilyLink] = try await client
+            .from("game_family_members")
+            .select("family_id")
+            .eq("game_id", value: gameId.uuidString)
+            .execute()
+            .value
+        guard !links.isEmpty else { return [] }
+
+        // Fetch all families in parallel
+        return try await withThrowingTaskGroup(of: (GameFamily, [Game]).self) { group in
+            for link in links {
+                group.addTask {
+                    let family: GameFamily = try await self.client
+                        .from("game_families")
+                        .select()
+                        .eq("id", value: link.familyId)
+                        .single()
+                        .execute()
+                        .value
+
+                    struct MemberLink: Decodable {
+                        let gameId: String
+                        enum CodingKeys: String, CodingKey {
+                            case gameId = "game_id"
+                        }
+                    }
+                    let memberLinks: [MemberLink] = try await self.client
+                        .from("game_family_members")
+                        .select("game_id")
+                        .eq("family_id", value: link.familyId)
+                        .execute()
+                        .value
+                    let memberIds = memberLinks.map(\.gameId)
+                    let games: [Game] = try await self.client
+                        .from("games")
+                        .select()
+                        .in("id", values: memberIds)
+                        .execute()
+                        .value
+                    return (family, games)
+                }
+            }
+
+            var results: [(family: GameFamily, games: [Game])] = []
+            for try await (family, games) in group {
+                results.append((family: family, games: games))
+            }
+            return results
+        }
+    }
+
+    private struct ExpansionLinkInsert: Encodable {
+        let baseGameId: UUID
+        let expansionGameId: UUID
+        enum CodingKeys: String, CodingKey {
+            case baseGameId = "base_game_id"
+            case expansionGameId = "expansion_game_id"
+        }
+    }
+
+    func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws {
+        guard !expansionGameIds.isEmpty else { return }
+        let inserts = expansionGameIds.map { ExpansionLinkInsert(baseGameId: baseGameId, expansionGameId: $0) }
+        try await client
+            .from("game_expansions")
+            .upsert(inserts, onConflict: "base_game_id,expansion_game_id")
+            .execute()
+    }
+
+    func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws {
+        for family in families {
+            // Upsert family
+            let familyEntry: [String: AnyJSON] = [
+                "bgg_family_id": .int(family.bggFamilyId),
+                "name": .string(family.name)
+            ]
+            let upsertedFamily: GameFamily = try await client
+                .from("game_families")
+                .upsert(familyEntry, onConflict: "bgg_family_id")
+                .select()
+                .single()
+                .execute()
+                .value
+
+            // Upsert member link
+            let memberEntry: [String: AnyJSON] = [
+                "family_id": .string(upsertedFamily.id.uuidString),
+                "game_id": .string(gameId.uuidString)
+            ]
+            try await client
+                .from("game_family_members")
+                .upsert(memberEntry, onConflict: "family_id,game_id")
+                .execute()
+        }
+    }
+
+    func fetchGamesByDesigner(name: String) async throws -> [Game] {
+        let games: [Game] = try await client
+            .from("games")
+            .select()
+            .contains("designers", value: [name])
+            .order("bgg_rating", ascending: false)
+            .limit(50)
+            .execute()
+            .value
+        return games
+    }
+
+    func fetchGamesByPublisher(name: String) async throws -> [Game] {
+        let games: [Game] = try await client
+            .from("games")
+            .select()
+            .contains("publishers", value: [name])
+            .order("bgg_rating", ascending: false)
+            .limit(50)
+            .execute()
+            .value
+        return games
     }
 
     // MARK: - Categories

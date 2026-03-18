@@ -2,6 +2,13 @@ import Foundation
 import SwiftUI
 import Supabase
 
+protocol EventGameBGGProviding {
+    func searchGames(query: String) async throws -> [BGGSearchResult]
+    func fetchGameDetailsWithRelations(bggId: Int) async throws -> BGGGameParseResult
+}
+
+extension BGGService: EventGameBGGProviding {}
+
 // MARK: - Create Event ViewModel
 @MainActor
 final class CreateEventViewModel: ObservableObject {
@@ -48,6 +55,7 @@ final class CreateEventViewModel: ObservableObject {
     @Published var gameSearchResults: [BGGSearchResult] = []
     @Published var isSearchingGames = false
     @Published var manualGameName = ""
+    @Published var libraryGames: [Game] = []
 
     @Published var suggestedContacts: [FrequentContact] = []
     @Published var isLoadingSuggestions = true
@@ -72,7 +80,7 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     private let supabase: EventEditingProviding
-    private let bgg: BGGService
+    private let bgg: EventGameBGGProviding
     private let userDefaults: UserDefaults
 
     private enum LocalCoverPreviewStorage {
@@ -84,7 +92,7 @@ final class CreateEventViewModel: ObservableObject {
         eventToEdit: GameEvent? = nil,
         initialInvites: [Invite] = [],
         supabase: EventEditingProviding? = nil,
-        bgg: BGGService = .shared,
+        bgg: EventGameBGGProviding = BGGService.shared,
         userDefaults: UserDefaults = .standard
     ) {
         self.eventToEdit = eventToEdit
@@ -244,8 +252,8 @@ final class CreateEventViewModel: ObservableObject {
 
     func addGame(bggId: Int, isPrimary: Bool = false) async {
         do {
-            let game = try await bgg.fetchGameDetails(bggId: bggId)
-            let saved = try await supabase.upsertGame(game)
+            let parseResult = try await bgg.fetchGameDetailsWithRelations(bggId: bggId)
+            let saved = try await persistBGGGame(parseResult)
             let eventGame = EventGame(
                 id: UUID(),
                 gameId: saved.id,
@@ -257,6 +265,43 @@ final class CreateEventViewModel: ObservableObject {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    private func persistBGGGame(_ parseResult: BGGGameParseResult) async throws -> Game {
+        let savedGame = try await supabase.upsertGame(parseResult.game)
+
+        var outboundExpansionIds: [UUID] = []
+        var inboundBaseIds: [UUID] = []
+
+        for link in parseResult.expansionLinks {
+            let linkedGame = try await supabase.upsertGame(
+                Game(
+                    id: UUID(),
+                    bggId: link.bggId,
+                    name: link.name
+                )
+            )
+
+            if link.isInbound {
+                inboundBaseIds.append(linkedGame.id)
+            } else {
+                outboundExpansionIds.append(linkedGame.id)
+            }
+        }
+
+        if !outboundExpansionIds.isEmpty {
+            try await supabase.upsertExpansionLinks(baseGameId: savedGame.id, expansionGameIds: outboundExpansionIds)
+        }
+
+        for baseGameId in inboundBaseIds {
+            try await supabase.upsertExpansionLinks(baseGameId: baseGameId, expansionGameIds: [savedGame.id])
+        }
+
+        if !parseResult.familyLinks.isEmpty {
+            try await supabase.upsertFamilyLinks(gameId: savedGame.id, families: parseResult.familyLinks)
+        }
+
+        return savedGame
     }
 
     func addManualGame(name: String) async {
@@ -400,6 +445,21 @@ final class CreateEventViewModel: ObservableObject {
             // Non-critical
         }
         isLoadingSuggestions = false
+    }
+
+    func loadLibrary() async {
+        do {
+            let entries = try await supabase.fetchGameLibrary()
+            libraryGames = entries.compactMap(\.game)
+        } catch {
+            // Non-critical
+        }
+    }
+
+    var libraryAutocompleteResults: [Game] {
+        guard !manualGameName.isEmpty else { return [] }
+        let query = manualGameName.lowercased()
+        return libraryGames.filter { $0.name.lowercased().contains(query) }
     }
 
     var topSuggestions: [FrequentContact] {

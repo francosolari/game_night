@@ -18,6 +18,19 @@ struct MainTabView: View {
                         .navigationDestination(for: CalendarDestination.self) { _ in
                             CalendarView(navigationPath: $homeNavigationPath)
                         }
+                        .navigationDestination(for: Game.self) { game in
+                            GameDetailView(game: game)
+                        }
+                        .navigationDestination(for: CreatorDestination.self) { dest in
+                            if dest.role == .designer {
+                                DesignerDetailView(name: dest.name)
+                            } else {
+                                PublisherDetailView(name: dest.name)
+                            }
+                        }
+                        .navigationDestination(for: GameFamilyDestination.self) { destination in
+                            GameFamilyDetailView(destination: destination)
+                        }
                 }
                 .tag(AppState.Tab.home)
 

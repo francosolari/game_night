@@ -169,7 +169,9 @@ struct EventDetailView: View {
                                     startDate: timeOption.startTime,
                                     endDate: timeOption.endTime,
                                     location: event.locationAddress ?? event.location,
-                                    notes: event.description
+                                    notes: event.description,
+                                    games: event.games,
+                                    hostName: event.host?.displayName
                                 )
                             }
 
@@ -590,46 +592,55 @@ struct PrimaryGameCard: View {
             .foregroundColor(Theme.Colors.accent)
             .textCase(.uppercase)
 
-            HStack(spacing: Theme.Spacing.md) {
-                // Thumbnail
-                if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
-                    AsyncImage(url: imageUrl) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
+            NavigationLink(value: game) {
+                HStack(spacing: Theme.Spacing.md) {
+                    // Thumbnail
+                    if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                        AsyncImage(url: imageUrl) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .fill(Theme.Colors.backgroundElevated)
+                        }
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+                    } else {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                             .fill(Theme.Colors.backgroundElevated)
-                    }
-                    .frame(width: 56, height: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
-                } else {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                        .fill(Theme.Colors.backgroundElevated)
-                        .frame(width: 56, height: 56)
-                        .overlay(
-                            Image(systemName: "dice.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        )
-                }
-
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text(game.name)
-                        .font(Theme.Typography.titleLarge)
-                        .foregroundColor(Theme.Colors.textPrimary)
-
-                    // Pills
-                    HStack(spacing: 6) {
-                        GamePill(icon: "clock", text: game.playtimeDisplay, color: Theme.Colors.textSecondary)
-                        if game.complexity > 0 {
-                            GamePill(
-                                icon: "brain",
-                                text: String(format: "%.1f/5", game.complexity),
-                                color: Theme.Colors.complexity(game.complexity)
+                            .frame(width: 56, height: 56)
+                            .overlay(
+                                Image(systemName: "dice.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(Theme.Colors.textTertiary)
                             )
+                    }
+
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text(game.name)
+                            .font(Theme.Typography.titleLarge)
+                            .foregroundColor(Theme.Colors.textPrimary)
+
+                        // Pills
+                        HStack(spacing: 6) {
+                            GamePill(icon: "clock", text: game.playtimeDisplay, color: Theme.Colors.textSecondary)
+                            if game.complexity > 0 {
+                                GamePill(
+                                    icon: "brain",
+                                    text: String(format: "%.1f/5", game.complexity),
+                                    color: Theme.Colors.complexity(game.complexity)
+                                )
+                            }
                         }
                     }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
+            .buttonStyle(.plain)
 
             if !otherGames.isEmpty {
                 Divider().background(Theme.Colors.divider)
@@ -643,24 +654,27 @@ struct PrimaryGameCard: View {
                         HStack(spacing: Theme.Spacing.md) {
                             ForEach(otherGames) { eGame in
                                 if let oGame = eGame.game {
-                                    HStack(spacing: 4) {
-                                        if let url = oGame.thumbnailUrl, let imageUrl = URL(string: url) {
-                                            AsyncImage(url: imageUrl) { image in
-                                                image.resizable().aspectRatio(contentMode: .fill)
-                                            } placeholder: {
-                                                Color.clear
+                                    NavigationLink(value: oGame) {
+                                        HStack(spacing: 4) {
+                                            if let url = oGame.thumbnailUrl, let imageUrl = URL(string: url) {
+                                                AsyncImage(url: imageUrl) { image in
+                                                    image.resizable().aspectRatio(contentMode: .fill)
+                                                } placeholder: {
+                                                    Color.clear
+                                                }
+                                                .frame(width: 20, height: 20)
+                                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                            } else {
+                                                Image(systemName: "dice")
+                                                    .font(.system(size: 14))
+                                                    .foregroundColor(Theme.Colors.textTertiary)
                                             }
-                                            .frame(width: 20, height: 20)
-                                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                                        } else {
-                                            Image(systemName: "dice")
-                                                .font(.system(size: 14))
-                                                .foregroundColor(Theme.Colors.textTertiary)
+                                            Text(oGame.name)
+                                                .font(Theme.Typography.caption)
+                                                .foregroundColor(Theme.Colors.textSecondary)
                                         }
-                                        Text(oGame.name)
-                                            .font(Theme.Typography.caption)
-                                            .foregroundColor(Theme.Colors.textSecondary)
                                     }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }

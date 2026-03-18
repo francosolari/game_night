@@ -52,6 +52,16 @@ actor BGGService {
         return result
     }
 
+    func fetchMultipleGameDetailsWithRelations(bggIds: [Int]) async throws -> [BGGGameParseResult] {
+        guard !bggIds.isEmpty else { return [] }
+
+        let ids = bggIds.map(String.init).joined(separator: ",")
+        let url = URL(string: "\(baseURL)/thing?id=\(ids)&stats=1")!
+
+        let (data, _) = try await session.data(from: url)
+        return try BGGXMLParser.parseMultipleGamesWithRelations(data: data)
+    }
+
     // MARK: - Hot Games
 
     func fetchHotGames() async throws -> [BGGSearchResult] {

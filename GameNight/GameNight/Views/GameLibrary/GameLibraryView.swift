@@ -5,7 +5,6 @@ struct GameLibraryView: View {
     @State private var showAddGame = false
     @State private var showImportBGG = false
     @State private var showCreateCategory = false
-    @State private var selectedGame: Game?
 
     var body: some View {
         NavigationStack {
@@ -103,9 +102,10 @@ struct GameLibraryView: View {
                         LazyVStack(spacing: Theme.Spacing.md) {
                             ForEach(viewModel.filteredEntries) { entry in
                                 if let game = entry.game {
-                                    GameCard(game: game, onTap: {
-                                        selectedGame = game
-                                    })
+                                    NavigationLink(value: game) {
+                                        GameCard(game: game, onTap: {})
+                                    }
+                                    .buttonStyle(.plain)
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
                                             Task {
@@ -135,8 +135,18 @@ struct GameLibraryView: View {
                     Task { await viewModel.createCategory(name: name, icon: icon) }
                 }
             }
-            .sheet(item: $selectedGame) { game in
-                GameDetailSheet(game: game)
+            .navigationDestination(for: Game.self) { game in
+                GameDetailView(game: game)
+            }
+            .navigationDestination(for: CreatorDestination.self) { dest in
+                if dest.role == .designer {
+                    DesignerDetailView(name: dest.name)
+                } else {
+                    PublisherDetailView(name: dest.name)
+                }
+            }
+            .navigationDestination(for: GameFamilyDestination.self) { destination in
+                GameFamilyDetailView(destination: destination)
             }
         }
         .task {
@@ -376,196 +386,3 @@ struct CreateCategorySheet: View {
     }
 }
 
-// MARK: - Game Detail Sheet
-struct GameDetailSheet: View {
-    let game: Game
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xxl) {
-                    // Hero image
-                    if let imageUrl = game.imageUrl, let url = URL(string: imageUrl) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.lg))
-                        } placeholder: {
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                                .fill(Theme.Colors.cardBackground)
-                                .frame(height: 200)
-                                .shimmer()
-                        }
-                    }
-
-                    // Title and year
-                    VStack(spacing: Theme.Spacing.sm) {
-                        Text(game.name)
-                            .font(Theme.Typography.displayMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-
-                        if let year = game.yearPublished {
-                            Text("(\(String(year)))")
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        }
-                    }
-
-                    // Stats grid
-                    HStack(spacing: Theme.Spacing.lg) {
-                        StatBox(label: "Players", value: game.playerCountDisplay, icon: "person.2.fill")
-                        StatBox(label: "Time", value: game.playtimeDisplay, icon: "clock.fill")
-                        StatBox(label: "Weight", value: String(format: "%.1f", game.complexity), icon: "scalemass.fill")
-                        if let rating = game.bggRating {
-                            StatBox(label: "BGG", value: String(format: "%.1f", rating), icon: "star.fill")
-                        }
-                    }
-
-                    // Complexity
-                    ComplexityBadge(weight: game.complexity)
-
-                    // Recommended players
-                    if let recommended = game.recommendedPlayers, !recommended.isEmpty {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            Text("Best at")
-                                .font(Theme.Typography.label)
-                                .foregroundColor(Theme.Colors.textTertiary)
-                            HStack(spacing: Theme.Spacing.sm) {
-                                ForEach(recommended, id: \.self) { count in
-                                    Text("\(count)p")
-                                        .chipStyle(color: Theme.Colors.success, isSelected: true)
-                                }
-                            }
-                        }
-                        .cardStyle()
-                    }
-
-                    // Categories & mechanics
-                    if !game.categories.isEmpty {
-                        TagSection(title: "Categories", tags: game.categories, color: Theme.Colors.primary)
-                    }
-
-                    if !game.mechanics.isEmpty {
-                        TagSection(title: "Mechanics", tags: game.mechanics, color: Theme.Colors.accent)
-                    }
-
-                    // Description
-                    if let desc = game.description, !desc.isEmpty {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            Text("Description")
-                                .font(Theme.Typography.headlineMedium)
-                                .foregroundColor(Theme.Colors.textPrimary)
-                            Text(desc)
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                        }
-                        .cardStyle()
-                    }
-                }
-                .padding(Theme.Spacing.xl)
-            }
-            .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(Theme.Colors.primary)
-                }
-            }
-        }
-    }
-}
-
-// Helper Views
-struct StatBox: View {
-    let label: String
-    let value: String
-    let icon: String
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(Theme.Colors.primary)
-            Text(value)
-                .font(Theme.Typography.calloutMedium)
-                .foregroundColor(Theme.Colors.textPrimary)
-            Text(label)
-                .font(Theme.Typography.caption2)
-                .foregroundColor(Theme.Colors.textTertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(Theme.Spacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                .fill(Theme.Colors.backgroundElevated)
-        )
-    }
-}
-
-struct TagSection: View {
-    let title: String
-    let tags: [String]
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            Text(title)
-                .font(Theme.Typography.headlineMedium)
-                .foregroundColor(Theme.Colors.textPrimary)
-
-            FlowLayout(spacing: Theme.Spacing.sm) {
-                ForEach(tags, id: \.self) { tag in
-                    Text(tag)
-                        .chipStyle(color: color)
-                }
-            }
-        }
-        .cardStyle()
-    }
-}
-
-// Simple flow layout
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
-        for (index, subview) in subviews.enumerated() {
-            let point = result.positions[index]
-            subview.place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y), proposal: .unspecified)
-        }
-    }
-
-    struct FlowResult {
-        var positions: [CGPoint] = []
-        var size: CGSize = .zero
-
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var x: CGFloat = 0
-            var y: CGFloat = 0
-            var rowHeight: CGFloat = 0
-
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-                if x + size.width > maxWidth && x > 0 {
-                    x = 0
-                    y += rowHeight + spacing
-                    rowHeight = 0
-                }
-                positions.append(CGPoint(x: x, y: y))
-                rowHeight = max(rowHeight, size.height)
-                x += size.width + spacing
-                self.size.width = max(self.size.width, x)
-            }
-            self.size.height = y + rowHeight
-        }
-    }
-}

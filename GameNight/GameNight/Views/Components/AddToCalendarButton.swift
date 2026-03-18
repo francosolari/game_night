@@ -8,12 +8,51 @@ struct AddToCalendarButton: View {
     let endDate: Date?
     let location: String?
     let notes: String?
+    var games: [EventGame] = []
+    var hostName: String?
 
     @Environment(\.openURL) private var openURL
     @State private var showCalendarPicker = false
     @State private var showEventComposer = false
     @State private var showShareSheet = false
     @State private var icsFileURL: URL?
+
+    static func calendarNotes(
+        title: String,
+        games: [EventGame],
+        description: String?,
+        hostName: String?
+    ) -> String {
+        var lines: [String] = []
+
+        if let primary = games.first(where: { $0.isPrimary })?.game?.name ?? games.first?.game?.name {
+            lines.append("Game Night: \(primary)")
+            let others = games.filter { ($0.game?.name ?? "") != primary }.compactMap(\.game?.name)
+            if !others.isEmpty {
+                lines.append("Also playing: \(others.joined(separator: ", "))")
+            }
+        } else {
+            lines.append("Game Night")
+        }
+
+        if let description, !description.isEmpty {
+            lines.append("")
+            lines.append(description)
+        }
+
+        lines.append("")
+        if let hostName {
+            lines.append("Hosted by \(hostName) on CardboardWithMe")
+        } else {
+            lines.append("Hosted on CardboardWithMe")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private var resolvedNotes: String {
+        Self.calendarNotes(title: title, games: games, description: notes, hostName: hostName)
+    }
 
     var body: some View {
         Button {
@@ -44,7 +83,7 @@ struct AddToCalendarButton: View {
                 startDate: startDate,
                 endDate: endDate,
                 location: location,
-                notes: notes
+                notes: resolvedNotes
             )
         }
         .sheet(isPresented: $showShareSheet) {
@@ -71,9 +110,7 @@ struct AddToCalendarButton: View {
         if let location {
             components.queryItems?.append(URLQueryItem(name: "location", value: location))
         }
-        if let notes {
-            components.queryItems?.append(URLQueryItem(name: "details", value: notes))
-        }
+        components.queryItems?.append(URLQueryItem(name: "details", value: resolvedNotes))
 
         if let url = components.url {
             openURL(url)
@@ -103,9 +140,7 @@ struct AddToCalendarButton: View {
         if let location {
             ics += "\nLOCATION:\(icsEscape(location))"
         }
-        if let notes {
-            ics += "\nDESCRIPTION:\(icsEscape(notes))"
-        }
+        ics += "\nDESCRIPTION:\(icsEscape(resolvedNotes))"
 
         ics += """
 

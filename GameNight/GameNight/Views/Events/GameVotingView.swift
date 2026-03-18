@@ -55,40 +55,43 @@ private struct GameVoteCard: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
-            // Game info row
-            HStack(spacing: Theme.Spacing.sm) {
-                if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
-                    AsyncImage(url: imageUrl) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
+            // Game info row — tappable to view game detail
+            NavigationLink(value: game) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                        AsyncImage(url: imageUrl) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                .fill(Theme.Colors.backgroundElevated)
+                        }
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+                    } else {
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
                             .fill(Theme.Colors.backgroundElevated)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Image(systemName: "dice.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Theme.Colors.textTertiary)
+                            )
                     }
-                    .frame(width: 32, height: 32)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
-                } else {
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                        .fill(Theme.Colors.backgroundElevated)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Image(systemName: "dice.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        )
-                }
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(game.name)
-                        .font(Theme.Typography.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .lineLimit(2)
-                    Text("\(game.playtimeDisplay) · \(String(format: "%.1f", game.complexity))⚖️")
-                        .font(.system(size: 9))
-                        .foregroundColor(Theme.Colors.textTertiary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(game.name)
+                            .font(Theme.Typography.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                            .lineLimit(2)
+                        Text("\(game.playtimeDisplay) · \(String(format: "%.1f", game.complexity))⚖️")
+                            .font(.system(size: 9))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
 
             // Vote buttons
             HStack(spacing: 4) {
