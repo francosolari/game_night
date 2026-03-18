@@ -20,8 +20,8 @@ struct InfoRow: View {
                 .frame(width: 28)
 
             Text(data.value)
-                .font(Theme.Typography.bodyMedium)
-                .foregroundColor(Theme.Colors.textPrimary)
+                .font(Theme.Typography.bodyMedium.weight(.bold))
+                .foregroundColor(data.label == "Weight" ? data.detailColor : Theme.Colors.textPrimary)
 
             if let detail = data.detail {
                 Text(detail)

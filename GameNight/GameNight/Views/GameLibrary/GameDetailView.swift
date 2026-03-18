@@ -42,7 +42,7 @@ struct GameDetailView: View {
                 ZStack(alignment: .bottomLeading) {
                     DetailHeroImage(
                         imageUrl: displayedGame.imageUrl,
-                        badge: displayedGame.bggRating,
+                        badge: nil,
                         fallbackInitials: gameInitials,
                         gradientColors: isManualGame
                             ? [Theme.Colors.primary.opacity(0.65), Theme.Colors.accent.opacity(0.45)]
