@@ -9,72 +9,75 @@ struct GameCard: View {
     var onTap: (() -> Void)?
 
     var body: some View {
-        Button(action: { onTap?() }) {
-            HStack(spacing: Theme.Spacing.md) {
-                // Thumbnail
-                GameThumbnail(url: game.thumbnailUrl, size: 72)
+        content
+            .cardStyle()
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap?()
+            }
+    }
 
-                // Info
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    HStack(spacing: Theme.Spacing.sm) {
-                        if isPrimary {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(Theme.Colors.warning)
-                        }
+    private var content: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            // Thumbnail
+            GameThumbnail(url: game.thumbnailUrl, size: 72)
 
-                        Text(game.name)
-                            .font(Theme.Typography.titleMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                            .lineLimit(1)
+            // Info
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if isPrimary {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.Colors.warning)
                     }
 
-                    if let year = game.yearPublished {
-                        Text("(\(String(year)))")
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    }
-
-                    HStack(spacing: Theme.Spacing.md) {
-                        // Player count
-                        Label(game.playerCountDisplay, systemImage: "person.2.fill")
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textSecondary)
-
-                        // Play time
-                        Label(game.playtimeDisplay, systemImage: "clock.fill")
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textSecondary)
-                    }
-
-                    // Complexity badge
-                    ComplexityBadge(weight: game.complexity)
+                    Text(game.name)
+                        .font(Theme.Typography.titleMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .lineLimit(1)
                 }
 
-                Spacer()
-
-                if showAddButton {
-                    Button(action: { onAdd?() }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(Theme.Gradients.primary)
-                    }
+                if let year = game.yearPublished {
+                    Text("(\(String(year)))")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
 
-                if let rating = game.bggRating {
-                    VStack(spacing: 2) {
-                        Text(String(format: "%.1f", rating))
-                            .font(Theme.Typography.titleMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        Text("BGG")
-                            .font(Theme.Typography.caption2)
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    }
+                HStack(spacing: Theme.Spacing.md) {
+                    Label(game.playerCountDisplay, systemImage: "person.2.fill")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textSecondary)
+
+                    Label(game.playtimeDisplay, systemImage: "clock.fill")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                }
+
+                ComplexityBadge(weight: game.complexity)
+            }
+
+            Spacer()
+
+            if showAddButton {
+                Button(action: { onAdd?() }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Theme.Gradients.primary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let rating = game.bggRating {
+                VStack(spacing: 2) {
+                    Text(String(format: "%.1f", rating))
+                        .font(Theme.Typography.titleMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Text("BGG")
+                        .font(Theme.Typography.caption2)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
-            .cardStyle()
         }
-        .buttonStyle(.plain)
     }
 }
 

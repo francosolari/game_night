@@ -3,10 +3,28 @@ import SwiftUI
 struct GameDetailView: View {
     @StateObject private var viewModel: GameDetailViewModel
     @State private var isDescriptionExpanded = false
-    @State private var showEditSheet = false
+    @State private var isEditingManualGame = false
+    @State private var manualDraftGame: Game?
+    @State private var isSavingManualGame = false
 
     private var isManualGame: Bool {
         viewModel.game.bggId == nil
+    }
+
+    private var displayedGame: Game {
+        if isEditingManualGame, let manualDraftGame {
+            return manualDraftGame
+        }
+        return viewModel.game
+    }
+
+    private var gameInitials: String {
+        let parts = displayedGame.name
+            .split(separator: " ")
+            .prefix(2)
+            .compactMap(\.first)
+        let initials = String(parts)
+        return initials.isEmpty ? "GM" : initials
     }
 
     init(game: Game) {
@@ -18,33 +36,54 @@ struct GameDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 // 1. Hero image with rating badge
                 DetailHeroImage(
-                    imageUrl: viewModel.game.imageUrl,
-                    badge: viewModel.game.bggRating
+                    imageUrl: displayedGame.imageUrl,
+                    badge: displayedGame.bggRating,
+                    fallbackInitials: gameInitials,
+                    gradientColors: isManualGame
+                        ? [Theme.Colors.primary.opacity(0.65), Theme.Colors.accent.opacity(0.45)]
+                        : [Theme.Colors.accent.opacity(0.5), Theme.Colors.primary.opacity(0.5)]
                 )
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     // 2. Title cluster
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text(viewModel.game.name)
-                            .font(Theme.Typography.displayMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
+                        if isEditingManualGame, let draftBinding = manualDraftBinding {
+                            TextField("Game Name", text: draftBinding.name)
+                                .font(Theme.Typography.displayMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                                .textInputAutocapitalization(.words)
+                        } else {
+                            Text(displayedGame.name)
+                                .font(Theme.Typography.displayMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                        }
 
                         titleMetadata
                     }
 
                     // 3. Info rows
-                    InfoRowGroup(rows: buildInfoRows())
+                    if isEditingManualGame, let draftBinding = manualDraftBinding {
+                        ManualGameEditorSection(game: draftBinding)
+                    } else {
+                        InfoRowGroup(rows: buildInfoRows(for: displayedGame))
+                    }
 
                     // 4. Tags
-                    if !viewModel.game.categories.isEmpty {
-                        TagFlowSection(title: "Categories", tags: viewModel.game.categories, color: Theme.Colors.primary)
-                    }
-                    if !viewModel.game.mechanics.isEmpty {
-                        TagFlowSection(title: "Mechanics", tags: viewModel.game.mechanics, color: Theme.Colors.accent)
+                    if isEditingManualGame, let draftBinding = manualDraftBinding {
+                        ManualTagEditorSection(game: draftBinding)
+                    } else {
+                        if !displayedGame.categories.isEmpty {
+                            TagFlowSection(title: "Categories", tags: displayedGame.categories, color: Theme.Colors.primary)
+                        }
+                        if !displayedGame.mechanics.isEmpty {
+                            TagFlowSection(title: "Mechanics", tags: displayedGame.mechanics, color: Theme.Colors.accent)
+                        }
                     }
 
                     // 5. Description
-                    if let desc = viewModel.game.description, !desc.isEmpty {
+                    if isEditingManualGame, let draftBinding = manualDraftBinding {
+                        ManualDescriptionEditorSection(game: draftBinding)
+                    } else if let desc = displayedGame.description, !desc.isEmpty {
                         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                             Text(desc)
                                 .font(Theme.Typography.body)
@@ -60,7 +99,7 @@ struct GameDetailView: View {
                     }
 
                     // 6. Base game link
-                    if let baseGame = viewModel.baseGame {
+                    if !isEditingManualGame, let baseGame = viewModel.baseGame {
                         NavigationLink(value: baseGame) {
                             HStack {
                                 Image(systemName: "arrow.turn.up.left")
@@ -81,36 +120,38 @@ struct GameDetailView: View {
                     }
 
                     // 7. Family links
-                    ForEach(viewModel.families, id: \.family.id) { familyData in
-                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            NavigationLink(
-                                value: GameFamilyDestination(
-                                    family: familyData.family,
-                                    games: familyData.games
-                                )
-                            ) {
-                                HStack(spacing: Theme.Spacing.sm) {
-                                    Text("Part of \(familyData.family.name)")
-                                        .font(Theme.Typography.label)
-                                        .foregroundColor(Theme.Colors.accent)
-                                        .textCase(.uppercase)
+                    if !isEditingManualGame {
+                        ForEach(viewModel.families, id: \.family.id) { familyData in
+                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                NavigationLink(
+                                    value: GameFamilyDestination(
+                                        family: familyData.family,
+                                        games: familyData.games
+                                    )
+                                ) {
+                                    HStack(spacing: Theme.Spacing.sm) {
+                                        Text("Part of \(familyData.family.name)")
+                                            .font(Theme.Typography.label)
+                                            .foregroundColor(Theme.Colors.accent)
+                                            .textCase(.uppercase)
 
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(Theme.Colors.textTertiary)
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(Theme.Colors.textTertiary)
+                                    }
                                 }
-                            }
-                            .buttonStyle(.plain)
+                                .buttonStyle(.plain)
 
-                            HorizontalGameScroll(
-                                title: "",
-                                games: familyData.games.filter { $0.id != viewModel.game.id }
-                            )
+                                HorizontalGameScroll(
+                                    title: "",
+                                    games: familyData.games.filter { $0.id != displayedGame.id }
+                                )
+                            }
                         }
                     }
 
                     // 8. Expansions
-                    if !viewModel.expansions.isEmpty {
+                    if !isEditingManualGame, !viewModel.expansions.isEmpty {
                         HorizontalGameScroll(
                             title: "Expansions",
                             games: viewModel.expansions
@@ -125,18 +166,30 @@ struct GameDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if isManualGame {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showEditSheet = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .foregroundColor(Theme.Colors.primary)
+                if isEditingManualGame {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            cancelManualEditing()
+                        }
+                        .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(isSavingManualGame ? "Saving..." : "Save") {
+                            Task { await saveManualGameEdits() }
+                        }
+                        .disabled(
+                            isSavingManualGame ||
+                            (manualDraftGame?.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+                        )
+                    }
+                } else {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Edit") {
+                            startManualEditing()
+                        }
                     }
                 }
             }
-        }
-        .sheet(isPresented: $showEditSheet) {
-            ManualGameEditSheet(game: $viewModel.game)
         }
         .task {
             await viewModel.loadRelatedData()
@@ -146,25 +199,33 @@ struct GameDetailView: View {
     @ViewBuilder
     private var titleMetadata: some View {
         let designerLinks = creatorLinks(
-            names: viewModel.game.designers,
+            names: displayedGame.designers,
             role: .designer
         )
         let publisherLinks = creatorLinks(
-            names: viewModel.game.publishers,
+            names: displayedGame.publishers,
             role: .publisher
         )
 
-        let hasMetadata = !designerLinks.isEmpty || !publisherLinks.isEmpty || viewModel.game.yearPublished != nil
+        let hasMetadata = !designerLinks.isEmpty || !publisherLinks.isEmpty || displayedGame.yearPublished != nil || isManualGame
 
         if hasMetadata {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                if isManualGame {
+                    Label(
+                        isEditingManualGame ? "Editing Manual Game" : "Manual Library Game",
+                        systemImage: isEditingManualGame ? "slider.horizontal.3" : "square.and.pencil"
+                    )
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textTertiary)
+                }
                 if !designerLinks.isEmpty {
                     creatorRow(links: designerLinks)
                 }
                 if !publisherLinks.isEmpty {
                     creatorRow(links: publisherLinks)
                 }
-                if let year = viewModel.game.yearPublished {
+                if let year = displayedGame.yearPublished {
                     Label(String(year), systemImage: "calendar")
                         .font(Theme.Typography.callout)
                         .foregroundColor(Theme.Colors.textTertiary)
@@ -197,17 +258,56 @@ struct GameDetailView: View {
         }
     }
 
-    private func buildInfoRows() -> [InfoRowData] {
+    private var manualDraftBinding: Binding<Game>? {
+        guard isEditingManualGame, manualDraftGame != nil else { return nil }
+        return Binding(
+            get: { manualDraftGame ?? viewModel.game },
+            set: { manualDraftGame = $0 }
+        )
+    }
+
+    private func startManualEditing() {
+        manualDraftGame = viewModel.game
+        isEditingManualGame = true
+    }
+
+    private func cancelManualEditing() {
+        manualDraftGame = nil
+        isEditingManualGame = false
+        isSavingManualGame = false
+    }
+
+    private func saveManualGameEdits() async {
+        guard var updatedGame = manualDraftGame else { return }
+
+        updatedGame.name = updatedGame.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !updatedGame.name.isEmpty else { return }
+
+        isSavingManualGame = true
+        viewModel.game = updatedGame
+
+        do {
+            try await SupabaseService.shared.updateGame(updatedGame)
+        } catch {
+            // Non-critical — local state is already updated
+        }
+
+        manualDraftGame = nil
+        isEditingManualGame = false
+        isSavingManualGame = false
+    }
+
+    private func buildInfoRows(for game: Game) -> [InfoRowData] {
         var rows: [InfoRowData] = []
 
         // Players
-        let bestStr = viewModel.game.recommendedPlayers.map { recs in
+        let bestStr = game.recommendedPlayers.map { recs in
             recs.isEmpty ? nil : "Best: \(recs.map(String.init).joined(separator: "\u{2013}"))"
         } ?? nil
         rows.append(InfoRowData(
             icon: "person.2.fill",
             label: "Players",
-            value: viewModel.game.playerCountDisplay,
+            value: game.playerCountDisplay,
             detail: bestStr,
             detailColor: Theme.Colors.success
         ))
@@ -216,20 +316,20 @@ struct GameDetailView: View {
         rows.append(InfoRowData(
             icon: "clock.fill",
             label: "Time",
-            value: viewModel.game.playtimeDisplay
+            value: game.playtimeDisplay
         ))
 
         // Weight
         rows.append(InfoRowData(
             icon: "scalemass.fill",
             label: "Weight",
-            value: String(format: "%.2f / 5", viewModel.game.complexity),
-            detail: viewModel.game.complexityLabel,
-            detailColor: Theme.Colors.complexity(viewModel.game.complexity)
+            value: String(format: "%.2f / 5", game.complexity),
+            detail: game.complexityLabel,
+            detailColor: Theme.Colors.complexity(game.complexity)
         ))
 
         // Age
-        if let age = viewModel.game.minAge {
+        if let age = game.minAge {
             rows.append(InfoRowData(
                 icon: "number.circle",
                 label: "Age",
@@ -238,6 +338,311 @@ struct GameDetailView: View {
         }
 
         return rows
+    }
+}
+
+private struct ManualGameEditorSection: View {
+    @Binding var game: Game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Text("Game Details")
+                .font(Theme.Typography.label)
+                .foregroundColor(Theme.Colors.textTertiary)
+                .textCase(.uppercase)
+
+            VStack(spacing: Theme.Spacing.md) {
+                numericRow(
+                    title: "Published",
+                    value: optionalIntBinding(\.yearPublished),
+                    placeholder: "Year"
+                )
+
+                stepperRow(
+                    title: "Minimum Players",
+                    value: game.minPlayers,
+                    decrement: {
+                        guard game.minPlayers > 1 else { return }
+                        game.minPlayers -= 1
+                        game.maxPlayers = max(game.maxPlayers, game.minPlayers)
+                    },
+                    increment: {
+                        guard game.minPlayers < 20 else { return }
+                        game.minPlayers += 1
+                        game.maxPlayers = max(game.maxPlayers, game.minPlayers)
+                    }
+                )
+
+                stepperRow(
+                    title: "Maximum Players",
+                    value: game.maxPlayers,
+                    decrement: {
+                        guard game.maxPlayers > game.minPlayers else { return }
+                        game.maxPlayers -= 1
+                    },
+                    increment: {
+                        guard game.maxPlayers < 20 else { return }
+                        game.maxPlayers += 1
+                    }
+                )
+
+                stepperRow(
+                    title: "Minimum Time",
+                    value: game.minPlaytime,
+                    suffix: "min",
+                    decrement: {
+                        guard game.minPlaytime > 5 else { return }
+                        game.minPlaytime -= 5
+                        game.maxPlaytime = max(game.maxPlaytime, game.minPlaytime)
+                    },
+                    increment: {
+                        guard game.minPlaytime < 600 else { return }
+                        game.minPlaytime += 5
+                        game.maxPlaytime = max(game.maxPlaytime, game.minPlaytime)
+                    }
+                )
+
+                stepperRow(
+                    title: "Maximum Time",
+                    value: game.maxPlaytime,
+                    suffix: "min",
+                    decrement: {
+                        guard game.maxPlaytime > game.minPlaytime else { return }
+                        game.maxPlaytime -= 5
+                    },
+                    increment: {
+                        guard game.maxPlaytime < 600 else { return }
+                        game.maxPlaytime += 5
+                    }
+                )
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack {
+                        Text("Complexity")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Spacer()
+                        Text(String(format: "%.1f / 5", game.complexity))
+                            .font(Theme.Typography.calloutMedium)
+                            .foregroundColor(Theme.Colors.complexity(game.complexity))
+                    }
+
+                    Slider(
+                        value: Binding(
+                            get: { game.complexity },
+                            set: { game.complexity = min(max($0, 0), 5) }
+                        ),
+                        in: 0...5,
+                        step: 0.1
+                    )
+                    .tint(Theme.Colors.complexity(game.complexity))
+
+                    Text(game.complexityLabel)
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    HStack {
+                        Text("Recommended Age")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Spacer()
+                        if let age = game.minAge {
+                            Text("\(age)+")
+                                .font(Theme.Typography.calloutMedium)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        } else {
+                            Text("Not set")
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Button(game.minAge == nil ? "Add Age" : "Clear") {
+                            if game.minAge == nil {
+                                game.minAge = 8
+                            } else {
+                                game.minAge = nil
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(Theme.Typography.calloutMedium)
+                        .foregroundColor(Theme.Colors.primary)
+
+                        if game.minAge != nil {
+                            Spacer()
+
+                            Button("-") {
+                                if let age = game.minAge, age > 1 {
+                                    game.minAge = age - 1
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(Theme.Typography.calloutMedium)
+
+                            Button("+") {
+                                if let age = game.minAge {
+                                    game.minAge = min(age + 1, 21)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .font(Theme.Typography.calloutMedium)
+                        }
+                    }
+                }
+            }
+            .padding(Theme.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .fill(Theme.Colors.backgroundElevated)
+            )
+        }
+    }
+
+    private func numericRow(title: String, value: Binding<String>, placeholder: String) -> some View {
+        HStack {
+            Text(title)
+                .font(Theme.Typography.bodyMedium)
+                .foregroundColor(Theme.Colors.textPrimary)
+            Spacer()
+            TextField(placeholder, text: value)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .font(Theme.Typography.calloutMedium)
+                .foregroundColor(Theme.Colors.textSecondary)
+                .frame(width: 84)
+        }
+    }
+
+    private func optionalIntBinding(_ keyPath: WritableKeyPath<Game, Int?>) -> Binding<String> {
+        Binding(
+            get: {
+                if let value = game[keyPath: keyPath] {
+                    return String(value)
+                }
+                return ""
+            },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                game[keyPath: keyPath] = Int(trimmed)
+            }
+        )
+    }
+
+    private func stepperRow(
+        title: String,
+        value: Int,
+        suffix: String = "",
+        decrement: @escaping () -> Void,
+        increment: @escaping () -> Void
+    ) -> some View {
+        HStack {
+            Text(title)
+                .font(Theme.Typography.bodyMedium)
+                .foregroundColor(Theme.Colors.textPrimary)
+            Spacer()
+            Button(action: decrement) {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+            Text(suffix.isEmpty ? "\(value)" : "\(value) \(suffix)")
+                .font(Theme.Typography.calloutMedium)
+                .foregroundColor(Theme.Colors.textSecondary)
+                .frame(minWidth: 70)
+            Button(action: increment) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundColor(Theme.Colors.primary)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+private struct ManualTagEditorSection: View {
+    @Binding var game: Game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Text("Categories & Mechanics")
+                .font(Theme.Typography.label)
+                .foregroundColor(Theme.Colors.textTertiary)
+                .textCase(.uppercase)
+
+            VStack(spacing: Theme.Spacing.md) {
+                tagField(
+                    title: "Categories",
+                    placeholder: "Strategy, Party, Co-op",
+                    binding: commaSeparatedBinding(\.categories)
+                )
+                tagField(
+                    title: "Mechanics",
+                    placeholder: "Deck Building, Drafting",
+                    binding: commaSeparatedBinding(\.mechanics)
+                )
+            }
+            .padding(Theme.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .fill(Theme.Colors.backgroundElevated)
+            )
+        }
+    }
+
+    private func tagField(title: String, placeholder: String, binding: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text(title)
+                .font(Theme.Typography.bodyMedium)
+                .foregroundColor(Theme.Colors.textPrimary)
+            TextField(placeholder, text: binding, axis: .vertical)
+                .lineLimit(2...4)
+                .font(Theme.Typography.callout)
+                .foregroundColor(Theme.Colors.textSecondary)
+        }
+    }
+
+    private func commaSeparatedBinding(_ keyPath: WritableKeyPath<Game, [String]>) -> Binding<String> {
+        Binding(
+            get: { game[keyPath: keyPath].joined(separator: ", ") },
+            set: { newValue in
+                game[keyPath: keyPath] = newValue
+                    .split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
+        )
+    }
+}
+
+private struct ManualDescriptionEditorSection: View {
+    @Binding var game: Game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            Text("Description")
+                .font(Theme.Typography.label)
+                .foregroundColor(Theme.Colors.textTertiary)
+                .textCase(.uppercase)
+
+            TextField(
+                "Add a description, notes, or house rules",
+                text: Binding(
+                    get: { game.description ?? "" },
+                    set: { game.description = $0.isEmpty ? nil : $0 }
+                ),
+                axis: .vertical
+            )
+            .lineLimit(5...10)
+            .padding(Theme.Spacing.lg)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .fill(Theme.Colors.backgroundElevated)
+            )
+            .font(Theme.Typography.body)
+            .foregroundColor(Theme.Colors.textSecondary)
+        }
     }
 }
 
@@ -278,89 +683,5 @@ struct GameFamilyDetailView: View {
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-// MARK: - Manual Game Edit Sheet
-private struct ManualGameEditSheet: View {
-    @Binding var game: Game
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var name: String = ""
-    @State private var minPlayers: String = ""
-    @State private var maxPlayers: String = ""
-    @State private var minPlaytime: String = ""
-    @State private var maxPlaytime: String = ""
-    @State private var description: String = ""
-    @State private var isSaving = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Game Info") {
-                    TextField("Name", text: $name)
-                    TextField("Description", text: $description, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-
-                Section("Players") {
-                    HStack {
-                        TextField("Min", text: $minPlayers)
-                            .keyboardType(.numberPad)
-                        Text("–")
-                        TextField("Max", text: $maxPlayers)
-                            .keyboardType(.numberPad)
-                    }
-                }
-
-                Section("Playtime (minutes)") {
-                    HStack {
-                        TextField("Min", text: $minPlaytime)
-                            .keyboardType(.numberPad)
-                        Text("–")
-                        TextField("Max", text: $maxPlaytime)
-                            .keyboardType(.numberPad)
-                    }
-                }
-            }
-            .navigationTitle("Edit Game")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task { await save() }
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
-                }
-            }
-        }
-        .onAppear {
-            name = game.name
-            minPlayers = String(game.minPlayers)
-            maxPlayers = String(game.maxPlayers)
-            minPlaytime = String(game.minPlaytime)
-            maxPlaytime = String(game.maxPlaytime)
-            description = game.description ?? ""
-        }
-    }
-
-    private func save() async {
-        isSaving = true
-        game.name = name.trimmingCharacters(in: .whitespaces)
-        game.minPlayers = Int(minPlayers) ?? game.minPlayers
-        game.maxPlayers = Int(maxPlayers) ?? game.maxPlayers
-        game.minPlaytime = Int(minPlaytime) ?? game.minPlaytime
-        game.maxPlaytime = Int(maxPlaytime) ?? game.maxPlaytime
-        game.description = description.isEmpty ? nil : description
-
-        do {
-            try await SupabaseService.shared.updateGame(game)
-        } catch {
-            // Non-critical — local state is already updated
-        }
-        isSaving = false
-        dismiss()
     }
 }
