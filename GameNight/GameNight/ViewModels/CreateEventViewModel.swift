@@ -44,7 +44,7 @@ final class CreateEventViewModel: ObservableObject {
 
     @Published var suggestedContacts: [FrequentContact] = []
     @Published var isLoadingSuggestions = true
-    @Published var collapsedGroups: Set<UUID> = []
+    @Published var collapsedGroups: Set<String> = []
     @Published private(set) var currentUserId: UUID?
     @Published private(set) var currentUserPhone: String?
 
@@ -122,7 +122,8 @@ final class CreateEventViewModel: ObservableObject {
                             userId: draft.userId,
                             tier: draft.tier,
                             groupId: draft.groupId,
-                            groupEmoji: draft.groupEmoji
+                            groupEmoji: draft.groupEmoji,
+                            groupName: draft.groupName
                         )
                     }
                 }
@@ -342,7 +343,8 @@ final class CreateEventViewModel: ObservableObject {
                     userId: member.userId,
                     tier: member.tier,
                     groupId: group.id,
-                    groupEmoji: group.emoji
+                    groupEmoji: group.emoji,
+                    groupName: group.name
                 )
             }
         invitees.append(contentsOf: newMembers)
@@ -407,29 +409,29 @@ final class CreateEventViewModel: ObservableObject {
         invitees.filter { $0.tier == 2 }
     }
 
-    func toggleGroupCollapse(_ groupId: UUID) {
-        if collapsedGroups.contains(groupId) {
-            collapsedGroups.remove(groupId)
+    func toggleGroupCollapse(_ key: String) {
+        if collapsedGroups.contains(key) {
+            collapsedGroups.remove(key)
         } else {
-            collapsedGroups.insert(groupId)
+            collapsedGroups.insert(key)
         }
     }
 
-    func groupedInvitees(forTier tier: Int) -> (groups: [(id: UUID, emoji: String, entries: [InviteeEntry])], ungrouped: [InviteeEntry]) {
+    func groupedInvitees(forTier tier: Int) -> (groups: [(id: UUID, emoji: String, name: String, entries: [InviteeEntry])], ungrouped: [InviteeEntry]) {
         let tierInvitees = invitees.filter { $0.tier == tier }
         let ungrouped = tierInvitees.filter { $0.groupId == nil }
 
-        var groupDict: [UUID: (emoji: String, entries: [InviteeEntry])] = [:]
+        var groupDict: [UUID: (emoji: String, name: String, entries: [InviteeEntry])] = [:]
         for invitee in tierInvitees {
             guard let groupId = invitee.groupId else { continue }
             if groupDict[groupId] == nil {
-                groupDict[groupId] = (emoji: invitee.groupEmoji ?? "🎲", entries: [])
+                groupDict[groupId] = (emoji: invitee.groupEmoji ?? "🎲", name: invitee.groupName ?? "Group", entries: [])
             }
             groupDict[groupId]?.entries.append(invitee)
         }
 
-        let groups = groupDict.map { (id: $0.key, emoji: $0.value.emoji, entries: $0.value.entries) }
-            .sorted { $0.entries.first?.name ?? "" < $1.entries.first?.name ?? "" }
+        let groups = groupDict.map { (id: $0.key, emoji: $0.value.emoji, name: $0.value.name, entries: $0.value.entries) }
+            .sorted { $0.name < $1.name }
 
         return (groups: groups, ungrouped: ungrouped)
     }
@@ -465,9 +467,15 @@ final class CreateEventViewModel: ObservableObject {
 
     func setInviteeTier(_ id: UUID, tier: Int) {
         if let index = invitees.firstIndex(where: { $0.id == id }) {
+            let oldTier = invitees[index].tier
             invitees[index].tier = tier
+            // Expand the group in the destination tier
             if let groupId = invitees[index].groupId {
-                collapsedGroups.remove(groupId)
+                let destKey = "\(groupId.uuidString)-\(tier)"
+                collapsedGroups.remove(destKey)
+                // Also expand source tier so user can see the change
+                let srcKey = "\(groupId.uuidString)-\(oldTier)"
+                collapsedGroups.remove(srcKey)
             }
         }
     }
@@ -605,7 +613,8 @@ final class CreateEventViewModel: ObservableObject {
                     userId: entry.userId,
                     tier: entry.tier,
                     groupId: entry.groupId,
-                    groupEmoji: entry.groupEmoji
+                    groupEmoji: entry.groupEmoji,
+                    groupName: entry.groupName
                 )
             } : nil,
             deletedAt: existingEvent?.deletedAt,
@@ -864,4 +873,5 @@ struct InviteeEntry: Identifiable {
     var tier: Int
     var groupId: UUID?
     var groupEmoji: String?
+    var groupName: String?
 }

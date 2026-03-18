@@ -80,7 +80,7 @@ struct CreateEventDetailsStep: View {
             } label: {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: "person.2")
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        .foregroundColor(Theme.Colors.dateAccent)
                         .frame(width: 24)
                     Text("Player Count")
                         .font(Theme.Typography.bodyMedium)
@@ -148,7 +148,7 @@ struct CreateEventDetailsStep: View {
         } label: {
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "mappin.circle.fill")
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .foregroundColor(Theme.Colors.dateAccent)
                     .frame(width: 24)
 
                 if viewModel.location.isEmpty {
@@ -194,7 +194,7 @@ struct CreateEventDetailsStep: View {
             } label: {
                 HStack(spacing: Theme.Spacing.md) {
                     Image(systemName: "envelope.badge")
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        .foregroundColor(Theme.Colors.dateAccent)
                         .frame(width: 24)
                     Text("RSVP Options")
                         .font(Theme.Typography.bodyMedium)
@@ -239,7 +239,7 @@ struct CreateEventDetailsStep: View {
                     // Plus Ones
                     HStack(spacing: Theme.Spacing.md) {
                         Image(systemName: "person.badge.plus")
-                            .foregroundColor(Theme.Colors.textTertiary)
+                            .foregroundColor(Theme.Colors.dateAccent)
                             .frame(width: 24)
                         Text("Plus Ones")
                             .font(Theme.Typography.bodyMedium)
@@ -316,7 +316,7 @@ struct CreateEventDetailsStep: View {
         } label: {
             HStack(spacing: Theme.Spacing.md) {
                 Image(systemName: "hourglass")
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .foregroundColor(Theme.Colors.dateAccent)
                     .frame(width: 24)
                 Text("RSVP Deadline")
                     .font(Theme.Typography.bodyMedium)
@@ -368,6 +368,7 @@ struct CreateEventDetailsStep: View {
                 Text("Public").tag(EventVisibility.public)
             }
             .pickerStyle(.segmented)
+            .sageSegmented()
 
             Text(visibilityHelperText)
                 .font(Theme.Typography.caption)
@@ -478,6 +479,7 @@ struct CreateEventDetailsStep: View {
                 Text("Poll Attendees").tag(ScheduleMode.poll)
             }
             .pickerStyle(.segmented)
+            .sageSegmented()
 
             if viewModel.scheduleMode == .fixed {
                 // Fixed mode: tappable summary card

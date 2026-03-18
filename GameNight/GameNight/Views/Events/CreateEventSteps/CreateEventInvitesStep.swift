@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CreateEventInvitesStep: View {
     @ObservedObject var viewModel: CreateEventViewModel
@@ -6,6 +7,7 @@ struct CreateEventInvitesStep: View {
     @Binding var showGroupPicker: Bool
     @Binding var showContactList: Bool
     @Binding var showContactPicker: Bool
+    @State private var draggingInviteeId: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
@@ -55,59 +57,17 @@ struct CreateEventInvitesStep: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.Spacing.md) {
                     if !groupsViewModel.groups.isEmpty {
-                        Button {
+                        addPeopleButton(icon: "person.3.fill", label: "Groups") {
                             showGroupPicker = true
-                        } label: {
-                            HStack(spacing: Theme.Spacing.sm) {
-                                Image(systemName: "person.3.fill")
-                                    .font(.system(size: 14))
-                                Text("Groups")
-                                    .font(Theme.Typography.calloutMedium)
-                            }
-                            .foregroundColor(Theme.Colors.secondary)
-                            .padding(.horizontal, Theme.Spacing.lg)
-                            .padding(.vertical, Theme.Spacing.md)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                    .fill(Theme.Colors.secondary.opacity(0.1))
-                            )
                         }
                     }
 
-                    Button {
+                    addPeopleButton(icon: "person.2.fill", label: "All Contacts") {
                         showContactList = true
-                    } label: {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 14))
-                            Text("All Contacts")
-                                .font(Theme.Typography.calloutMedium)
-                        }
-                        .foregroundColor(Theme.Colors.primary)
-                        .padding(.horizontal, Theme.Spacing.lg)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.primary.opacity(0.1))
-                        )
                     }
 
-                    Button {
+                    addPeopleButton(icon: "person.badge.plus", label: "Phone") {
                         showContactPicker = true
-                    } label: {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 14))
-                            Text("Phone")
-                                .font(Theme.Typography.calloutMedium)
-                        }
-                        .foregroundColor(Theme.Colors.accent)
-                        .padding(.horizontal, Theme.Spacing.lg)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.accent.opacity(0.1))
-                        )
                     }
                 }
             }
@@ -200,57 +160,107 @@ struct CreateEventInvitesStep: View {
         }
     }
 
+    private func addPeopleButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                Text(label)
+                    .font(Theme.Typography.calloutMedium)
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.md)
+        }
+        .buttonStyle(AddPeopleButtonStyle())
+    }
+
+    private func collapseKey(groupId: UUID, tier: Int) -> String {
+        "\(groupId.uuidString)-\(tier)"
+    }
+
     @ViewBuilder
     private func tierInviteeList(tier: Int, benchTier: Int) -> some View {
         let grouped = viewModel.groupedInvitees(forTier: tier)
 
         // Grouped invitees
         ForEach(grouped.groups, id: \.id) { group in
-            let isCollapsed = viewModel.collapsedGroups.contains(group.id)
+            let key = collapseKey(groupId: group.id, tier: tier)
+            let isCollapsed = viewModel.collapsedGroups.contains(key)
 
             GroupInviteeHeader(
                 emoji: group.emoji,
+                groupName: group.name,
                 groupId: group.id,
                 memberCount: group.entries.count,
                 isCollapsed: isCollapsed,
                 onToggle: {
                     withAnimation(Theme.Animation.snappy) {
-                        viewModel.toggleGroupCollapse(group.id)
+                        viewModel.toggleGroupCollapse(key)
                     }
                 }
             )
 
             if !isCollapsed {
                 ForEach(group.entries) { invitee in
-                    InviteeRow(
-                        invitee: invitee,
-                        groupEmoji: invitee.groupEmoji,
-                        onBench: {
-                            viewModel.setInviteeTier(invitee.id, tier: benchTier)
-                        },
-                        onRemove: {
-                            if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
-                                viewModel.removeInvitee(at: idx)
-                            }
-                        }
-                    )
+                    draggableInviteeRow(invitee: invitee, groupEmoji: invitee.groupEmoji, benchTier: benchTier)
                 }
             }
         }
 
         // Ungrouped invitees
         ForEach(grouped.ungrouped) { invitee in
-            InviteeRow(
-                invitee: invitee,
-                onBench: {
-                    viewModel.setInviteeTier(invitee.id, tier: benchTier)
-                },
-                onRemove: {
-                    if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
-                        viewModel.removeInvitee(at: idx)
-                    }
-                }
-            )
+            draggableInviteeRow(invitee: invitee, groupEmoji: nil, benchTier: benchTier)
         }
+    }
+
+    private func draggableInviteeRow(invitee: InviteeEntry, groupEmoji: String?, benchTier: Int) -> some View {
+        InviteeRow(
+            invitee: invitee,
+            groupEmoji: groupEmoji,
+            onBench: {
+                viewModel.setInviteeTier(invitee.id, tier: benchTier)
+            },
+            onRemove: {
+                if let idx = viewModel.invitees.firstIndex(where: { $0.id == invitee.id }) {
+                    viewModel.removeInvitee(at: idx)
+                }
+            }
+        )
+        .opacity(draggingInviteeId == invitee.id ? 0.5 : 1.0)
+        .onDrag {
+            draggingInviteeId = invitee.id
+            return NSItemProvider(object: invitee.id.uuidString as NSString)
+        }
+        .onDrop(of: [.text], delegate: InviteeDropDelegate(
+            targetId: invitee.id,
+            viewModel: viewModel,
+            draggingId: $draggingInviteeId
+        ))
+    }
+}
+
+struct InviteeDropDelegate: DropDelegate {
+    let targetId: UUID
+    let viewModel: CreateEventViewModel
+    @Binding var draggingId: UUID?
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingId = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let sourceId = draggingId, sourceId != targetId else { return }
+        guard let sourceIndex = viewModel.invitees.firstIndex(where: { $0.id == sourceId }),
+              let targetIndex = viewModel.invitees.firstIndex(where: { $0.id == targetId }) else { return }
+        // Only reorder within same tier
+        guard viewModel.invitees[sourceIndex].tier == viewModel.invitees[targetIndex].tier else { return }
+        withAnimation(Theme.Animation.snappy) {
+            viewModel.invitees.move(fromOffsets: IndexSet(integer: sourceIndex), toOffset: targetIndex > sourceIndex ? targetIndex + 1 : targetIndex)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }

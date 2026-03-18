@@ -104,6 +104,33 @@ struct CreateEventView: View {
                     .padding(.bottom, 120)
                 }
                 .background(Theme.Colors.background.ignoresSafeArea())
+                .gesture(
+                    DragGesture(minimumDistance: 50, coordinateSpace: .local)
+                        .onEnded { value in
+                            let horizontal = value.translation.width
+                            let vertical = value.translation.height
+                            // Only trigger if swipe is more horizontal than vertical
+                            guard abs(horizontal) > abs(vertical) * 1.5 else { return }
+
+                            let steps = visibleSteps
+                            guard let idx = steps.firstIndex(of: viewModel.currentStep) else { return }
+
+                            if horizontal < -50, idx < steps.count - 1 {
+                                // Swipe left → next step
+                                let nextStep = steps[idx + 1]
+                                if viewModel.canNavigateToStep(nextStep) {
+                                    withAnimation(Theme.Animation.snappy) {
+                                        viewModel.navigateToStep(nextStep)
+                                    }
+                                }
+                            } else if horizontal > 50, idx > 0 {
+                                // Swipe right → previous step
+                                withAnimation(Theme.Animation.snappy) {
+                                    viewModel.currentStep = steps[idx - 1]
+                                }
+                            }
+                        }
+                )
 
                 // Bottom action bar
                 VStack(spacing: 0) {
@@ -128,7 +155,7 @@ struct CreateEventView: View {
 
                         Spacer()
 
-                        if viewModel.currentStep != visibleSteps.first {
+                        if viewModel.currentStep != visibleSteps.first && viewModel.primaryAction != .saveChanges {
                             Button("Back") {
                                 withAnimation(Theme.Animation.snappy) {
                                     let steps = visibleSteps
@@ -354,7 +381,7 @@ struct FixedDateSummaryCard: View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: "calendar")
                 .font(.system(size: 20))
-                .foregroundColor(Theme.Colors.primary)
+                .foregroundColor(Theme.Colors.dateAccent)
 
             if hasDate {
                 let dateF: DateFormatter = {
@@ -504,6 +531,7 @@ struct AddInviteeField: View {
 // MARK: - Group Invitee Header
 struct GroupInviteeHeader: View {
     let emoji: String
+    let groupName: String
     let groupId: UUID
     let memberCount: Int
     let isCollapsed: Bool
@@ -520,21 +548,25 @@ struct GroupInviteeHeader: View {
                         .font(.system(size: 14))
                 }
 
-                Text("\(memberCount) members")
+                Text(groupName)
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("\(memberCount)")
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.textSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                     .background(Capsule().fill(Theme.Colors.backgroundElevated))
 
                 Spacer()
 
-                Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
                     .font(.system(size: 12))
                     .foregroundColor(Theme.Colors.textTertiary)
             }
-            .padding(.vertical, Theme.Spacing.xs)
-            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.sm)
+            .padding(.horizontal, Theme.Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
                     .fill(Theme.Colors.primary.opacity(0.05))

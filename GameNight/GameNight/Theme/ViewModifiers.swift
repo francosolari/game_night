@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Card Style
 struct CardModifier: ViewModifier {
@@ -79,6 +80,45 @@ struct SecondaryButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Sage Segmented Picker Style
+struct SageSegmentedStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                let sage = UIColor(Theme.Colors.primary)
+                let sand = UIColor(Theme.Colors.backgroundElevated)
+                UISegmentedControl.appearance().selectedSegmentTintColor = sage
+                UISegmentedControl.appearance().backgroundColor = sand
+                UISegmentedControl.appearance().setTitleTextAttributes(
+                    [.foregroundColor: UIColor.white],
+                    for: .selected
+                )
+                UISegmentedControl.appearance().setTitleTextAttributes(
+                    [.foregroundColor: UIColor(Theme.Colors.textSecondary)],
+                    for: .normal
+                )
+            }
+    }
+}
+
+// MARK: - Add People Button Style
+struct AddPeopleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(configuration.isPressed ? Theme.Colors.primary : Theme.Colors.textPrimary)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(configuration.isPressed ? Theme.Colors.primary.opacity(0.08) : Theme.Colors.backgroundElevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .stroke(configuration.isPressed ? Theme.Colors.primary : Theme.Colors.divider, lineWidth: configuration.isPressed ? 1.5 : 1)
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Chip Style
 struct ChipModifier: ViewModifier {
     let color: Color
@@ -113,6 +153,10 @@ extension View {
 
     func shimmer() -> some View {
         modifier(ShimmerModifier())
+    }
+
+    func sageSegmented() -> some View {
+        modifier(SageSegmentedStyle())
     }
 }
 
