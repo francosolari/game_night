@@ -133,10 +133,11 @@ struct HomeView: View {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
                                         ForEach(futureEvents) { event in
-                                            CompactEventCard(
+                                            VerticalEventCard(
                                                 event: event,
                                                 myInvite: viewModel.invite(for: event.id),
-                                                confirmedCount: viewModel.confirmedCount(for: event.id)
+                                                confirmedCount: viewModel.confirmedCount(for: event.id),
+                                                size: .compact
                                             ) {
                                                 navigationPath.append(event)
                                             }
@@ -162,10 +163,11 @@ struct HomeView: View {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
                                         ForEach(hostingEvents) { event in
-                                            CompactEventCard(
+                                            VerticalEventCard(
                                                 event: event,
                                                 myInvite: viewModel.invite(for: event.id),
-                                                confirmedCount: viewModel.confirmedCount(for: event.id)
+                                                confirmedCount: viewModel.confirmedCount(for: event.id),
+                                                size: .compact
                                             ) {
                                                 navigationPath.append(event)
                                             }

@@ -28,7 +28,7 @@ struct EventLocationLabel: View {
 
     private var displayText: String {
         guard event.location != nil || event.locationAddress != nil else {
-            return "TBD"
+            return "TBD Location"
         }
 
         let presentation = EventLocationPresentation(

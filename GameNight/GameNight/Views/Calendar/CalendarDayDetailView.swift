@@ -28,7 +28,7 @@ struct CalendarDayDetailView: View {
                 .foregroundColor(Theme.Colors.textSecondary)
 
             ForEach(events) { event in
-                CompactEventCard(
+                ListEventCard(
                     event: event,
                     myInvite: viewModel.invite(for: event.id),
                     confirmedCount: viewModel.confirmedCount(for: event.id)

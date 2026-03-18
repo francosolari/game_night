@@ -426,7 +426,7 @@ struct Theme {
 
     // MARK: - Shadows
     struct Shadows {
-        static func card() -> some View {
+        static func card() -> Color {
             Color.black.opacity(ThemeManager.shared.isDark ? 0.4 : 0.08)
         }
     }

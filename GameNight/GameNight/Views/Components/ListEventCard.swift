@@ -30,41 +30,54 @@ struct ListEventCard: View {
 
     var body: some View {
         Button(action: { onTap?() }) {
-            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            HStack(alignment: .center, spacing: Theme.Spacing.md) {
+                // Cover Image
                 ZStack(alignment: .topTrailing) {
                     coverImage
-                        .frame(width: 80, height: 80)
+                        .frame(width: 90, height: 90)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
 
                     if let invite = myInvite {
                         InviteStatusBadge(status: invite.status, isPast: eventIsPast)
-                            .scaleEffect(0.75)
+                            .scaleEffect(0.7)
                             .padding(2)
+                            .shadow(color: Color.black.opacity(0.1), radius: 2)
                     }
                 }
 
+                // Info Content
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    EventDateLabel(event: event, size: .standard)
-
-                    Text(event.title)
-                        .font(ComponentSize.standard.titleFont)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .lineLimit(1)
-
-                    EventLocationLabel(event: event, viewerRole: viewerRole, size: .standard)
-
-                    if !event.games.isEmpty {
-                        GameInfoCompact(games: event.games, size: .standard)
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            EventDateLabel(event: event, size: .compact)
+                            
+                            Text(event.title)
+                                .font(Theme.Typography.headlineMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                                .lineLimit(1)
+                        }
+                        
+                        Spacer()
                     }
 
-                    HStack {
-                        HostBadge(host: event.host, isCurrentUserHost: isCurrentUserHost, size: .compact)
+                    EventLocationLabel(event: event, viewerRole: viewerRole, size: .compact)
+
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                            if !event.games.isEmpty {
+                                GameInfoCompact(games: event.games, size: .compact)
+                            }
+                            
+                            HostBadge(host: event.host, isCurrentUserHost: isCurrentUserHost, size: .compact)
+                        }
+
                         Spacer()
+
                         PlayerCountIndicator(
                             confirmedCount: confirmedCount,
                             minPlayers: event.minPlayers,
                             maxPlayers: event.maxPlayers,
-                            size: .standard
+                            size: .compact
                         )
                     }
                 }
@@ -74,6 +87,11 @@ struct ListEventCard: View {
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                     .fill(Theme.Colors.cardBackground)
+                    .shadow(color: Theme.Shadows.card(), radius: 4, x: 0, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .stroke(Theme.Colors.border.opacity(0.5), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)

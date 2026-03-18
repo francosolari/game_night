@@ -3,269 +3,149 @@ import SwiftUI
 struct EventCard: View {
     let event: GameEvent
     var myInvite: Invite?
+    var confirmedCount: Int = 0
     var onTap: (() -> Void)?
 
-    private var viewerRole: EventViewerRole {
-        let currentUserId = SupabaseService.shared.client.auth.currentSession?.user.id
-        if event.hostId == currentUserId {
-            return .host
-        }
+    private var isCurrentUserHost: Bool {
+        event.hostId == SupabaseService.shared.client.auth.currentSession?.user.id
+    }
 
+    private var viewerRole: EventViewerRole {
+        if isCurrentUserHost { return .host }
         if let status = myInvite?.status, status == .accepted || status == .maybe {
             return .rsvpd
         }
-
-        if myInvite != nil {
-            return .invitedNotRSVPd
-        }
-
+        if myInvite != nil { return .invitedNotRSVPd }
         return .publicViewer
     }
 
-    private var accessPolicy: EventAccessPolicy {
-        EventAccessPolicy(
-            visibility: event.visibility,
-            viewerRole: viewerRole,
-            rsvpDeadline: event.rsvpDeadline,
-            allowGuestInvites: event.allowGuestInvites,
-            now: Date()
-        )
-    }
-
-    private var locationPresentation: EventLocationPresentation? {
-        guard event.location != nil || event.locationAddress != nil else { return nil }
-        return EventLocationPresentation(
-            locationName: event.location,
-            locationAddress: event.locationAddress,
-            canViewFullAddress: accessPolicy.canViewFullAddress
-        )
+    private var eventIsPast: Bool {
+        let eventDate = event.timeOptions.first?.date ?? event.createdAt
+        return eventDate < Date()
     }
 
     var body: some View {
         Button(action: { onTap?() }) {
             VStack(alignment: .leading, spacing: 0) {
-                // Cover / Header
+                // 1. Top Section: Game Collage & Status
                 ZStack(alignment: .bottomLeading) {
-                    // Gradient background with subtle warm tint
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                        .fill(Theme.Gradients.eventCard)
-                        .frame(height: 140)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                                .stroke(Theme.Colors.divider, lineWidth: 1)
-                        )
-
-                    // Game thumbnails collage
-                    HStack(spacing: -8) {
-                        ForEach(event.games.prefix(3)) { eventGame in
-                            if let game = eventGame.game {
-                                GameThumbnail(url: game.thumbnailUrl, size: 48)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                            .stroke(Theme.Colors.cardBackground, lineWidth: 2)
-                                    )
-                            }
-                        }
-                    }
-                    .padding(Theme.Spacing.lg)
-
-                    // Status badge
+                    gameCollage
+                        .frame(height: 160)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.lg))
+                    
+                    // Status Badge (Top Right)
                     if let invite = myInvite {
-                        HStack {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                InviteStatusBadge(status: invite.status, isPast: eventIsPast)
+                                    .padding(Theme.Spacing.md)
+                                    .shadow(color: Color.black.opacity(0.15), radius: 4)
+                            }
                             Spacer()
-                            InviteStatusBadge(status: invite.status)
-                                .padding(Theme.Spacing.md)
                         }
                     }
+
+                    // Floating Date Badge (Bottom Left)
+                    EventDateLabel(event: event, size: .standard)
+                        .padding(Theme.Spacing.md)
+                        .shadow(color: Color.black.opacity(0.1), radius: 3)
                 }
+                .padding(Theme.Spacing.xs)
 
-                // Content
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text(event.title)
-                        .font(Theme.Typography.headlineMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .lineLimit(1)
-
-                    // Time display — terracotta for dates
-                    if let firstTime = event.timeOptions.first {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            if event.scheduleMode == .fixed || event.timeOptions.count <= 1 {
-                                Image(systemName: "calendar")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(Theme.Colors.dateAccent)
-
-                                Text("\(firstTime.displayDate) \u{00B7} \(firstTime.displayTime)")
-                                    .font(Theme.Typography.calloutMedium)
-                                    .foregroundColor(Theme.Colors.dateAccent)
-                            } else {
-                                Image(systemName: "chart.bar.fill")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(Theme.Colors.accent)
-
-                                Text("\(event.timeOptions.count) time options")
-                                    .font(Theme.Typography.calloutMedium)
-                                    .foregroundColor(Theme.Colors.accent)
-                            }
-                        }
-                    }
-
-                    // Location — sage green
-                    if let locationPresentation {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: "mappin")
-                                .font(.system(size: 13))
-                                .foregroundColor(Theme.Colors.primary)
-
-                            Text(locationPresentation.title)
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.primary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    // Games list — yellow star, colored complexity
+                // 2. Info Section
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    // Title & Location
                     VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        ForEach(event.games.prefix(2)) { eventGame in
-                            if let game = eventGame.game {
-                                HStack(spacing: 6) {
-                                    if eventGame.isPrimary {
-                                        Image(systemName: "star.fill")
-                                            .font(.system(size: 10))
-                                            .foregroundColor(Theme.Colors.highlight)
-                                    }
-                                    Text(game.name)
-                                        .font(Theme.Typography.callout)
-                                        .foregroundColor(Theme.Colors.textPrimary)
-                                    ComplexityDot(weight: game.complexity)
-                                    Text(game.playtimeDisplay)
-                                        .font(Theme.Typography.caption)
-                                        .foregroundColor(Theme.Colors.textTertiary)
-                                }
-                            }
-                        }
+                        Text(event.title)
+                            .font(Theme.Typography.displaySmall)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                            .lineLimit(2)
+                        
+                        EventLocationLabel(event: event, viewerRole: viewerRole, size: .standard)
                     }
 
-                    // Host & player count
-                    HStack {
-                        if let host = event.host {
-                            HStack(spacing: 6) {
-                                AvatarView(url: host.avatarUrl, size: 20)
-                                Text("Hosted by \(host.displayName)")
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.textTertiary)
-                            }
-                        }
+                    // Games Detail Section
+                    if !event.games.isEmpty {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("PLANNED GAMES")
+                                .font(Theme.Typography.caption2)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                                .tracking(1)
 
+                            GameInfoCompact(games: event.games, size: .expanded)
+                        }
+                        .padding(Theme.Spacing.sm)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .fill(Theme.Colors.backgroundElevated.opacity(0.5))
+                        )
+                    }
+
+                    // Footer: Host & Players
+                    HStack(alignment: .center) {
+                        HostBadge(host: event.host, isCurrentUserHost: isCurrentUserHost, size: .standard)
+                        
                         Spacer()
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 11))
-                            Text("\(event.minPlayers)\(event.maxPlayers.map { "-\($0)" } ?? "+") players")
-                                .font(Theme.Typography.caption)
-                        }
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        
+                        PlayerCountIndicator(
+                            confirmedCount: confirmedCount,
+                            minPlayers: event.minPlayers,
+                            maxPlayers: event.maxPlayers,
+                            size: .standard
+                        )
                     }
+                    .padding(.top, Theme.Spacing.xs)
                 }
                 .padding(Theme.Spacing.lg)
             }
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                     .fill(Theme.Colors.cardBackground)
+                    .shadow(color: Theme.Shadows.card(), radius: 12, x: 0, y: 6)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .stroke(Theme.Colors.border.opacity(0.5), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
     }
-}
 
-// MARK: - Invite Status Badge
-struct InviteStatusBadge: View {
-    let status: InviteStatus
-    var isPast: Bool = false
-
-    private var displayLabel: String {
-        if isPast && status == .accepted { return "Went" }
-        return status.displayLabel
-    }
-
-    private var displayIcon: String {
-        if isPast && status == .accepted { return "checkmark.seal.fill" }
-        return status.icon
-    }
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: displayIcon)
-                .font(.system(size: 10))
-            Text(displayLabel)
-                .font(Theme.Typography.caption2)
-        }
-        .foregroundColor(status.color)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(
-            Capsule()
-                .fill(status.color.opacity(0.15))
-        )
-    }
-}
-
-// MARK: - Avatar View
-struct AvatarView: View {
-    let url: String?
-    var size: CGFloat = 40
-    var placeholder: String = "person.fill"
-
-    var body: some View {
-        Group {
-            if let url, let imageUrl = URL(string: url) {
-                AsyncImage(url: imageUrl) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    avatarPlaceholder
+    @ViewBuilder
+    private var gameCollage: some View {
+        let games = event.games.prefix(3)
+        if games.isEmpty {
+            ZStack {
+                Theme.Gradients.eventCard
+                Image(systemName: "dice.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(Theme.Colors.textTertiary.opacity(0.3))
+            }
+        } else {
+            HStack(spacing: 1) {
+                ForEach(Array(games.enumerated()), id: \.offset) { index, eventGame in
+                    if let game = eventGame.game, let url = URL(string: game.imageUrl ?? "") {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Theme.Colors.backgroundElevated
+                        }
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                    } else {
+                        Theme.Gradients.eventCard
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-            } else {
-                avatarPlaceholder
             }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-    }
-
-    private var avatarPlaceholder: some View {
-        ZStack {
-            Circle().fill(Theme.Colors.backgroundElevated)
-            Image(systemName: placeholder)
-                .font(.system(size: size * 0.4))
-                .foregroundColor(Theme.Colors.textTertiary)
-        }
-    }
-}
-
-// MARK: - Avatar Stack
-struct AvatarStack: View {
-    let urls: [String?]
-    var size: CGFloat = 32
-    var maxDisplay: Int = 4
-
-    var body: some View {
-        HStack(spacing: -(size * 0.3)) {
-            ForEach(Array(urls.prefix(maxDisplay).enumerated()), id: \.offset) { index, url in
-                AvatarView(url: url, size: size)
-                    .overlay(Circle().stroke(Theme.Colors.cardBackground, lineWidth: 2))
-                    .zIndex(Double(maxDisplay - index))
-            }
-            if urls.count > maxDisplay {
-                ZStack {
-                    Circle()
-                        .fill(Theme.Colors.backgroundElevated)
-                        .frame(width: size, height: size)
-                    Text("+\(urls.count - maxDisplay)")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.textSecondary)
-                }
-                .overlay(Circle().stroke(Theme.Colors.cardBackground, lineWidth: 2))
-            }
+            .overlay(
+                LinearGradient(
+                    colors: [.clear, Color.black.opacity(0.3)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
     }
 }

@@ -1,9 +1,10 @@
 import SwiftUI
 
-struct CompactEventCard: View {
+struct VerticalEventCard: View {
     let event: GameEvent
     var myInvite: Invite?
     var confirmedCount: Int = 0
+    var size: ComponentSize = .standard
     var onTap: (() -> Void)?
 
     private var isCurrentUserHost: Bool {
@@ -30,34 +31,45 @@ struct CompactEventCard: View {
 
     var body: some View {
         Button(action: { onTap?() }) {
-            HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Top Cover Section
                 ZStack(alignment: .topTrailing) {
                     coverImage
-                        .frame(width: 100, height: 120)
+                        .frame(height: 120)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
 
                     if let invite = myInvite {
                         InviteStatusBadge(status: invite.status, isPast: eventIsPast)
                             .scaleEffect(0.85)
-                            .padding(4)
+                            .padding(Theme.Spacing.sm)
+                            .shadow(color: Color.black.opacity(0.1), radius: 2)
                     }
                 }
+                .padding(Theme.Spacing.xs)
 
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                // Info Section
+                VStack(alignment: .leading, spacing: size.spacing) {
                     EventDateLabel(event: event, size: .compact)
 
                     Text(event.title)
-                        .font(ComponentSize.compact.titleFont)
+                        .font(size.titleFont)
                         .foregroundColor(Theme.Colors.textPrimary)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.9)
+                        .frame(height: size.titleFont == Theme.Typography.calloutMedium ? 36 : 44, alignment: .topLeading)
 
                     EventLocationLabel(event: event, viewerRole: viewerRole, size: .compact)
 
                     if !event.games.isEmpty {
                         GameInfoCompact(games: event.games, size: .compact)
+                            .padding(.top, 2)
                     }
 
-                    Spacer(minLength: 0)
+                    Spacer(minLength: Theme.Spacing.sm)
+
+                    Divider()
+                        .opacity(0.5)
+                        .padding(.vertical, 2)
 
                     HStack {
                         HostBadge(host: event.host, isCurrentUserHost: isCurrentUserHost, size: .compact)
@@ -70,13 +82,17 @@ struct CompactEventCard: View {
                         )
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding([.horizontal, .bottom], Theme.Spacing.md)
+                .padding(.top, Theme.Spacing.xs)
             }
-            .padding(Theme.Spacing.sm)
-            .frame(height: 136)
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                     .fill(Theme.Colors.cardBackground)
+                    .shadow(color: Theme.Shadows.card(), radius: 8, x: 0, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                    .stroke(Theme.Colors.border.opacity(0.5), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)

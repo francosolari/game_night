@@ -12,6 +12,7 @@ struct CardModifier: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                     .fill(Theme.Colors.cardBackground)
+                    .shadow(color: Color.black.opacity(themeManager.isDark ? 0.3 : 0.06), radius: 8, x: 0, y: 4)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                             .stroke(Theme.Colors.divider, lineWidth: 1)
