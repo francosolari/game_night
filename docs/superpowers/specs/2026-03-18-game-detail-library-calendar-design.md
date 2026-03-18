@@ -24,7 +24,7 @@ New columns in `games` table: `designers text[] default '{}'`, `publishers text[
 
 **Migration must backfill existing rows:** `UPDATE games SET designers = '{}' WHERE designers IS NULL; UPDATE games SET publishers = '{}' WHERE publishers IS NULL; UPDATE games SET artists = '{}' WHERE artists IS NULL;` — the `DEFAULT` only applies to new inserts.
 
-**Swift Codable safety:** `designers`, `publishers`, and `artists` decode with `decodeIfPresent` and fallback to `[]` to handle rows that haven't been backfilled or pre-existing cached data.
+**Swift Codable safety:** `designers`, `publishers`, and `artists` decode with `decodeIfPresent` and fallback to `[]` to handle rows that haven't been backfilled or pre-existing cached data. **Note:** The current `Game` struct has no custom `init(from decoder:)` — one must be added, handling all 17+ existing fields plus the new ones. This is a non-trivial but mechanical change.
 
 ### 1b. New Supabase tables
 
@@ -68,7 +68,7 @@ Parse additional `<link>` types from BGG's `/thing` endpoint:
 | `boardgamedesigner` | `designers` array on Game |
 | `boardgamepublisher` | `publishers` array on Game |
 | `boardgameartist` | `artists` array on Game |
-| `boardgameexpansion` | Insert into `game_expansions`. On a base game's page, expansion links have NO `inbound` attribute → the linked game is the expansion (`expansion_game_id`). On an expansion's page, the base game link has `inbound="true"` → the linked game is the base (`base_game_id`). Store the BGG ID of the linked game; the actual `games` row may not exist yet — upsert a stub row or defer the link insertion until both sides are fetched. |
+| `boardgameexpansion` | Insert into `game_expansions`. On a base game's page, expansion links have NO `inbound` attribute → the linked game is the expansion (`expansion_game_id`). On an expansion's page, the base game link has `inbound="true"` → the linked game is the base (`base_game_id`). Store the BGG ID of the linked game; the actual `games` row may not exist yet — upsert a stub row into `games` with just `bgg_id` and `name` (from the link's `value` attribute), then create the expansion link. The stub gets fully populated when the user navigates to that game's detail page. |
 | `boardgamefamily` | Insert into `game_families` + `game_family_members` |
 
 Also parse:
@@ -198,13 +198,13 @@ Shared ViewModel for both Designer and Publisher detail pages:
 - `@Published var isExpanded = false`
 - `var displayedGames: [Game]` — computed, returns sorted + limited (top 5 or all if expanded)
 - `loadGames()` — fetches via `fetchGamesByDesigner` or `fetchGamesByPublisher`
-- For prolific creators (700+ games), the Supabase query should `ORDER BY bgg_rating DESC NULLS LAST LIMIT 50` to keep initial load fast. "Show All" fetches without limit.
+- For prolific creators (700+ games), the Supabase query should `ORDER BY bgg_rating DESC NULLS LAST LIMIT 50` to keep initial load fast. If exactly 50 results are returned, show the "Show All" button. Tapping it fetches without limit. This avoids an extra COUNT query.
 
 ---
 
 ## 6. Library Suggestions in CreateEventGamesStep
 
-### 5a. Library games section (below manual entry)
+### 6a. Library games section (below manual entry)
 
 When `selectedGames` is empty, show a "From Your Library" section below the manual entry field:
 - Load user's game library on appear via `SupabaseService.fetchGameLibrary()`
@@ -213,7 +213,7 @@ When `selectedGames` is empty, show a "From Your Library" section below the manu
 - Section hides once at least one game is selected
 - If the user has zero games in their library, do not show the section header at all
 
-### 5b. Autocomplete from library
+### 6b. Autocomplete from library
 
 When typing in the manual game name field:
 - Filter the loaded library entries by name (case-insensitive contains)
@@ -241,7 +241,7 @@ Single game:
 ```
 Game Night: Dune: Imperium
 
-Hosted on CardboardWithMe
+Hosted by Alex on CardboardWithMe
 ```
 
 Multiple games:
@@ -249,7 +249,7 @@ Multiple games:
 Game Night: Dune: Imperium
 Also playing: Ark Nova, Clank!
 
-Hosted on CardboardWithMe
+Hosted by Alex on CardboardWithMe
 ```
 
 No games:
@@ -259,7 +259,7 @@ Game Night
 Hosted by Alex on CardboardWithMe
 ```
 
-The host's display name is included when available (from `event.host?.displayName`).
+The host's display name is always included when available (from `event.host?.displayName`). Falls back to "Hosted on CardboardWithMe" when host info is unavailable.
 
 The event's own `description` field, if present, is appended after the game info and before the boilerplate.
 
