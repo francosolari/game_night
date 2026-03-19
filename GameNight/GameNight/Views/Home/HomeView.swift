@@ -127,7 +127,7 @@ struct HomeView: View {
 
                         // Next Up — horizontal carousel (future/today events only)
                         let futureEvents = viewModel.upcomingEvents.filter { event in
-                            let eventDate = event.timeOptions.first?.date ?? event.createdAt
+                            let eventDate = event.timeOptions.map(\.date).min() ?? event.createdAt
                             return eventDate >= Calendar.current.startOfDay(for: Date())
                         }
 
