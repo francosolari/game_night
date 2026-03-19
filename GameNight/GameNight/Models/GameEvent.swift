@@ -32,6 +32,17 @@ struct GameEvent: Identifiable, Codable {
     var createdAt: Date
     var updatedAt: Date
 
+    /// The authoritative start time for sorting and filtering.
+    /// Uses the confirmed time option's startTime if set, otherwise the earliest
+    /// startTime across all options (stable regardless of fetch order).
+    var effectiveStartDate: Date {
+        if let confirmedId = confirmedTimeOptionId,
+           let confirmed = timeOptions.first(where: { $0.id == confirmedId }) {
+            return confirmed.startTime
+        }
+        return timeOptions.map(\.startTime).min() ?? createdAt
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case hostId = "host_id"

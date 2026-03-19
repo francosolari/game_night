@@ -8,11 +8,13 @@ enum GuestListVisibilityMode: Equatable {
 struct GuestListTabsView: View {
     let summary: InviteSummary
     var visibilityMode: GuestListVisibilityMode = .fullList
+    var isHost: Bool = false
     var actionTitle: String? = nil
     var onAction: (() -> Void)? = nil
+    var onViewAll: (() -> Void)? = nil
     @State private var selectedTab = 0
 
-    private var tabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
+    private var allTabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
         [
             ("Going", summary.accepted, InviteStatus.accepted.color, summary.acceptedUsers),
             ("Maybe", summary.maybe, InviteStatus.maybe.color, summary.maybeUsers),
@@ -21,15 +23,26 @@ struct GuestListTabsView: View {
         ]
     }
 
+    private var tabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
+        isHost ? allTabs : Array(allTabs.prefix(2))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack {
                 SectionHeader(title: "Guest List")
                 Spacer()
-                if let actionTitle, let onAction {
-                    Button(actionTitle, action: onAction)
-                        .font(Theme.Typography.calloutMedium)
-                        .foregroundColor(Theme.Colors.primary)
+                HStack(spacing: Theme.Spacing.md) {
+                    if let onViewAll {
+                        Button("View all", action: onViewAll)
+                            .font(Theme.Typography.calloutMedium)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                    if let actionTitle, let onAction {
+                        Button(actionTitle, action: onAction)
+                            .font(Theme.Typography.calloutMedium)
+                            .foregroundColor(Theme.Colors.primary)
+                    }
                 }
             }
 
@@ -80,6 +93,7 @@ struct GuestListTabsView: View {
     private var guestListHeight: CGFloat {
         switch visibilityMode {
         case .fullList:
+            guard selectedTab < tabs.count else { return 2 * 44 + Theme.Spacing.sm }
             let currentUsers = tabs[selectedTab].users
             let rowHeight: CGFloat = 44
             let minRows: CGFloat = 2
@@ -136,6 +150,93 @@ private struct GuestTabContent: View {
                                     .foregroundColor(Theme.Colors.textTertiary)
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct GuestListFullPageView: View {
+    let summary: InviteSummary
+    let isHost: Bool
+    let visibilityMode: GuestListVisibilityMode
+    let canInvite: Bool
+    let onInvite: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedTab = 0
+
+    private var allTabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
+        [
+            ("Going", summary.accepted, InviteStatus.accepted.color, summary.acceptedUsers),
+            ("Maybe", summary.maybe, InviteStatus.maybe.color, summary.maybeUsers),
+            ("Pending", summary.pending, InviteStatus.pending.color, summary.pendingUsers),
+            ("Can't", summary.declined, InviteStatus.declined.color, summary.declinedUsers)
+        ]
+    }
+
+    private var tabs: [(label: String, count: Int, color: Color, users: [InviteSummary.InviteUser])] {
+        isHost ? allTabs : Array(allTabs.prefix(2))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: Theme.Spacing.md) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                            Button {
+                                withAnimation(Theme.Animation.snappy) {
+                                    selectedTab = index
+                                }
+                            } label: {
+                                Text("\(tab.label) · \(tab.count)")
+                                    .font(Theme.Typography.caption2)
+                                    .foregroundColor(selectedTab == index ? .white : tab.color)
+                                    .padding(.horizontal, Theme.Spacing.md)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(selectedTab == index ? tab.color : tab.color.opacity(0.15))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                }
+
+                TabView(selection: $selectedTab) {
+                    ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                        switch visibilityMode {
+                        case .fullList:
+                            GuestTabContent(users: tab.users, emptyLabel: "No one \(tab.label.lowercased()) yet")
+                                .tag(index)
+                        case .countsOnly(let message):
+                            CountsOnlyGuestTabContent(message: message)
+                                .tag(index)
+                        }
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(Theme.Animation.snappy, value: selectedTab)
+            }
+            .background(Theme.Colors.background.ignoresSafeArea())
+            .navigationTitle("Guest List")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(Theme.Colors.primary)
+                }
+                if canInvite {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Invite") {
+                            onInvite()
+                            dismiss()
+                        }
+                        .font(Theme.Typography.calloutMedium)
+                        .foregroundColor(Theme.Colors.primary)
                     }
                 }
             }

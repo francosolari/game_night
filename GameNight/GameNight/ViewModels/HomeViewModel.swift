@@ -66,9 +66,7 @@ final class HomeViewModel: ObservableObject {
                     return (event, invite)
                 }
                 pendingEvents.sort { a, b in
-                    let dateA = a.event.timeOptions.map(\.date).min() ?? a.event.createdAt
-                    let dateB = b.event.timeOptions.map(\.date).min() ?? b.event.createdAt
-                    return dateA < dateB
+                    a.event.effectiveStartDate < b.event.effectiveStartDate
                 }
             } catch is CancellationError {
                 // Ignore cancellations — pending list can stay empty
@@ -142,10 +140,6 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func sortByEventDate(_ events: [GameEvent]) -> [GameEvent] {
-        events.sorted { a, b in
-            let dateA = a.timeOptions.map(\.date).min() ?? a.createdAt
-            let dateB = b.timeOptions.map(\.date).min() ?? b.createdAt
-            return dateA < dateB
-        }
+        events.sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }
 }

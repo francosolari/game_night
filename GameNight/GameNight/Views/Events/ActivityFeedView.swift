@@ -7,6 +7,13 @@ struct ActivityFeedView: View {
     @State private var replyingTo: UUID?
     @FocusState private var isCommentFocused: Bool
 
+    private var visibleFeedItems: [ActivityFeedItem] {
+        viewModel.activityFeed.filter { item in
+            guard item.type == .rsvpUpdate else { return true }
+            return item.content == "accepted" || item.content == "maybe"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             SectionHeader(title: "Activity")
@@ -26,7 +33,7 @@ struct ActivityFeedView: View {
             } else {
                 // Feed items
                 LazyVStack(spacing: 0) {
-                    ForEach(viewModel.activityFeed) { item in
+                    ForEach(visibleFeedItems) { item in
                         switch item.type {
                         case .rsvpUpdate:
                             RSVPUpdateRow(item: item)

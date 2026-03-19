@@ -12,6 +12,7 @@ struct EventDetailView: View {
     @State private var showEditSheet = false
     @State private var showDeleteConfirmation = false
     @State private var showCreateGroupFromEvent = false
+    @State private var showGuestListFullPage = false
     @State private var toast: ToastItem?
     @State private var editSavePresentation = EventEditSavePresentation()
 
@@ -179,10 +180,12 @@ struct EventDetailView: View {
                             GuestListTabsView(
                                 summary: viewModel.inviteSummary,
                                 visibilityMode: guestListVisibilityMode,
+                                isHost: viewModel.isOwner,
                                 actionTitle: viewModel.canInviteGuests ? "Invite" : nil,
                                 onAction: viewModel.canInviteGuests ? {
                                     showInviteContacts = true
-                                } : nil
+                                } : nil,
+                                onViewAll: { showGuestListFullPage = true }
                             )
 
                             // Activity Feed
@@ -314,6 +317,15 @@ struct EventDetailView: View {
                 toast = resultToast
             })
         }
+        .sheet(isPresented: $showGuestListFullPage) {
+            GuestListFullPageView(
+                summary: viewModel.inviteSummary,
+                isHost: viewModel.isOwner,
+                visibilityMode: guestListVisibilityMode,
+                canInvite: viewModel.canInviteGuests,
+                onInvite: { showInviteContacts = true }
+            )
+        }
         .toast($toast)
         .task {
             await viewModel.loadEvent(id: eventId)
@@ -330,11 +342,13 @@ struct EventDetailView: View {
 
 
     private var guestListVisibilityMode: GuestListVisibilityMode {
-        if viewModel.accessPolicy?.canViewGuestList ?? true {
+        guard viewModel.accessPolicy?.canViewGuestList ?? true else {
+            return .countsOnly(message: "RSVP to see who's going.")
+        }
+        if viewModel.isOwner || viewModel.hasRSVPd {
             return .fullList
         }
-
-        return .countsOnly(message: "Guest names unlock after you RSVP.")
+        return .countsOnly(message: "RSVP to see who's going.")
     }
 
     private func locationPresentation(for event: GameEvent) -> EventLocationPresentation? {

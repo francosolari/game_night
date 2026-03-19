@@ -126,9 +126,11 @@ struct HomeView: View {
                         }
 
                         // Next Up — horizontal carousel (future/today events only)
+                        let startOfToday = Calendar.current.startOfDay(for: Date())
                         let futureEvents = viewModel.upcomingEvents.filter { event in
-                            let eventDate = event.timeOptions.map(\.date).min() ?? event.createdAt
-                            return eventDate >= Calendar.current.startOfDay(for: Date())
+                            // Include events starting today (even if already started) and future events.
+                            // An event that started today at noon still shows at 3pm.
+                            event.effectiveStartDate >= startOfToday
                         }
 
                         if !futureEvents.isEmpty {
