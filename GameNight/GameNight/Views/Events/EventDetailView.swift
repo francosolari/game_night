@@ -403,7 +403,7 @@ struct EventHeroHeader: View {
     var minPlayers: Int = 0
     var maxPlayers: Int? = nil
     var onRSVPTap: (() -> Void)? = nil
-    private let heroHeight: CGFloat = 380
+    private let heroHeight: CGFloat = 330
 
     @Environment(\.openURL) private var openURL
     @State private var showMapPicker = false
@@ -436,35 +436,42 @@ struct EventHeroHeader: View {
                 // Frosted material that fades in from mid → bottom
                 Rectangle()
                     .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .light)
+                    .environment(\.colorScheme, ThemeManager.shared.isDark ? .dark : .light)
                     .mask(
                         LinearGradient(stops: [
                             .init(color: .clear, location: 0.0),
-                            .init(color: .clear, location: 0.25),
-                            .init(color: .black.opacity(0.5), location: 0.45),
-                            .init(color: .black, location: 0.6),
+                            .init(color: .clear, location: 0.35),
+                            .init(color: .black.opacity(0.6), location: 0.55),
+                            .init(color: .black, location: 0.68),
                         ], startPoint: .top, endPoint: .bottom)
                     )
 
-                // Subtle warm tint over the material area
+                // Subtle tint over the material area — warm cream in light, dark in dark
                 LinearGradient(stops: [
                     .init(color: .clear, location: 0.0),
-                    .init(color: .clear, location: 0.45),
-                    .init(color: Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.25), location: 0.65),
-                    .init(color: Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.35), location: 1.0),
+                    .init(color: .clear, location: 0.55),
+                    .init(color: (ThemeManager.shared.isDark
+                        ? Color(red: 0.08, green: 0.07, blue: 0.06).opacity(0.4)
+                        : Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.25)
+                    ), location: 0.72),
+                    .init(color: (ThemeManager.shared.isDark
+                        ? Color(red: 0.08, green: 0.07, blue: 0.06).opacity(0.55)
+                        : Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.35)
+                    ), location: 1.0),
                 ], startPoint: .top, endPoint: .bottom)
 
-                // Content
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                // Content — single dense VStack, no extra gaps
+                VStack(alignment: .leading, spacing: 0) {
                     // Title
                     Text(event.title)
                         .font(Theme.Typography.displayMedium.weight(.bold))
                         .foregroundColor(Theme.Colors.textPrimary)
-                        .shadow(color: .white.opacity(0.5), radius: 8, y: 0)
+                        .shadow(color: ThemeManager.shared.isDark ? .black.opacity(0.6) : .white.opacity(0.5), radius: 8, y: 0)
+                        .padding(.bottom, Theme.Spacing.xs)
 
                     // Info row: location + host + date badge
                     HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 4) {
                             // Location
                             if let locationPresentation {
                                 heroLocationRow(locationPresentation)
@@ -507,10 +514,11 @@ struct EventHeroHeader: View {
                         }
                     }
 
-                    // RSVP + player count
+                    // RSVP + player count — tight against host row
                     if myInvite != nil || minPlayers > 0 {
                         Divider()
                             .background(Theme.Colors.divider)
+                            .padding(.vertical, 6)
 
                         HStack(spacing: Theme.Spacing.md) {
                             if let myInvite, let onRSVPTap {
