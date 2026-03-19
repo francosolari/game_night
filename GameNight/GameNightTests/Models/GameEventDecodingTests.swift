@@ -125,4 +125,57 @@ final class GameEventDecodingTests: XCTestCase {
         XCTAssertEqual(event.games.count, 1)
         XCTAssertTrue(event.timeOptions.isEmpty)
     }
+
+    func testPreferredCoverImageURLStringUsesEventCoverFirst() {
+        let event = FixtureFactory.makeEvent(
+            games: [
+                FixtureFactory.makeEventGame(
+                    game: FixtureFactory.makeGame(name: "Dune")
+                )
+            ]
+        )
+
+        var mutableEvent = event
+        mutableEvent.coverImageUrl = "https://cdn.example.com/event-cover.jpg"
+        mutableEvent.games[0].game?.imageUrl = "https://cdn.example.com/game-cover.jpg"
+
+        XCTAssertEqual(
+            mutableEvent.preferredCoverImageURLString,
+            "https://cdn.example.com/event-cover.jpg"
+        )
+    }
+
+    func testPreferredCoverImageURLStringFallsBackToPrimaryGameImage() {
+        var primaryGame = FixtureFactory.makeGame(name: "Primary")
+        primaryGame.imageUrl = "https://cdn.example.com/primary.jpg"
+
+        var secondaryGame = FixtureFactory.makeGame(name: "Secondary")
+        secondaryGame.imageUrl = "https://cdn.example.com/secondary.jpg"
+
+        let event = FixtureFactory.makeEvent(
+            games: [
+                FixtureFactory.makeEventGame(game: secondaryGame, isPrimary: false, sortOrder: 1),
+                FixtureFactory.makeEventGame(game: primaryGame, isPrimary: true, sortOrder: 0)
+            ]
+        )
+
+        XCTAssertEqual(event.preferredCoverImageURLString, "https://cdn.example.com/primary.jpg")
+    }
+
+    func testPreferredCoverImageURLStringFallsBackToFirstGameImageWhenNoPrimary() {
+        var firstGame = FixtureFactory.makeGame(name: "First")
+        firstGame.imageUrl = "https://cdn.example.com/first.jpg"
+
+        var secondGame = FixtureFactory.makeGame(name: "Second")
+        secondGame.imageUrl = "https://cdn.example.com/second.jpg"
+
+        let event = FixtureFactory.makeEvent(
+            games: [
+                FixtureFactory.makeEventGame(game: firstGame, isPrimary: false, sortOrder: 0),
+                FixtureFactory.makeEventGame(game: secondGame, isPrimary: false, sortOrder: 1)
+            ]
+        )
+
+        XCTAssertEqual(event.preferredCoverImageURLString, "https://cdn.example.com/first.jpg")
+    }
 }

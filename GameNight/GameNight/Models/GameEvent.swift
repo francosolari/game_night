@@ -196,6 +196,12 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(updatedAt, forKey: .updatedAt)
         // Intentionally skip: host, games, timeOptions (separate tables)
     }
+
+    var preferredCoverImageURLString: String? {
+        coverImageUrl
+            ?? games.first(where: { $0.isPrimary })?.game?.imageUrl
+            ?? games.first?.game?.imageUrl
+    }
 }
 
 // MARK: - Schedule Mode

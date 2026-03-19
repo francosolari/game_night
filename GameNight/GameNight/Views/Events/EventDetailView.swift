@@ -393,32 +393,47 @@ struct EventHeroHeader: View {
     let locationPresentation: EventLocationPresentation?
     @Environment(\.openURL) private var openURL
     @State private var showMapPicker = false
+    private let heroHeight: CGFloat = 260
 
     private var firstTimeOption: TimeOption? {
         event.timeOptions.first
     }
 
+    private var coverImageURL: URL? {
+        guard let urlString = event.preferredCoverImageURLString else { return nil }
+        return URL(string: urlString)
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Clean background — flows naturally from page
-            Theme.Colors.background
-                .frame(height: 240)
+            coverBackground
+                .frame(height: heroHeight)
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.1),
+                    Color.black.opacity(0.45)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: heroHeight)
 
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     // Title
                     Text(event.title)
                         .font(Theme.Typography.displayMedium.weight(.bold))
-                        .foregroundColor(Theme.Colors.textPrimary)
+                        .foregroundColor(.white)
 
                     // Status Pill
                     HStack(spacing: Theme.Spacing.md) {
                         Text(event.status.rawValue.capitalized)
                             .font(Theme.Typography.caption2)
-                            .foregroundColor(Theme.Colors.primaryLight)
+                            .foregroundColor(Theme.Colors.accentLight)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.2)))
+                            .background(Capsule().fill(.black.opacity(0.28)))
                     }
 
                     // Location line (simplified)
@@ -432,7 +447,7 @@ struct EventHeroHeader: View {
                             AvatarView(url: host.avatarUrl, size: 24)
                             Text("Hosted by \(host.displayName)")
                                 .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textSecondary)
+                                .foregroundColor(.white.opacity(0.88))
                         }
                         .padding(.top, 4)
                     }
@@ -450,6 +465,8 @@ struct EventHeroHeader: View {
             }
             .padding(Theme.Spacing.xl)
         }
+        .frame(height: heroHeight)
+        .clipped()
     }
 
     @ViewBuilder
@@ -457,24 +474,24 @@ struct EventHeroHeader: View {
         let content = HStack(alignment: .top, spacing: 6) {
             Image(systemName: "mappin.circle.fill")
                 .font(.system(size: 14))
-                .foregroundColor(Theme.Colors.textTertiary)
+                .foregroundColor(.white.opacity(0.82))
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 Text(locationPresentation.title)
                     .font(Theme.Typography.callout)
-                    .foregroundColor(Theme.Colors.textSecondary)
+                    .foregroundColor(.white.opacity(0.9))
                     .lineLimit(1)
                 if let subtitle = locationPresentation.subtitle {
                     Text(subtitle)
                         .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
+                        .foregroundColor(.white.opacity(0.72))
                         .lineLimit(1)
                 }
             }
             if locationPresentation.mapsURL != nil {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Theme.Colors.textTertiary)
+                    .foregroundColor(.white.opacity(0.72))
                     .padding(.top, 3)
             }
         }
@@ -500,6 +517,21 @@ struct EventHeroHeader: View {
             }
         } else {
             content
+        }
+    }
+
+    @ViewBuilder
+    private var coverBackground: some View {
+        if let coverImageURL {
+            AsyncImage(url: coverImageURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
+            }
+        } else {
+            GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
         }
     }
 }
