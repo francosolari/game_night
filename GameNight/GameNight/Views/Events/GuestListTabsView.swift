@@ -181,16 +181,12 @@ private struct GuestTabContent: View {
                             .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, Theme.Spacing.sm)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                        .fill(Theme.Colors.cardBackground)
-                )
+                .padding(.vertical, 6)
 
                 if index < displayUsers.count - 1 {
                     Divider()
                         .background(Theme.Colors.divider)
+                        .padding(.leading, 46)
                 }
             }
 

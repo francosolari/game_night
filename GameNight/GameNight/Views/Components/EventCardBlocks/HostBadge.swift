@@ -20,7 +20,7 @@ struct HostBadge: View {
 
     private var displayText: String {
         if isCurrentUserHost {
-            return "You \u{00B7} Hosting"
+            return "Hosting"
         }
         if let host {
             return host.displayName
