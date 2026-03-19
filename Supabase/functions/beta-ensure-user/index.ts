@@ -5,7 +5,6 @@ interface BetaUserRequest {
   phone: string;
   password?: string;
   mode?: "probe" | "ensure";
-  allow_password_reset?: boolean;
 }
 
 const PAGE_SIZE = 1000;
@@ -51,7 +50,6 @@ serve(async (req) => {
   const normalizedPhone = normalizePhone(body?.phone ?? "");
   const mode = body?.mode ?? "ensure";
   const password = body?.password?.trim();
-  const allowPasswordReset = Boolean(body?.allow_password_reset);
   if (!normalizedPhone) {
     return new Response(JSON.stringify({ error: "Missing phone number" }), {
       status: 400,
@@ -80,16 +78,6 @@ serve(async (req) => {
 
         if (existingUser) {
             userId = existingUser.id;
-            if (allowPasswordReset) {
-                const { error } = await supabase.auth.admin.updateUserById(existingUser.id, {
-                    password: password!,
-                    phone_confirm: true,
-                });
-                if (error) {
-                    console.error("[beta-ensure-user] updateUserById failed", error);
-                    throw error;
-                }
-            }
         } else {
             const { data, error } = await supabase.auth.admin.createUser({
                 phone: normalizedPhone,
@@ -102,15 +90,6 @@ serve(async (req) => {
                 const fallbackExisting = await retryFindUserByPhone(supabase, normalizedPhone);
                 if (fallbackExisting) {
                     userId = fallbackExisting.id;
-                    if (allowPasswordReset) {
-                        const { error: updateError } = await supabase.auth.admin.updateUserById(fallbackExisting.id, {
-                            password: password!,
-                            phone_confirm: true,
-                        });
-                        if (updateError) {
-                            throw updateError;
-                        }
-                    }
                 } else {
                     const body = JSON.stringify(error);
                     return new Response(

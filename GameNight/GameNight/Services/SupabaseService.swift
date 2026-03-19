@@ -45,8 +45,6 @@ private struct BetaUserProbePayload: Encodable {
     let mode: String
 }
 
-private struct EmptyBody: Encodable {}
-
 struct BetaUserProbeResponse: Decodable {
     let exists: Bool
     let userId: String?
@@ -563,12 +561,6 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchMyInvites() async throws -> [Invite] {
         let session = try await client.auth.session
-        do {
-            try await invokeAuthenticatedFunction("claim-my-invites", body: EmptyBody())
-        } catch {
-            // Non-fatal: fallback to current visibility rules
-            print("📨 [SupabaseService] claim-my-invites failed: \(error)")
-        }
 
         let invites: [Invite] = try await client
             .from("invites")
