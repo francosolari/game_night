@@ -403,14 +403,10 @@ struct EventHeroHeader: View {
     var minPlayers: Int = 0
     var maxPlayers: Int? = nil
     var onRSVPTap: (() -> Void)? = nil
-    private let heroHeight: CGFloat = 360
+    private let heroHeight: CGFloat = 380
 
     @Environment(\.openURL) private var openURL
     @State private var showMapPicker = false
-
-    // Consistent overlay tag background — cream-tinted with opacity, works on both light/dark covers
-    private let tagBackground = Color(red: 0.98, green: 0.97, blue: 0.95).opacity(0.85)
-    private let tagForeground = Color(red: 0.17, green: 0.12, blue: 0.08) // espresso
 
     private var coverImageURL: URL? {
         guard let urlString = event.preferredCoverImageURLString else { return nil }
@@ -431,57 +427,63 @@ struct EventHeroHeader: View {
             let minY = geo.frame(in: .global).minY
             let stretchHeight = minY > 0 ? heroHeight + minY : heroHeight
 
-            ZStack(alignment: .bottomLeading) {
-                // Cover image
+            ZStack(alignment: .bottom) {
+                // Cover image — full bleed
                 coverBackground
                     .frame(width: geo.size.width, height: stretchHeight)
                     .clipped()
 
-                // Subtle base tint for light covers
-                Color.black.opacity(0.08)
+                // Frosted material that fades in from mid → bottom
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .light)
+                    .mask(
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0.0),
+                            .init(color: .clear, location: 0.25),
+                            .init(color: .black.opacity(0.5), location: 0.45),
+                            .init(color: .black, location: 0.6),
+                        ], startPoint: .top, endPoint: .bottom)
+                    )
 
-                // Multi-stop gradient scrim
+                // Subtle warm tint over the material area
                 LinearGradient(stops: [
-                    .init(color: .black.opacity(0.0), location: 0.0),
-                    .init(color: .black.opacity(0.08), location: 0.3),
-                    .init(color: .black.opacity(0.35), location: 0.6),
-                    .init(color: .black.opacity(0.58), location: 1.0),
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .clear, location: 0.45),
+                    .init(color: Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.25), location: 0.65),
+                    .init(color: Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.35), location: 1.0),
                 ], startPoint: .top, endPoint: .bottom)
 
-                // Content overlay
-                VStack(spacing: Theme.Spacing.sm) {
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text(event.title)
-                                .font(Theme.Typography.displayMedium.weight(.bold))
-                                .foregroundColor(.white)
-                                .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+                // Content
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    // Title
+                    Text(event.title)
+                        .font(Theme.Typography.displayMedium.weight(.bold))
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .shadow(color: .white.opacity(0.5), radius: 8, y: 0)
 
-                            // Location row with full address
+                    // Info row: location + host + date badge
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            // Location
                             if let locationPresentation {
                                 heroLocationRow(locationPresentation)
                             }
 
-                            // Host row
+                            // Host
                             if let host = event.host {
-                                HStack(spacing: Theme.Spacing.sm) {
-                                    AvatarView(url: host.avatarUrl, size: 20)
+                                HStack(spacing: 6) {
+                                    AvatarView(url: host.avatarUrl, size: 18)
                                     Text("Hosted by \(host.displayName)")
                                         .font(Theme.Typography.caption)
-                                        .foregroundColor(tagForeground.opacity(0.8))
+                                        .foregroundColor(Theme.Colors.textSecondary)
                                 }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                        .fill(tagBackground)
-                                )
                             }
                         }
 
                         Spacer()
 
-                        // Date badge + calendar button
+                        // Date badge + calendar
                         if let timeOption = firstTimeOption {
                             VStack(spacing: Theme.Spacing.xs) {
                                 DateBadge(
@@ -505,26 +507,23 @@ struct EventHeroHeader: View {
                         }
                     }
 
-                    // RSVP row + player count side by side
+                    // RSVP + player count
                     if myInvite != nil || minPlayers > 0 {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            // RSVP
+                        Divider()
+                            .background(Theme.Colors.divider)
+
+                        HStack(spacing: Theme.Spacing.md) {
                             if let myInvite, let onRSVPTap {
                                 heroRSVPRow(invite: myInvite, onTap: onRSVPTap)
                             }
 
-                            // Player count indicator
+                            Spacer()
+
                             if minPlayers > 0 {
                                 PlayerCountIndicator(
                                     confirmedCount: confirmedCount,
                                     minPlayers: minPlayers,
                                     maxPlayers: maxPlayers
-                                )
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                        .fill(tagBackground)
                                 )
                             }
                         }
@@ -537,88 +536,72 @@ struct EventHeroHeader: View {
         .frame(height: heroHeight)
     }
 
-    // MARK: - RSVP Row (in overlay)
+    // MARK: - RSVP Row
     @ViewBuilder
     private func heroRSVPRow(invite: Invite, onTap: @escaping () -> Void) -> some View {
         let isPending = invite.status == .pending
         Button(action: onTap) {
-            VStack(spacing: 2) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: Theme.Spacing.sm) {
                     if isPending {
                         Image(systemName: "envelope.open.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(tagForeground)
+                            .foregroundColor(Theme.Colors.primary)
                         Text("RSVP")
                             .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(tagForeground)
-                        Spacer()
+                            .foregroundColor(Theme.Colors.primary)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(tagForeground.opacity(0.5))
+                            .foregroundColor(Theme.Colors.textTertiary)
                     } else {
                         Image(systemName: invite.status.icon)
                             .font(.system(size: 14))
                             .foregroundColor(invite.status.color)
                         Text(invite.status.rsvpDisplayLabel)
                             .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(tagForeground)
-                        Spacer()
+                            .foregroundColor(Theme.Colors.textPrimary)
                         Image(systemName: "pencil")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(tagForeground.opacity(0.5))
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
 
                 if let rsvpDeadline {
                     Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(tagForeground.opacity(0.6))
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.sm)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                    .fill(tagBackground)
-            )
         }
         .buttonStyle(.plain)
     }
 
     @ViewBuilder
     private func heroLocationRow(_ presentation: EventLocationPresentation) -> some View {
-        let content = VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: Theme.Spacing.sm) {
+        let content = VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.system(size: 13))
-                    .foregroundColor(tagForeground.opacity(0.7))
+                    .foregroundColor(Theme.Colors.textSecondary)
                 Text(presentation.title)
-                    .font(Theme.Typography.callout)
-                    .foregroundColor(tagForeground)
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .lineLimit(1)
                 if presentation.mapsURL != nil {
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(tagForeground.opacity(0.5))
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
 
-            // Full address underneath
             if let subtitle = presentation.subtitle {
                 Text(subtitle)
                     .font(Theme.Typography.caption)
-                    .foregroundColor(tagForeground.opacity(0.6))
+                    .foregroundColor(Theme.Colors.textTertiary)
                     .lineLimit(1)
-                    .padding(.leading, 21)
+                    .padding(.leading, 19)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                .fill(tagBackground)
-        )
 
         if presentation.mapsURL != nil {
             Button {
