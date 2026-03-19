@@ -47,12 +47,5 @@ supabase/.temp
 
 # Local git worktrees
 .worktrees/
-/.superpowers/brainstorm/80967-1773632508/.server.log
-/.superpowers/brainstorm/80967-1773632508/.server.pid
-/.superpowers/brainstorm/80967-1773632508/.server-stopped
-/.superpowers/brainstorm/80967-1773632508/activity-feed-and-game-voting.html
-/.superpowers/brainstorm/80967-1773632508/activity-feed-v2.html
-/.superpowers/brainstorm/80967-1773632508/event-detail-layout.html
-/.superpowers/brainstorm/80967-1773632508/game-voting-v3.html
-/.superpowers/brainstorm/80967-1773632508/waiting.html
+/.superpowers/brainstorm/
 /.claude/worktrees/schedule-redesign/

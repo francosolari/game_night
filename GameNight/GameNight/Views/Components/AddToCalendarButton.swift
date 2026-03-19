@@ -213,6 +213,141 @@ struct CalendarEventComposer: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - Compact Calendar Icon Button
+
+struct CompactCalendarButton: View {
+    let title: String
+    let startDate: Date
+    let endDate: Date?
+    let location: String?
+    let notes: String?
+    var games: [EventGame] = []
+    var hostName: String?
+
+    @Environment(\.openURL) private var openURL
+    @State private var showCalendarPicker = false
+    @State private var showEventComposer = false
+    @State private var showShareSheet = false
+    @State private var icsFileURL: URL?
+
+    private var resolvedNotes: String {
+        AddToCalendarButton.calendarNotes(title: title, games: games, description: notes, hostName: hostName)
+    }
+
+    var body: some View {
+        Button {
+            showCalendarPicker = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Add")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(Theme.Colors.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(Theme.Colors.accent.opacity(0.12))
+            )
+        }
+        .confirmationDialog("Add to Calendar", isPresented: $showCalendarPicker, titleVisibility: .visible) {
+            Button("Apple Calendar") { showEventComposer = true }
+            Button("Google Calendar") { openGoogleCalendar() }
+            Button("Other (Share .ics)") { shareICSFile() }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showEventComposer) {
+            CalendarEventComposer(
+                title: title,
+                startDate: startDate,
+                endDate: endDate,
+                location: location,
+                notes: resolvedNotes
+            )
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = icsFileURL {
+                ShareSheet(items: [url])
+            }
+        }
+    }
+
+    private func openGoogleCalendar() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss"
+        formatter.timeZone = TimeZone.current
+
+        let start = formatter.string(from: startDate)
+        let end = formatter.string(from: endDate ?? startDate.addingTimeInterval(3600))
+
+        var components = URLComponents(string: "https://calendar.google.com/calendar/render")!
+        components.queryItems = [
+            URLQueryItem(name: "action", value: "TEMPLATE"),
+            URLQueryItem(name: "text", value: title),
+            URLQueryItem(name: "dates", value: "\(start)/\(end)"),
+        ]
+        if let location {
+            components.queryItems?.append(URLQueryItem(name: "location", value: location))
+        }
+        components.queryItems?.append(URLQueryItem(name: "details", value: resolvedNotes))
+
+        if let url = components.url {
+            openURL(url)
+        }
+    }
+
+    private func shareICSFile() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+
+        let uid = UUID().uuidString
+        let start = formatter.string(from: startDate)
+        let end = formatter.string(from: endDate ?? startDate.addingTimeInterval(3600))
+
+        var ics = """
+        BEGIN:VCALENDAR
+        VERSION:2.0
+        PRODID:-//CardboardWithMe//GameNight//EN
+        BEGIN:VEVENT
+        UID:\(uid)
+        DTSTART:\(start)Z
+        DTEND:\(end)Z
+        SUMMARY:\(icsEscape(title))
+        """
+
+        if let location {
+            ics += "\nLOCATION:\(icsEscape(location))"
+        }
+        ics += "\nDESCRIPTION:\(icsEscape(resolvedNotes))"
+
+        ics += """
+
+        END:VEVENT
+        END:VCALENDAR
+        """
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(title.prefix(30)).ics")
+
+        do {
+            try ics.write(to: tempURL, atomically: true, encoding: .utf8)
+            icsFileURL = tempURL
+            showShareSheet = true
+        } catch {
+            // Non-critical
+        }
+    }
+
+    private func icsEscape(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: ",", with: "\\,")
+            .replacingOccurrences(of: ";", with: "\\;")
+            .replacingOccurrences(of: "\n", with: "\\n")
+    }
+}
+
 // MARK: - UIActivityViewController wrapper
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]

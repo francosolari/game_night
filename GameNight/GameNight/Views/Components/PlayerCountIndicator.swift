@@ -55,7 +55,7 @@ struct PlayerCountIndicator: View {
         }
     }
 
-    // MARK: - Standard: fuller display with status label
+    // MARK: - Standard: fuller display with status label below bar
     private var standardView: some View {
         VStack(alignment: .trailing, spacing: 3) {
             HStack(spacing: 3) {
@@ -72,10 +72,10 @@ struct PlayerCountIndicator: View {
                     .foregroundColor(Theme.Colors.textTertiary)
             }
 
-            statusLabel
-
             segmentedBar
                 .frame(width: size == .expanded ? 64 : 50, height: 4)
+
+            statusLabel
         }
     }
 

@@ -134,6 +134,18 @@ enum InviteStatus: String, Codable, CaseIterable {
         }
     }
 
+    /// First-person label for RSVP display ("You're going" vs "Going")
+    var rsvpDisplayLabel: String {
+        switch self {
+        case .pending: return "Pending"
+        case .accepted: return "You're going"
+        case .declined: return "Can't go"
+        case .maybe: return "Maybe"
+        case .expired: return "Expired"
+        case .waitlisted: return "Waitlisted"
+        }
+    }
+
     var icon: String {
         switch self {
         case .pending: return "clock.fill"
