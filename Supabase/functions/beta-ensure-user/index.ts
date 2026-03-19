@@ -3,10 +3,12 @@ import { createServiceClient } from "../_shared/auth.ts";
 
 interface BetaUserRequest {
   phone: string;
-  password: string;
+  password?: string;
+  mode?: "probe" | "ensure";
+  allow_password_reset?: boolean;
 }
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 1000;
 const SECRET_HEADER = "x-beta-secret";
 const SECRET_ENV = "BETA_SHARED_SECRET";
 
@@ -47,9 +49,17 @@ serve(async (req) => {
   }
 
   const normalizedPhone = normalizePhone(body?.phone ?? "");
+  const mode = body?.mode ?? "ensure";
   const password = body?.password?.trim();
-  if (!normalizedPhone || !password) {
-    return new Response(JSON.stringify({ error: "Missing phone or password" }), {
+  const allowPasswordReset = Boolean(body?.allow_password_reset);
+  if (!normalizedPhone) {
+    return new Response(JSON.stringify({ error: "Missing phone number" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (mode === "ensure" && !password) {
+    return new Response(JSON.stringify({ error: "Missing password for ensure mode" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
@@ -57,33 +67,61 @@ serve(async (req) => {
 
   const supabase = createServiceClient();
 
-  try {
-    const existingUser = await findUserByPhone(supabase, normalizedPhone);
-    let userId: string | undefined;
+    try {
+        const existingUser = await findUserByPhone(supabase, normalizedPhone);
+        let userId: string | undefined;
 
-    if (existingUser) {
-      userId = existingUser.id;
-      const { error } = await supabase.auth.admin.updateUserById(existingUser.id, {
-        password,
-        phone_confirm: true,
-      });
-      if (error) {
-        console.error("[beta-ensure-user] updateUserById failed", error);
-        throw error;
-      }
-    } else {
-      const { data, error } = await supabase.auth.admin.createUser({
-        phone: normalizedPhone,
-        password,
-        phone_confirm: true,
-        user_metadata: { beta: true },
-      });
-      if (error) {
-        console.error("[beta-ensure-user] createUser failed", error);
-        throw error;
-      }
-      userId = data?.user?.id;
-    }
+        if (mode === "probe") {
+            return new Response(
+              JSON.stringify({ exists: Boolean(existingUser), userId: existingUser?.id ?? null }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+        }
+
+        if (existingUser) {
+            userId = existingUser.id;
+            if (allowPasswordReset) {
+                const { error } = await supabase.auth.admin.updateUserById(existingUser.id, {
+                    password: password!,
+                    phone_confirm: true,
+                });
+                if (error) {
+                    console.error("[beta-ensure-user] updateUserById failed", error);
+                    throw error;
+                }
+            }
+        } else {
+            const { data, error } = await supabase.auth.admin.createUser({
+                phone: normalizedPhone,
+                password: password!,
+                phone_confirm: true,
+                user_metadata: { beta: true },
+            });
+            if (error) {
+                console.error("[beta-ensure-user] createUser failed", error);
+                const fallbackExisting = await retryFindUserByPhone(supabase, normalizedPhone);
+                if (fallbackExisting) {
+                    userId = fallbackExisting.id;
+                    if (allowPasswordReset) {
+                        const { error: updateError } = await supabase.auth.admin.updateUserById(fallbackExisting.id, {
+                            password: password!,
+                            phone_confirm: true,
+                        });
+                        if (updateError) {
+                            throw updateError;
+                        }
+                    }
+                } else {
+                    const body = JSON.stringify(error);
+                    return new Response(
+                        JSON.stringify({ error: body ?? "Phone collision" }),
+                        { status: 500, headers: { "Content-Type": "application/json" } },
+                    );
+                }
+            } else {
+                userId = data?.user?.id;
+            }
+        }
 
     return new Response(
       JSON.stringify({ success: true, userId }),
@@ -119,6 +157,7 @@ async function findUserByPhone(
   supabase: ReturnType<typeof createServiceClient>,
   phone: string,
 ) {
+  const normalizedTarget = normalizePhone(phone);
   let page = 1;
   while (true) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
@@ -127,7 +166,7 @@ async function findUserByPhone(
     }
 
     const users = data?.users ?? [];
-    const match = users.find((user) => user?.phone === phone);
+    const match = users.find((user) => normalizePhone(user?.phone ?? "") === normalizedTarget);
     if (match) {
       return match;
     }
@@ -136,6 +175,20 @@ async function findUserByPhone(
       break;
     }
     page += 1;
+  }
+  return null;
+}
+
+async function retryFindUserByPhone(
+  supabase: ReturnType<typeof createServiceClient>,
+  phone: string,
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const match = await findUserByPhone(supabase, phone);
+    if (match) {
+      return match;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return null;
 }

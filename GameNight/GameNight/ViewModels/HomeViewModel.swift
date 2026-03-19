@@ -6,6 +6,7 @@ final class HomeViewModel: ObservableObject {
     @Published var upcomingEvents: [GameEvent] = []
     @Published var myInvites: [Invite] = []
     @Published var drafts: [GameEvent] = []
+    @Published var awaitingResponseEvents: [(event: GameEvent, invite: Invite)] = []
     @Published var isLoading = true
     @Published var error: String?
 
@@ -51,6 +52,32 @@ final class HomeViewModel: ObservableObject {
 
         var upcomingEvents = snapshot.upcomingEvents
         let errorMessage = snapshot.errorMessage
+
+        let pendingInvites = snapshot.myInvites.filter { $0.status == .pending }
+        print("🏠 [HomeViewModel] pending invites count: \(pendingInvites.count)")
+        var pendingEvents: [(event: GameEvent, invite: Invite)] = []
+        if !pendingInvites.isEmpty {
+            let pendingIds = Set(pendingInvites.map(\.eventId))
+            do {
+                let fetched = try await supabase.fetchEvents(ids: Array(pendingIds))
+                let eventsById = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
+                pendingEvents = pendingInvites.compactMap { invite in
+                    guard let event = eventsById[invite.eventId] else { return nil }
+                    return (event, invite)
+                }
+                pendingEvents.sort { a, b in
+                    let dateA = a.event.timeOptions.first?.date ?? a.event.createdAt
+                    let dateB = b.event.timeOptions.first?.date ?? b.event.createdAt
+                    return dateA < dateB
+                }
+            } catch is CancellationError {
+                // Ignore cancellations — pending list can stay empty
+            } catch {
+                print("🏠 [HomeViewModel] Pending invite fetch failed: \(error)")
+            }
+        }
+        self.awaitingResponseEvents = pendingEvents
+        print("🏠 [HomeViewModel] awaiting response events count: \(pendingEvents.count)")
 
         let existingEventIds = Set(upcomingEvents.map(\.id))
         let acceptedInviteEventIds = Set(

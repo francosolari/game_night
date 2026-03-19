@@ -673,17 +673,20 @@ struct BetaAuthFlowView: View {
     @State private var betaPassword = ""
     @State private var phoneNumber = ""
     @State private var countryCode = "+1"
+    @State private var accountPassword = ""
+    @State private var accountExistsForPhone = false
     @State private var displayName = ""
     @State private var isLoading = false
     @State private var error: String?
     @FocusState private var passwordFieldFocused: Bool
     @FocusState private var phoneFieldFocused: Bool
+    @FocusState private var accountPasswordFieldFocused: Bool
     @FocusState private var nameFieldFocused: Bool
 
     private let correctPassword = "francosfriend"
 
     enum BetaStep {
-        case password, phone, name
+        case password, phone, accountPassword, name
     }
 
     var body: some View {
@@ -694,7 +697,7 @@ struct BetaAuthFlowView: View {
                 VStack(spacing: 0) {
                     // Progress bar
                     HStack(spacing: 4) {
-                        ForEach(0..<3, id: \.self) { i in
+                        ForEach(0..<4, id: \.self) { i in
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(stepIndex >= i ? Theme.Colors.accent : Theme.Colors.divider)
                                 .frame(height: 3)
@@ -711,6 +714,7 @@ struct BetaAuthFlowView: View {
                                 switch step {
                                 case .password: passwordStep
                                 case .phone: betaPhoneStep
+                                case .accountPassword: betaAccountPasswordStep
                                 case .name: betaNameStep
                                 }
                             }
@@ -731,7 +735,8 @@ struct BetaAuthFlowView: View {
                             withAnimation(Theme.Animation.snappy) {
                                 switch step {
                                 case .phone: step = .password
-                                case .name: step = .phone
+                                case .accountPassword: step = .phone
+                                case .name: step = .accountPassword
                                 case .password: break
                                 }
                             }
@@ -755,7 +760,8 @@ struct BetaAuthFlowView: View {
         switch step {
         case .password: return 0
         case .phone: return 1
-        case .name: return 2
+        case .accountPassword: return 2
+        case .name: return 3
         }
     }
 
@@ -875,7 +881,7 @@ struct BetaAuthFlowView: View {
             }
 
             Button("Continue") {
-                Task { await signUpOrIn() }
+                Task { await prepareAccountStep() }
             }
             .buttonStyle(PrimaryButtonStyle(isEnabled: isPhoneValid && !isLoading))
             .disabled(!isPhoneValid || isLoading)
@@ -886,6 +892,59 @@ struct BetaAuthFlowView: View {
             }
         }
         .onAppear { phoneFieldFocused = true }
+    }
+
+    // MARK: - Account Password Step
+    private var betaAccountPasswordStep: some View {
+        VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.md) {
+                Text(accountExistsForPhone ? "Enter account password" : "Create account password")
+                    .font(Theme.Typography.displayMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text(accountExistsForPhone
+                     ? "Use your own account password to sign in."
+                     : "Set your own password for beta login.")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            SecureField("Account Password", text: $accountPassword)
+                .font(Theme.Typography.headlineLarge)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .multilineTextAlignment(.center)
+                .focused($accountPasswordFieldFocused)
+                .padding(Theme.Spacing.lg)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .fill(Theme.Colors.fieldBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                .stroke(accountPasswordFieldFocused ? Theme.Colors.accent.opacity(0.5) : .clear, lineWidth: 1.5)
+                        )
+                )
+                .submitLabel(.go)
+                .onSubmit { Task { await signInOrCreateWithAccountPassword() } }
+
+            if let error {
+                Text(error)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.error)
+            }
+
+            Button(accountExistsForPhone ? "Sign In" : "Create Account") {
+                Task { await signInOrCreateWithAccountPassword() }
+            }
+            .buttonStyle(PrimaryButtonStyle(isEnabled: !accountPassword.isEmpty && !isLoading))
+            .disabled(accountPassword.isEmpty || isLoading)
+
+            if isLoading {
+                ProgressView()
+                    .tint(Theme.Colors.accent)
+            }
+        }
+        .onAppear { accountPasswordFieldFocused = true }
     }
 
     // MARK: - Name Step
@@ -972,35 +1031,62 @@ struct BetaAuthFlowView: View {
         }
     }
 
-    private func signUpOrIn() async {
+    private func prepareAccountStep() async {
         isLoading = true
         error = nil
 
         do {
-            try await SupabaseService.shared.ensureBetaUser(
-                phoneNumber: fullPhoneNumber,
-                password: correctPassword
-            )
-            try await SupabaseService.shared.signInWithPassword(
-                phoneNumber: fullPhoneNumber,
-                password: correctPassword
-            )
-
-            if let existingUser = try? await SupabaseService.shared.fetchCurrentUser() {
-                appState.currentUser = existingUser
-                appState.isAuthenticated = true
-                dismiss()
-                isLoading = false
-                return
-            } else {
-                withAnimation(Theme.Animation.snappy) { step = .name }
-            }
-        } catch let signInError {
-            print("❌ [betaAuth] ensure/sign-in error: \(signInError)")
-            self.error = "Something went wrong. Please try again."
+            let probe = try await SupabaseService.shared.probeBetaUser(phoneNumber: fullPhoneNumber)
+            accountExistsForPhone = probe.exists
+            accountPassword = ""
+            withAnimation(Theme.Animation.snappy) { step = .accountPassword }
+        } catch {
+            self.error = "Couldn't check this account. Please try again."
         }
-
         isLoading = false
+    }
+
+    private func signInOrCreateWithAccountPassword() async {
+        isLoading = true
+        error = nil
+
+        do {
+            if accountExistsForPhone {
+                try await SupabaseService.shared.signInWithPassword(
+                    phoneNumber: fullPhoneNumber,
+                    password: accountPassword
+                )
+            } else {
+                try await SupabaseService.shared.ensureBetaUser(
+                    phoneNumber: fullPhoneNumber,
+                    password: accountPassword,
+                    allowPasswordReset: false
+                )
+                try await SupabaseService.shared.signInWithPassword(
+                    phoneNumber: fullPhoneNumber,
+                    password: accountPassword
+                )
+            }
+
+            await finishAfterPasswordSignIn()
+        } catch {
+            if accountExistsForPhone {
+                self.error = "Wrong password for this account."
+            } else {
+                self.error = "Couldn't create this beta account. Please try again."
+            }
+        }
+        isLoading = false
+    }
+
+    private func finishAfterPasswordSignIn() async {
+        if let existingUser = try? await SupabaseService.shared.fetchCurrentUser() {
+            appState.currentUser = existingUser
+            appState.isAuthenticated = true
+            dismiss()
+        } else {
+            withAnimation(Theme.Animation.snappy) { step = .name }
+        }
     }
 
     private func createProfile() async {

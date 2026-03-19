@@ -87,7 +87,7 @@ struct HomeView: View {
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
-                    } else if viewModel.upcomingEvents.isEmpty && viewModel.drafts.isEmpty {
+                    } else if viewModel.awaitingResponseEvents.isEmpty && viewModel.upcomingEvents.isEmpty && viewModel.drafts.isEmpty {
                         EmptyStateView(
                             icon: "dice.fill",
                             title: "No Game Nights Yet",
@@ -98,22 +98,30 @@ struct HomeView: View {
                         }
                         .frame(minHeight: 400)
                     } else {
-                        // My Invites Section
-                        let pendingInvites = viewModel.myInvites.filter { $0.status == .pending }
-                        if !pendingInvites.isEmpty {
+                        let awaitingResponseItems = viewModel.awaitingResponseEvents
+                        if !awaitingResponseItems.isEmpty {
                             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                                SectionHeader(title: "Pending Invites")
+                                SectionHeader(title: "Awaiting Response")
                                     .padding(.horizontal, Theme.Spacing.xl)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
-                                        ForEach(pendingInvites) { invite in
-                                            PendingInviteCard(invite: invite)
-                                                .frame(width: 280)
+                                        ForEach(awaitingResponseItems, id: \.event.id) { entry in
+                                            VerticalEventCard(
+                                                event: entry.event,
+                                                myInvite: entry.invite,
+                                                confirmedCount: viewModel.confirmedCount(for: entry.event.id),
+                                                size: .compact
+                                            ) {
+                                                navigationPath.append(entry.event)
+                                            }
+                                            .frame(width: carouselCardWidth)
                                         }
                                     }
                                     .padding(.horizontal, Theme.Spacing.xl)
+                                    .scrollTargetLayout()
                                 }
+                                .scrollTargetBehavior(.viewAligned)
                             }
                         }
 

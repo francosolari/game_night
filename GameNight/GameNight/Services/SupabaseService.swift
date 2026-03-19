@@ -31,6 +31,25 @@ protocol EventEditingProviding: AnyObject {
 private struct BetaUserPayload: Encodable {
     let phone: String
     let password: String
+    let mode: String
+    let allowPasswordReset: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case phone
+        case password
+        case mode
+        case allowPasswordReset = "allow_password_reset"
+    }
+}
+
+private struct BetaUserProbePayload: Encodable {
+    let phone: String
+    let mode: String
+}
+
+struct BetaUserProbeResponse: Decodable {
+    let exists: Bool
+    let userId: String?
 }
 
 private struct EventSoftDeletePatch: Encodable {
@@ -59,7 +78,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         )
     }
 
-    func ensureBetaUser(phoneNumber: String, password: String) async throws {
+    func probeBetaUser(phoneNumber: String) async throws -> BetaUserProbeResponse {
         guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
             throw NSError(
                 domain: "SupabaseService",
@@ -74,7 +93,52 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
         request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
-        request.httpBody = try JSONEncoder().encode(BetaUserPayload(phone: phoneNumber, password: password))
+        request.httpBody = try JSONEncoder().encode(BetaUserProbePayload(phone: phoneNumber, mode: "probe"))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid beta ensure response"]
+            )
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let message = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
+            throw NSError(
+                domain: "SupabaseService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: message]
+            )
+        }
+
+        return try JSONDecoder().decode(BetaUserProbeResponse.self, from: data)
+    }
+
+    func ensureBetaUser(phoneNumber: String, password: String, allowPasswordReset: Bool = false) async throws {
+        guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Beta shared secret or service role key not configured"]
+            )
+        }
+
+        var request = URLRequest(url: try betaEnsureUserURL())
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
+        request.httpBody = try JSONEncoder().encode(
+            BetaUserPayload(
+                phone: phoneNumber,
+                password: password,
+                mode: "ensure",
+                allowPasswordReset: allowPasswordReset
+            )
+        )
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -216,6 +280,10 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             ),
             decoder: decoder
         )
+    }
+
+    private func urlEncoded(phone: String) -> String {
+        phone.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? phone
     }
 
     private func betaEnsureUserURL() throws -> URL {
@@ -500,10 +568,13 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchMyInvites() async throws -> [Invite] {
         let session = try await client.auth.session
+        let userPhone = try await fetchCurrentUser().phoneNumber
+        let phoneFilter = "phone_number.eq.\(urlEncoded(phone: userPhone))"
+        let predicate = "user_id.eq.\(session.user.id.uuidString),and(user_id.is.null,\(phoneFilter))"
         let invites: [Invite] = try await client
             .from("invites")
             .select("*, event:events(\(Self.eventSelect))")
-            .eq("user_id", value: session.user.id.uuidString)
+            .or(predicate)
             .execute()
             .value
         return invites
