@@ -32,13 +32,11 @@ private struct BetaUserPayload: Encodable {
     let phone: String
     let password: String
     let mode: String
-    let allowPasswordReset: Bool
 
     enum CodingKeys: String, CodingKey {
         case phone
         case password
         case mode
-        case allowPasswordReset = "allow_password_reset"
     }
 }
 
@@ -46,6 +44,8 @@ private struct BetaUserProbePayload: Encodable {
     let phone: String
     let mode: String
 }
+
+private struct EmptyBody: Encodable {}
 
 struct BetaUserProbeResponse: Decodable {
     let exists: Bool
@@ -116,7 +116,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return try JSONDecoder().decode(BetaUserProbeResponse.self, from: data)
     }
 
-    func ensureBetaUser(phoneNumber: String, password: String, allowPasswordReset: Bool = false) async throws {
+    func ensureBetaUser(phoneNumber: String, password: String) async throws {
         guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
             throw NSError(
                 domain: "SupabaseService",
@@ -135,8 +135,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             BetaUserPayload(
                 phone: phoneNumber,
                 password: password,
-                mode: "ensure",
-                allowPasswordReset: allowPasswordReset
+                mode: "ensure"
             )
         )
 
@@ -280,10 +279,6 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             ),
             decoder: decoder
         )
-    }
-
-    private func urlEncoded(phone: String) -> String {
-        phone.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? phone
     }
 
     private func betaEnsureUserURL() throws -> URL {
@@ -568,15 +563,21 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchMyInvites() async throws -> [Invite] {
         let session = try await client.auth.session
-        let userPhone = try await fetchCurrentUser().phoneNumber
-        let phoneFilter = "phone_number.eq.\(urlEncoded(phone: userPhone))"
-        let predicate = "user_id.eq.\(session.user.id.uuidString),and(user_id.is.null,\(phoneFilter))"
+        do {
+            try await invokeAuthenticatedFunction("claim-my-invites", body: EmptyBody())
+        } catch {
+            // Non-fatal: fallback to current visibility rules
+            print("📨 [SupabaseService] claim-my-invites failed: \(error)")
+        }
+
         let invites: [Invite] = try await client
             .from("invites")
             .select("*, event:events(\(Self.eventSelect))")
-            .or(predicate)
+            .eq("user_id", value: session.user.id.uuidString)
             .execute()
             .value
+
+        print("📨 [SupabaseService] fetchMyInvites assigned: \(invites.count)")
         return invites
     }
 

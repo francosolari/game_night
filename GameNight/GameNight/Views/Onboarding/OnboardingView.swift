@@ -1059,8 +1059,7 @@ struct BetaAuthFlowView: View {
             } else {
                 try await SupabaseService.shared.ensureBetaUser(
                     phoneNumber: fullPhoneNumber,
-                    password: accountPassword,
-                    allowPasswordReset: false
+                    password: accountPassword
                 )
                 try await SupabaseService.shared.signInWithPassword(
                     phoneNumber: fullPhoneNumber,
