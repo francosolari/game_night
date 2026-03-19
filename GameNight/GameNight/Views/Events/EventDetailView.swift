@@ -411,8 +411,8 @@ struct EventHeroHeader: View {
 
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.1),
-                    Color.black.opacity(0.45)
+                    Color.black.opacity(0.03),
+                    Color.black.opacity(0.26)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -592,7 +592,10 @@ struct DateBadge: View {
                     Text(timeString)
                         .font(.system(size: 14, weight: .heavy))
                 }
-                .foregroundColor(Theme.Colors.textPrimary)
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.black.opacity(0.45)))
                 .padding(.top, 2)
             }
 
