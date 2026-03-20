@@ -20,7 +20,7 @@ struct HomeView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                             HStack(alignment: .center, spacing: Theme.Spacing.sm) {
-                                Text("Game Night")
+                                Text("CardboardWithMe")
                                     .font(Theme.Typography.displayLarge)
                                     .foregroundColor(Theme.Colors.textPrimary)
 
