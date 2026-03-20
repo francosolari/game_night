@@ -447,6 +447,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func clearEventCoverImageUrl(eventId: UUID) async throws {
+        let updates: [String: AnyJSON] = ["cover_image_url": .null]
+        try await client
+            .from("events")
+            .update(updates)
+            .eq("id", value: eventId.uuidString)
+            .execute()
+    }
+
     func softDeleteEvent(id: UUID) async throws {
         let updates: [String: AnyJSON] = [
             "deleted_at": .string(ISO8601DateFormatter().string(from: Date())),

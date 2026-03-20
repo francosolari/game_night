@@ -7,7 +7,8 @@ struct CreateEventReviewStep: View {
     @State private var coverUploadError: String?
 
     private var hasCustomCover: Bool {
-        viewModel.pendingCoverImageUrl != nil || viewModel.eventToEdit?.coverImageUrl != nil
+        !viewModel.coverImageRemoved &&
+        (viewModel.pendingCoverImageUrl != nil || viewModel.eventToEdit?.coverImageUrl != nil)
     }
 
     var body: some View {
@@ -160,9 +161,8 @@ struct CreateEventReviewStep: View {
 
                 if hasCustomCover {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.pendingCoverImageUrl = nil
-                        }
+                        print("[DEBUG] Remove cover tapped")
+                        Task { await removeCoverPhoto() }
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark")
@@ -220,16 +220,22 @@ struct CreateEventReviewStep: View {
                 }
             }
 
-            if let uploadedUrl = viewModel.pendingCoverImageUrl ?? viewModel.eventToEdit?.coverImageUrl,
+            let activeCoverUrl = viewModel.coverImageRemoved ? nil : (viewModel.pendingCoverImageUrl ?? viewModel.eventToEdit?.coverImageUrl)
+            if let uploadedUrl = activeCoverUrl,
                let url = URL(string: uploadedUrl) {
                 AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: 140)
+                        .clipped()
                 } placeholder: {
                     Color(Theme.Colors.backgroundElevated)
                         .overlay(ProgressView())
+                        .frame(height: 140)
                 }
-                .frame(height: 140)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+                .allowsHitTesting(false)
             } else {
                 GenerativeEventCover(
                     title: viewModel.title,
@@ -251,6 +257,37 @@ struct CreateEventReviewStep: View {
                 Task { await uploadCoverPhoto(image) }
             }
             .ignoresSafeArea()
+        }
+    }
+
+    private func removeCoverPhoto() async {
+        let urlToDelete = viewModel.pendingCoverImageUrl ?? viewModel.eventToEdit?.coverImageUrl
+        let existingId = viewModel.eventToEdit?.id
+
+        // Update UI immediately
+        withAnimation(.easeInOut(duration: 0.2)) {
+            viewModel.pendingCoverImageUrl = nil
+            viewModel.coverImageRemoved = true
+        }
+
+        // Best-effort cleanup in background
+        if let urlString = urlToDelete {
+            let components = URL(string: urlString)?.pathComponents.dropFirst() ?? []
+            let r2Path = components.joined(separator: "/")
+            if !r2Path.isEmpty {
+                do {
+                    try await R2StorageService.shared.deleteImage(path: r2Path)
+                } catch {
+                    print("[R2] delete image failed (non-fatal): \(error)")
+                }
+            }
+        }
+        if let eventId = existingId {
+            do {
+                try await SupabaseService.shared.clearEventCoverImageUrl(eventId: eventId)
+            } catch {
+                print("[R2] clear cover URL in DB failed (non-fatal): \(error)")
+            }
         }
     }
 
