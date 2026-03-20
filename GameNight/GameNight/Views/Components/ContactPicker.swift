@@ -74,21 +74,57 @@ struct ContactPickerSheet: View {
     @State private var showDeniedView = false
     @State private var isChecking = true
     @State private var isSyncing = false
-    @State private var syncCount = 0
+    @State private var syncedCount = 0
+    @State private var totalCount = 0
+    @State private var syncError: String?
 
     let onSelect: ([UserContact]) -> Void
 
     var body: some View {
         ZStack {
             Theme.Colors.background.ignoresSafeArea()
-            if isChecking || isSyncing {
+            if isChecking {
+                ProgressView().tint(Theme.Colors.primary)
+            } else if isSyncing {
                 VStack(spacing: Theme.Spacing.lg) {
-                    ProgressView().tint(Theme.Colors.primary)
-                    if isSyncing {
-                        Text("Syncing contacts...")
-                            .font(Theme.Typography.callout)
-                            .foregroundColor(Theme.Colors.textSecondary)
+                    ProgressView(value: totalCount > 0 ? Double(syncedCount) / Double(totalCount) : 0)
+                        .progressViewStyle(.linear)
+                        .tint(Theme.Colors.primary)
+                        .frame(width: 200)
+
+                    Text("Syncing contacts...")
+                        .font(Theme.Typography.headlineMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    Text("\(syncedCount) of \(totalCount)")
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                }
+                .padding(Theme.Spacing.xl)
+            } else if let syncError {
+                VStack(spacing: Theme.Spacing.xl) {
+                    Spacer()
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(Theme.Colors.warning)
+                    Text("Sync Failed")
+                        .font(Theme.Typography.headlineLarge)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Text(syncError)
+                        .font(Theme.Typography.body)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.Spacing.xxxl)
+                    Button("Try Again") {
+                        self.syncError = nil
+                        Task { await syncAllContacts() }
                     }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.horizontal, Theme.Spacing.jumbo)
+                    Button("Cancel") { dismiss() }
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                    Spacer()
                 }
             } else if showDeniedView {
                 deniedView
@@ -172,10 +208,15 @@ struct ContactPickerSheet: View {
         }
     }
 
-    /// Fetches all device contacts and upserts them into saved_contacts.
+    private static let batchSize = 100
+
+    /// Fetches all device contacts and upserts them into saved_contacts in chunks.
     /// Re-running catches any contacts added since the last sync.
     private func syncAllContacts() async {
         isSyncing = true
+        syncedCount = 0
+        syncError = nil
+
         do {
             let deviceContacts = try await ContactPickerService.shared.fetchLocalContacts()
             guard !deviceContacts.isEmpty else {
@@ -184,14 +225,25 @@ struct ContactPickerSheet: View {
                 dismiss()
                 return
             }
-            _ = try await SupabaseService.shared.saveContacts(deviceContacts)
+
+            totalCount = deviceContacts.count
+
+            // Chunk into batches to avoid PostgREST payload limits
+            let chunks = stride(from: 0, to: deviceContacts.count, by: Self.batchSize).map {
+                Array(deviceContacts[$0..<min($0 + Self.batchSize, deviceContacts.count)])
+            }
+
+            for chunk in chunks {
+                _ = try await SupabaseService.shared.saveContacts(chunk)
+                syncedCount += chunk.count
+            }
+
             isSyncing = false
             onSelect(deviceContacts)
             dismiss()
         } catch {
-            // If sync fails, fall back to native picker
             isSyncing = false
-            showNativePicker = true
+            syncError = error.localizedDescription
         }
     }
 }

@@ -45,6 +45,18 @@ struct GameEvent: Identifiable, Codable {
         return timeOptions.map(\.startTime).min() ?? createdAt
     }
 
+    /// The effective end of the event for "still showing" purposes.
+    /// Uses the confirmed time option's endTime if set, otherwise end-of-day of the start date.
+    var effectiveEndDate: Date {
+        if let confirmedId = confirmedTimeOptionId,
+           let confirmed = timeOptions.first(where: { $0.id == confirmedId }),
+           let end = confirmed.endTime {
+            return end
+        }
+        // Fall back to end of the start day
+        return Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: effectiveStartDate) ?? effectiveStartDate
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case hostId = "host_id"
