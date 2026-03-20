@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner.tsx";
 import { Toaster } from "@/components/ui/toaster.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip.tsx";
 import { AuthProvider } from "@/contexts/AuthContext.tsx";
+import { MobileBottomNav } from "@/components/MobileBottomNav.tsx";
 import Index from "./pages/Index.tsx";
 import Login from "./pages/Login.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <MobileBottomNav />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

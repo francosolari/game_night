@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { CalendarDays, MapPin, ChevronRight, Pencil, Mail } from "lucide-react";
 import { GenerativeEventCover } from "@/components/GenerativeEventCover";
-import type { GameEvent, Invite, TimeOption } from "@/lib/types";
+import { PlayerCountIndicator } from "@/components/PlayerCountIndicator";
+import type { GameEvent, Invite } from "@/lib/types";
 import { getPreferredCoverImage } from "@/lib/types";
 
 interface Props {
@@ -118,7 +119,7 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
           </div>
         )}
 
-        {/* RSVP Row + Player Count */}
+        {/* RSVP Row + Player Count Indicator */}
         {(rsvpStatusConfig || event.min_players > 0) && (
           <>
             <div className="border-t border-white/20 pt-2 mt-1 flex items-center justify-between">
@@ -137,16 +138,12 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
               )}
 
               {event.min_players > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <div className="flex items-center gap-1">
-                    <span className={`text-xs font-bold tabular-nums ${confirmedCount >= event.min_players ? "text-green-500" : "text-amber-500"}`}>
-                      {confirmedCount}
-                    </span>
-                    <span className="text-[10px] text-white/50">
-                      / {event.max_players || event.min_players} players
-                    </span>
-                  </div>
-                </div>
+                <PlayerCountIndicator
+                  confirmedCount={confirmedCount}
+                  minPlayers={event.min_players}
+                  maxPlayers={event.max_players}
+                  size="standard"
+                />
               )}
             </div>
 

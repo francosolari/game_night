@@ -158,7 +158,8 @@ export async function respondToInviteRPC(
   const { error } = await supabase.rpc("respond_to_invite", {
     p_invite_id: inviteId,
     p_status: status,
-    p_votes: JSON.stringify(votes),
+    p_votes: votes,
+    p_suggested_times: [],
   });
   if (error) throw error;
 }

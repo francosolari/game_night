@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 const CreateEvent = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-24 md:pb-0">
       <header className="px-6 py-4 max-w-3xl mx-auto flex items-center gap-3">
         <Link to="/dashboard">
           <Button variant="ghost" size="icon" className="rounded-full">

@@ -1,5 +1,6 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, MoreHorizontal, Pencil, Trash2, Users, Loader2 } from "lucide-react";
+import { PlayerCountIndicator } from "@/components/PlayerCountIndicator";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ import { RSVPDialog } from "@/components/event-detail/RSVPDialog";
 import { GamesSection } from "@/components/event-detail/GamesSection";
 import { GuestListTabs } from "@/components/event-detail/GuestListTabs";
 import { ActivityFeed } from "@/components/event-detail/ActivityFeed";
+import { GuestListFullPage } from "@/components/event-detail/GuestListFullPage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 
@@ -33,6 +35,7 @@ const EventDetail = () => {
   const { toast } = useToast();
   const [showRSVP, setShowRSVP] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showGuestList, setShowGuestList] = useState(false);
 
   const detail = useEventDetail(id);
 
@@ -75,9 +78,13 @@ const EventDetail = () => {
   };
 
   const handleRSVPSubmit = async (status: string, votes: { time_option_id: string; vote_type: string }[]) => {
-    await respondToInvite(status, votes);
-    const msg = status === "accepted" ? "You're going!" : status === "maybe" ? "Maybe next time!" : "RSVP updated";
-    toast({ title: msg });
+    try {
+      await respondToInvite(status, votes);
+      const msg = status === "accepted" ? "You're going!" : status === "maybe" ? "Maybe next time!" : "RSVP updated";
+      toast({ title: msg });
+    } catch {
+      toast({ title: "Failed to update RSVP", description: "Please try again.", variant: "destructive" });
+    }
   };
 
   const guestListMode = (() => {
@@ -110,7 +117,7 @@ const EventDetail = () => {
 
   // ─── MOBILE LAYOUT ───
   const mobileView = (
-    <div className="md:hidden min-h-screen bg-background">
+    <div className="md:hidden min-h-screen bg-background pb-24">
       {/* Delete overlay */}
       {isDeleting && (
         <div className="fixed inset-0 z-50 bg-background/80 flex items-center justify-center">
@@ -188,6 +195,7 @@ const EventDetail = () => {
           blockerMessage="RSVP to see who's going."
           isHost={isOwner}
           canInvite={canInviteGuests}
+          onViewAll={() => setShowGuestList(true)}
         />
 
         {/* Activity Feed */}
@@ -329,7 +337,17 @@ const EventDetail = () => {
               )}
               {event.location && <InfoRow label="Location" value={event.location} />}
               {event.host && <InfoRow label="Host" value={event.host.display_name} />}
-              <InfoRow label="Players" value={`${inviteSummary.accepted} / ${event.max_players || event.min_players || "∞"}`} />
+              {event.min_players > 0 && (
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-xs text-muted-foreground shrink-0">Players</span>
+                  <PlayerCountIndicator
+                    confirmedCount={inviteSummary.accepted}
+                    minPlayers={event.min_players}
+                    maxPlayers={event.max_players}
+                    size="standard"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Guest List */}
@@ -339,6 +357,7 @@ const EventDetail = () => {
               blockerMessage="RSVP to see who's going."
               isHost={isOwner}
               canInvite={canInviteGuests}
+              onViewAll={() => setShowGuestList(true)}
             />
           </aside>
         </div>
@@ -380,6 +399,17 @@ const EventDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Full guest list */}
+      <GuestListFullPage
+        open={showGuestList}
+        onOpenChange={setShowGuestList}
+        summary={inviteSummary}
+        visibilityMode={guestListMode}
+        blockerMessage="RSVP to see who's going."
+        isHost={isOwner}
+        canInvite={canInviteGuests}
+      />
     </>
   );
 };

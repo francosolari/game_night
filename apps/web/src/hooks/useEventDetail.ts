@@ -181,13 +181,41 @@ export function useEventDetail(eventId: string | undefined) {
   const refreshData = useCallback(async () => {
     if (!eventId) return;
     try {
-      const [ev, inv] = await Promise.all([
+      const [ev, inv, feedItems, gVotes, tvResult, gvResult] = await Promise.allSettled([
         fetchEventById(eventId),
         fetchInvitesForEvent(eventId),
+        fetchActivityFeed(eventId),
+        fetchMyGameVotes(eventId),
+        fetchTimePollVoters(eventId),
+        fetchGamePollVoters(eventId),
       ]);
-      setEvent(ev);
-      setInvites(inv);
-      if (user) setMyInvite(inv.find(i => i.user_id === user.id) || null);
+
+      if (ev.status === "fulfilled") setEvent(ev.value);
+      if (inv.status === "fulfilled") {
+        setInvites(inv.value);
+        if (user) setMyInvite(inv.value.find(i => i.user_id === user.id) || null);
+      }
+      if (feedItems.status === "fulfilled") setActivityFeed(feedItems.value);
+      if (gVotes.status === "fulfilled") {
+        setGameVotes(gVotes.value);
+        if (user) {
+          const mine: Record<string, GameVoteType> = {};
+          for (const v of gVotes.value) {
+            if (v.user_id === user.id) mine[v.game_id] = v.vote_type;
+          }
+          setMyGameVotes(mine);
+        }
+      }
+      if (tvResult.status === "fulfilled") {
+        const grouped: Record<string, TimeOptionVoter[]> = {};
+        for (const v of tvResult.value) (grouped[v.time_option_id] ??= []).push(v);
+        setTimeOptionVoters(grouped);
+      }
+      if (gvResult.status === "fulfilled") {
+        const grouped: Record<string, GameVoterInfo[]> = {};
+        for (const v of gvResult.value) (grouped[v.game_id] ??= []).push(v);
+        setGameVoterDetails(grouped);
+      }
     } catch {
       // Non-critical for refresh
     }
@@ -227,8 +255,10 @@ export function useEventDetail(eventId: string | undefined) {
       await refreshData();
     } catch (err) {
       setError((err as Error).message);
+      throw err;
+    } finally {
+      setIsSending(false);
     }
-    setIsSending(false);
   }, [myInvite, refreshData]);
 
   const voteForGame = useCallback(async (gameId: string, voteType: GameVoteType) => {

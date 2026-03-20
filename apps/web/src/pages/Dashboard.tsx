@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -93,9 +93,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && !user) { navigate("/login"); return; }
-    if (user) loadData();
-  }, [user, authLoading, navigate, loadData]);
+    if (authLoading) return;
+    if (!user) { navigate("/login"); return; }
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading]);
 
   const awaitingResponseEvents = useMemo(() => {
     const pending = myInvites.filter(i => i.status === "pending");
@@ -201,27 +203,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-      {/* Bottom Nav — iOS style */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 pb-[env(safe-area-inset-bottom)]"
-        style={{ background: "hsl(var(--card))", boxShadow: "0 -5px 20px hsl(0 0% 0% / 0.08)" }}
-      >
-        <div className="flex items-center px-2 pt-2 pb-1">
-          <MobileTabBtn label="Home" href="/dashboard" active icon={<IconHome />} />
-          <MobileTabBtn label="Games" href="/dashboard" icon={<IconDice />} />
-          <div className="flex-1 flex justify-center">
-            <button
-              onClick={() => navigate("/events/new")}
-              className="w-14 h-14 -mt-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-              style={{ boxShadow: "0 4px 12px hsl(94 19% 48% / 0.4)" }}
-            >
-              <Plus className="w-6 h-6" strokeWidth={2.5} />
-            </button>
-          </div>
-          <MobileTabBtn label="Groups" href="/dashboard" icon={<IconGroups />} />
-          <MobileTabBtn label="Profile" href="/profile" icon={<IconProfile />} />
-        </div>
-      </nav>
     </div>
   );
 
@@ -244,8 +225,8 @@ export default function Dashboard() {
       >
         <div className="px-5 pt-6 pb-4">
           <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-extrabold tracking-tight text-foreground leading-none">
-              Game Night
+            <h1 className="text-[15px] lg:text-base font-extrabold tracking-tight text-foreground leading-none whitespace-nowrap">
+              CardboardWithMe
             </h1>
             <img src={meepleLogo} alt="" className="w-5 h-5 opacity-60" />
           </div>
@@ -285,11 +266,11 @@ export default function Dashboard() {
             {drafts.length > 0 && (
               <section className="space-y-3">
                 <SectionHeader title="Drafts" />
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+                <DesktopScrollRow>
                   {drafts.map(draft => (
                     <DraftCard key={draft.id} draft={draft} onClick={() => navigate(`/events/${draft.id}`)} />
                   ))}
-                </div>
+                </DesktopScrollRow>
               </section>
             )}
 
@@ -397,20 +378,50 @@ function SidebarLink({ label, icon, href, active }: { label: string; icon: React
   );
 }
 
-function MobileTabBtn({ icon, label, href, active }: { icon: React.ReactNode; label: string; href: string; active?: boolean }) {
-  return (
-    <Link to={href} className={`flex-1 flex flex-col items-center gap-1 py-1 ${active ? "text-primary" : "text-muted-foreground"}`}>
-      {icon}
-      <span className="text-[10px] font-medium leading-none">{label}</span>
-    </Link>
-  );
+
+/** Hook: mouse-drag horizontal scrolling for desktop */
+function useDragScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const state = useRef({ isDown: false, startX: 0, scrollLeft: 0, moved: false });
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    state.current = { isDown: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft, moved: false };
+    el.style.cursor = "grabbing";
+    el.style.userSelect = "none";
+  }, []);
+
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!state.current.isDown) return;
+    e.preventDefault();
+    const el = ref.current!;
+    const x = e.pageX - el.offsetLeft;
+    const walk = (x - state.current.startX) * 1.2;
+    if (Math.abs(walk) > 3) state.current.moved = true;
+    el.scrollLeft = state.current.scrollLeft - walk;
+  }, []);
+
+  const onMouseUpOrLeave = useCallback(() => {
+    state.current.isDown = false;
+    const el = ref.current;
+    if (el) { el.style.cursor = "grab"; el.style.removeProperty("user-select"); }
+  }, []);
+
+  return { ref, onMouseDown, onMouseMove, onMouseUp: onMouseUpOrLeave, onMouseLeave: onMouseUpOrLeave };
 }
 
 function CardCarousel({ children }: { children: React.ReactNode }) {
+  const drag = useDragScroll();
   return (
     <div
-      className="flex gap-3 overflow-x-auto px-5 pb-1 scrollbar-hide snap-x snap-mandatory"
+      ref={drag.ref}
+      className="flex gap-3 overflow-x-auto px-5 pb-1 scrollbar-hide snap-x snap-mandatory cursor-grab"
       style={{ WebkitOverflowScrolling: "touch", overscrollBehaviorX: "contain" }}
+      onMouseDown={drag.onMouseDown}
+      onMouseMove={drag.onMouseMove}
+      onMouseUp={drag.onMouseUp}
+      onMouseLeave={drag.onMouseLeave}
     >
       {children}
     </div>
@@ -420,6 +431,23 @@ function CardCarousel({ children }: { children: React.ReactNode }) {
 function CarouselCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="shrink-0 snap-start" style={{ width: "calc((100vw - 48px) / 2.05)" }}>
+      {children}
+    </div>
+  );
+}
+
+function DesktopScrollRow({ children }: { children: React.ReactNode }) {
+  const drag = useDragScroll();
+  return (
+    <div
+      ref={drag.ref}
+      className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 cursor-grab snap-x"
+      style={{ overscrollBehaviorX: "contain" }}
+      onMouseDown={drag.onMouseDown}
+      onMouseMove={drag.onMouseMove}
+      onMouseUp={drag.onMouseUp}
+      onMouseLeave={drag.onMouseLeave}
+    >
       {children}
     </div>
   );
