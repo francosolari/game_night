@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 When working on Supabase backend, avoid SECURITY_DEFINER wherever possible
 Build sustainably and responsibly to production coding standards from a FAANG company expectation
 When doing UI Elements reference the BrandGuidelines and support light and dark mode
+For interactive elements be sure to add toasts where necessary
 
 ## Project Overview
 
