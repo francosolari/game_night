@@ -51,6 +51,9 @@ struct CreateEventDetailsStep: View {
                 rsvpOptionsSection
             }
 
+            // Group link
+            groupLinkSection
+
             // Privacy
             privacySection
 
@@ -363,6 +366,65 @@ struct CreateEventDetailsStep: View {
     private var rsvpDeadlineValueText: String {
         guard let deadline = viewModel.rsvpDeadline else { return "Not set" }
         return RSVPDeadlineDisplay.label(for: deadline)
+    }
+
+    // MARK: - Group Link Section
+
+    @State private var showGroupPickerInDetails = false
+    @StateObject private var groupsVM = GroupsViewModel()
+
+    private var groupLinkSection: some View {
+        VStack(alignment: .leading, spacing: Layout.compactSectionSpacing) {
+            Text("Group (optional)")
+                .font(Theme.Typography.label)
+                .foregroundColor(Theme.Colors.textSecondary)
+
+            Button {
+                showGroupPickerInDetails = true
+            } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if let group = viewModel.selectedGroup {
+                        Text(group.emoji ?? "🎲")
+                            .font(.system(size: 18))
+                        Text(group.name)
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Spacer()
+                        Button {
+                            viewModel.selectedGroup = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Image(systemName: "person.3")
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        Text("Link to a group")
+                            .font(Theme.Typography.body)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                }
+                .padding(Theme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.fieldBackground)
+                )
+            }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showGroupPickerInDetails) {
+                GroupPickerSheet(groups: groupsVM.groups) { group in
+                    viewModel.selectedGroup = group
+                }
+            }
+            .task { await groupsVM.loadGroups() }
+        }
     }
 
     // MARK: - Privacy Section

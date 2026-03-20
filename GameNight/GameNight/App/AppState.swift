@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published var currentUser: User?
     @Published var selectedTab: Tab = .home
     @Published var showCreateEvent = false
+    @Published var scheduleNightGroup: GameGroup?
     @Published var deepLinkEventId: String?
 
     enum Tab: Int, CaseIterable {

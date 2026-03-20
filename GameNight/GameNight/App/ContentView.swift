@@ -57,6 +57,10 @@ struct MainTabView: View {
             CreateEventView()
                 .environmentObject(appState)
         }
+        .sheet(item: $appState.scheduleNightGroup) { group in
+            CreateEventView(group: group)
+                .environmentObject(appState)
+        }
         .onChange(of: appState.selectedTab) { oldTab, newTab in
             if newTab == .create {
                 showCreateEvent = true

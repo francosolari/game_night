@@ -197,24 +197,29 @@ const Login = () => {
             </button>
           )}
 
-          {/* Step: Beta Password */}
+          {/* Step: Beta Password — NOT a real login, suppress password managers */}
           {step === "beta-password" && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
                 <Lock className="h-10 w-10 text-accent mx-auto" />
                 <h1 className="text-xl font-bold">Beta Access</h1>
-                <p className="text-sm text-muted-foreground">Enter the password Franco gave you.</p>
+                <p className="text-sm text-muted-foreground">Enter the passphrase Franco gave you.</p>
               </div>
               <form
                 className="space-y-4"
                 onSubmit={(e) => { e.preventDefault(); checkBetaPassword(); }}
+                autoComplete="off"
               >
                 <Input
-                  type="password"
-                  placeholder="Password"
+                  type="text"
+                  placeholder="Passphrase"
                   value={betaPassword}
                   onChange={(e) => setBetaPassword(e.target.value)}
                   autoFocus
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
                   className="text-center text-lg"
                 />
                 {error && <p className="text-sm text-destructive text-center">{error}</p>}
@@ -225,7 +230,7 @@ const Login = () => {
             </div>
           )}
 
-          {/* Step: Phone Number */}
+          {/* Step: Phone Number — triggers browser "username" save */}
           {step === "phone" && (
             <div className="space-y-6">
               <div className="text-center space-y-2">
@@ -238,6 +243,7 @@ const Login = () => {
               <form
                 className="space-y-4"
                 onSubmit={(e) => { e.preventDefault(); probePhone(); }}
+                autoComplete="on"
               >
                 <div className="flex gap-2">
                   <select
@@ -254,10 +260,12 @@ const Login = () => {
                   </select>
                   <Input
                     type="tel"
+                    name="username"
                     placeholder="(555) 123-4567"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     autoFocus
+                    autoComplete="username"
                     className="flex-1"
                   />
                 </div>
@@ -290,13 +298,23 @@ const Login = () => {
               <form
                 className="space-y-4"
                 onSubmit={(e) => { e.preventDefault(); signInOrCreate(); }}
+                autoComplete="on"
               >
+                {/* Hidden username field so browser links password to phone */}
+                <input
+                  type="hidden"
+                  name="username"
+                  value={fullPhone}
+                  autoComplete="username"
+                />
                 <Input
                   type="password"
+                  name="password"
                   placeholder="Account Password"
                   value={accountPassword}
                   onChange={(e) => setAccountPassword(e.target.value)}
                   autoFocus
+                  autoComplete={accountExists ? "current-password" : "new-password"}
                   className="text-center text-lg"
                 />
                 {error && <p className="text-sm text-destructive text-center">{error}</p>}

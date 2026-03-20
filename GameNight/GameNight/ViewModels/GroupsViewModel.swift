@@ -3,11 +3,14 @@ import SwiftUI
 @MainActor
 final class GroupsViewModel: ObservableObject {
     @Published var groups: [GameGroup] = []
+    @Published var upcomingEvents: [GameEvent] = []
+    @Published var recentPlays: [Play] = []
     @Published var isLoading = true
     @Published var error: String?
     @Published var showCreateGroup = false
 
     private let supabase = SupabaseService.shared
+    private var inviteCounts: [UUID: Int] = [:]
 
     func loadGroups() async {
         isLoading = true
@@ -114,9 +117,42 @@ final class GroupsViewModel: ObservableObject {
         }
     }
 
-    func updateMemberTier(memberId: UUID, groupId: UUID, tier: Int) {
-        guard let groupIdx = groups.firstIndex(where: { $0.id == groupId }),
-              let memberIdx = groups[groupIdx].members.firstIndex(where: { $0.id == memberId }) else { return }
-        groups[groupIdx].members[memberIdx].tier = tier
+    func loadDashboardData() async {
+        var allEvents: [GameEvent] = []
+        var allPlays: [Play] = []
+
+        for group in groups {
+            if let events = try? await supabase.fetchEventsForGroup(groupId: group.id) {
+                allEvents.append(contentsOf: events)
+            }
+            if let plays = try? await supabase.fetchPlaysForGroup(groupId: group.id) {
+                allPlays.append(contentsOf: plays)
+            }
+        }
+
+        let now = Date()
+        upcomingEvents = allEvents
+            .filter { $0.effectiveStartDate >= now && $0.status == .published }
+            .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
+
+        // Fetch invite counts for upcoming events
+        let eventIds = upcomingEvents.map(\.id)
+        if !eventIds.isEmpty {
+            do {
+                inviteCounts = try await supabase.fetchAcceptedInviteCounts(eventIds: eventIds)
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+
+        recentPlays = allPlays
+            .sorted { $0.playedAt > $1.playedAt }
+            .prefix(5)
+            .map { $0 }
+    }
+
+    func confirmedCount(for eventId: UUID) -> Int {
+        let acceptedInvites = inviteCounts[eventId] ?? 0
+        return acceptedInvites + 1  // +1 for the host
     }
 }

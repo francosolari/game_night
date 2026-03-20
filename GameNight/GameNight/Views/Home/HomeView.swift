@@ -5,6 +5,9 @@ struct HomeView: View {
     @EnvironmentObject var appState: AppState
     @Binding var navigationPath: NavigationPath
     @State private var draftToResume: GameEvent?
+    @State private var eventsNeedingPlayLog: [GameEvent] = []
+    @State private var dismissedPlayLogIds: Set<UUID> = []
+    @State private var playLogEvent: GameEvent?
 
     private var carouselCardWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -20,7 +23,7 @@ struct HomeView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                             HStack(alignment: .center, spacing: Theme.Spacing.sm) {
-                                Text("Game Night")
+                                Text("CardboardWithMe")
                                     .font(Theme.Typography.displayLarge)
                                     .foregroundColor(Theme.Colors.textPrimary)
 
@@ -54,6 +57,79 @@ struct HomeView: View {
                             Task { await viewModel.loadData() }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
+                    }
+
+                    // Log Your Plays banner
+                    let visiblePlayLogEvents = eventsNeedingPlayLog.filter { !dismissedPlayLogIds.contains($0.id) }
+                    if !visiblePlayLogEvents.isEmpty {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            SectionHeader(title: "Log Your Plays")
+                                .padding(.horizontal, Theme.Spacing.xl)
+
+                            ForEach(visiblePlayLogEvents) { event in
+                                HStack(spacing: Theme.Spacing.md) {
+                                    // Game thumbnail
+                                    if let imageUrl = event.preferredCoverImageURLString, let url = URL(string: imageUrl) {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable().aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                                .fill(Theme.Colors.primary.opacity(0.1))
+                                        }
+                                        .frame(width: 44, height: 44)
+                                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+                                    } else {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                                .fill(Theme.Colors.primary.opacity(0.1))
+                                                .frame(width: 44, height: 44)
+                                            Image(systemName: "trophy")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(Theme.Colors.primary)
+                                        }
+                                    }
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(event.title)
+                                            .font(Theme.Typography.bodyMedium)
+                                            .foregroundColor(Theme.Colors.textPrimary)
+                                            .lineLimit(1)
+                                        Text("What did you play?")
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(Theme.Colors.textTertiary)
+                                    }
+
+                                    Spacer()
+
+                                    Button {
+                                        playLogEvent = event
+                                    } label: {
+                                        Text("Log")
+                                            .font(Theme.Typography.calloutMedium)
+                                            .foregroundColor(Theme.Colors.primary)
+                                            .padding(.horizontal, Theme.Spacing.md)
+                                            .padding(.vertical, Theme.Spacing.sm)
+                                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.1)))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        dismissedPlayLogIds.insert(event.id)
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Theme.Colors.textTertiary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(Theme.Spacing.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                        .fill(Theme.Colors.cardBackground)
+                                )
+                            }
+                            .padding(.horizontal, Theme.Spacing.xl)
+                        }
                     }
 
                     // Drafts section (always visible when drafts exist, even while loading)
@@ -201,12 +277,26 @@ struct HomeView: View {
             }
         .task {
             await viewModel.loadData()
+            await loadEventsNeedingPlayLog()
         }
         .sheet(item: $draftToResume) { draft in
             CreateEventView(eventToEdit: draft) { _ in
                 Task { await viewModel.loadData() }
             }
         }
+        .sheet(item: $playLogEvent) { event in
+            PlayLoggingSheet(event: event)
+        }
+        .onChange(of: playLogEvent) { _, newValue in
+            if newValue == nil {
+                Task { await loadEventsNeedingPlayLog() }
+            }
+        }
+    }
+
+    private func loadEventsNeedingPlayLog() async {
+        guard let userId = SupabaseService.shared.client.auth.currentSession?.user.id else { return }
+        eventsNeedingPlayLog = (try? await SupabaseService.shared.fetchCompletedEventsNeedingPlayLog(userId: userId)) ?? []
     }
 }
 

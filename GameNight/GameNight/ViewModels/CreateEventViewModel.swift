@@ -171,6 +171,34 @@ final class CreateEventViewModel: ObservableObject {
         }
     }
 
+    convenience init(group: GameGroup) {
+        self.init()
+        title = "\(group.name) Game Night"
+        selectedGroup = group
+        scheduleMode = .fixed
+        fixedDate = Date()
+        fixedStartTime = DateTimePickerSheet.defaultTime(hour: 19)
+        hasDate = false
+        minPlayers = 2
+        maxPlayers = group.memberCount
+
+        let members = group.members.map { member in
+            InviteeEntry(
+                id: UUID(),
+                name: member.displayName ?? member.phoneNumber,
+                phoneNumber: member.phoneNumber,
+                userId: member.userId,
+                tier: 1,
+                groupId: group.id,
+                groupEmoji: group.emoji,
+                groupName: group.name
+            )
+        }
+        invitees = members
+        completedSteps = Set(CreateStep.allCases.filter { $0 != .review })
+        currentStep = .review
+    }
+
     var isEditing: Bool { eventToEdit != nil }
 
     var isDraftEdit: Bool { eventToEdit?.status == .draft }
@@ -710,6 +738,7 @@ final class CreateEventViewModel: ObservableObject {
             plusOneLimit: plusOneLimit,
             allowMaybeRSVP: allowMaybeRSVP,
             requirePlusOneNames: requirePlusOneNames,
+            groupId: selectedGroup?.id ?? existingEvent?.groupId,
             coverImageUrl: coverImageRemoved ? nil : (pendingCoverImageUrl ?? existingEvent?.coverImageUrl),
             coverVariant: coverVariant,
             draftInvitees: status == .draft ? orderedInvitees().map { entry in

@@ -139,6 +139,108 @@ export interface Invite {
   created_at: string;
 }
 
+// Activity Feed
+export type ActivityType = "comment" | "rsvp_update" | "announcement" | "date_confirmed" | "game_confirmed";
+
+export interface ActivityFeedItem {
+  id: string;
+  event_id: string;
+  user_id: string;
+  user?: User | null;
+  type: ActivityType;
+  content?: string | null;
+  parent_id?: string | null;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  replies?: ActivityFeedItem[];
+}
+
+export type GameVoteType = "yes" | "maybe" | "no";
+
+export interface GameVote {
+  id: string;
+  event_id: string;
+  game_id: string;
+  user_id: string;
+  vote_type: GameVoteType;
+  created_at: string;
+}
+
+export interface TimeOptionVoter {
+  time_option_id: string;
+  vote_type: string;
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+export interface GameVoterInfo {
+  game_id: string;
+  vote_type: string;
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+export interface InviteUser {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  status: InviteStatusType;
+  tier: number;
+}
+
+export interface InviteSummary {
+  total: number;
+  accepted: number;
+  declined: number;
+  pending: number;
+  maybe: number;
+  waitlisted: number;
+  acceptedUsers: InviteUser[];
+  pendingUsers: InviteUser[];
+  maybeUsers: InviteUser[];
+  declinedUsers: InviteUser[];
+  waitlistedUsers: InviteUser[];
+}
+
+export type EventViewerRole = "host" | "rsvpd" | "invitedNotRSVPd" | "publicViewer";
+
+export interface EventAccessPolicy {
+  visibility: EventVisibility;
+  viewerRole: EventViewerRole;
+  rsvpDeadline?: string | null;
+  allowGuestInvites: boolean;
+  canViewFullAddress: boolean;
+  canViewGuestList: boolean;
+  canInviteGuests: boolean;
+  isRSVPClosed: boolean;
+}
+
+export function buildAccessPolicy(
+  event: GameEvent,
+  viewerRole: EventViewerRole
+): EventAccessPolicy {
+  const canViewFullAddress = event.visibility === "public" || viewerRole === "host" || viewerRole === "rsvpd";
+  const canViewGuestList = viewerRole !== "publicViewer";
+  const isRSVPClosed = event.rsvp_deadline ? new Date(event.rsvp_deadline) < new Date() : false;
+  const canInviteGuests =
+    viewerRole === "host" ||
+    (viewerRole === "rsvpd" && event.allow_guest_invites);
+
+  return {
+    visibility: event.visibility,
+    viewerRole,
+    rsvpDeadline: event.rsvp_deadline,
+    allowGuestInvites: event.allow_guest_invites,
+    canViewFullAddress,
+    canViewGuestList,
+    canInviteGuests,
+    isRSVPClosed,
+  };
+}
+
 // Helper functions matching iOS logic
 export function getEffectiveStartDate(event: GameEvent): Date {
   if (event.confirmed_time_option_id) {
@@ -160,4 +262,130 @@ export function getPreferredCoverImage(event: GameEvent): string | null {
   if (primary?.game?.image_url) return primary.game.image_url;
   if (event.games[0]?.game?.image_url) return event.games[0].game.image_url;
   return null;
+}
+
+export function buildInviteSummary(invites: Invite[], event: GameEvent): InviteSummary {
+  const nonHostInvites = invites.filter(inv => inv.user_id !== event.host_id);
+
+  const mapUsers = (list: Invite[]): InviteUser[] =>
+    list.map(inv => ({
+      id: inv.id,
+      name: inv.display_name || "Unknown",
+      avatarUrl: null,
+      status: inv.status,
+      tier: inv.tier,
+    }));
+
+  const accepted = nonHostInvites.filter(i => i.status === "accepted");
+  const declined = nonHostInvites.filter(i => i.status === "declined");
+  const pending = nonHostInvites.filter(i => i.status === "pending");
+  const maybe = nonHostInvites.filter(i => i.status === "maybe");
+  const waitlisted = nonHostInvites.filter(i => i.status === "waitlisted");
+
+  // Add host as accepted
+  const hostUser: InviteUser = {
+    id: event.host_id,
+    name: event.host?.display_name || "Host",
+    avatarUrl: event.host?.avatar_url || null,
+    status: "accepted",
+    tier: 1,
+  };
+
+  return {
+    total: nonHostInvites.length + 1,
+    accepted: accepted.length + 1,
+    declined: declined.length,
+    pending: pending.length,
+    maybe: maybe.length,
+    waitlisted: waitlisted.length,
+    acceptedUsers: [hostUser, ...mapUsers(accepted)],
+    pendingUsers: mapUsers(pending),
+    maybeUsers: mapUsers(maybe),
+    declinedUsers: mapUsers(declined),
+    waitlistedUsers: mapUsers(waitlisted),
+  };
+}
+
+// ─── Game Library Types ───
+
+export interface GameLibraryEntry {
+  id: string;
+  user_id: string;
+  game_id: string;
+  game?: Game | null;
+  category_id?: string | null;
+  rating?: number | null;
+  play_count: number;
+  added_at: string;
+  notes?: string | null;
+}
+
+export interface GameCategory {
+  id: string;
+  user_id: string;
+  name: string;
+  icon?: string | null;
+  sort_order: number;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface GameFamily {
+  id: string;
+  name: string;
+  bgg_family_id: number;
+}
+
+// ─── Game Helper Functions ───
+
+export function complexityLabel(weight: number): string {
+  if (weight <= 1.5) return "Light";
+  if (weight <= 2.0) return "Light-Medium";
+  if (weight <= 3.0) return "Medium";
+  if (weight <= 3.5) return "Medium-Heavy";
+  return "Heavy";
+}
+
+export function complexityColorClass(weight: number): string {
+  if (weight <= 2.0) return "bg-green-500/10 text-green-600";
+  if (weight <= 3.5) return "bg-amber-500/10 text-amber-600";
+  return "bg-red-500/10 text-red-600";
+}
+
+export function ratingColorClass(rating: number): string {
+  if (rating >= 8.5) return "text-green-600";
+  if (rating >= 7.0) return "text-lime-600";
+  if (rating >= 4.0) return "text-amber-600";
+  return "text-red-600";
+}
+
+export function playerCountDisplay(game: Game): string {
+  if (game.min_players === game.max_players) return `${game.min_players} players`;
+  return `${game.min_players}–${game.max_players} players`;
+}
+
+export function playtimeDisplay(game: Game): string {
+  if (game.min_playtime === game.max_playtime) return `${game.min_playtime} min`;
+  return `${game.min_playtime}–${game.max_playtime} min`;
+}
+
+export function formatPlayerRanges(values?: number[] | null): string | null {
+  if (!values || values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let end = sorted[0];
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === end + 1) {
+      end = sorted[i];
+    } else {
+      ranges.push(start === end ? `${start}` : `${start}–${end}`);
+      start = sorted[i];
+      end = sorted[i];
+    }
+  }
+  ranges.push(start === end ? `${start}` : `${start}–${end}`);
+  return ranges.join(", ");
 }
