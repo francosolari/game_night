@@ -1360,13 +1360,29 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func confirmGame(eventId: UUID, gameId: UUID) async throws {
+        // Set confirmed game and end game voting
         let updates: [String: AnyJSON] = [
-            "confirmed_game_id": .string(gameId.uuidString)
+            "confirmed_game_id": .string(gameId.uuidString),
+            "allow_game_voting": .bool(false)
         ]
         try await client
             .from("events")
             .update(updates)
             .eq("id", value: eventId.uuidString)
+            .execute()
+
+        // Set confirmed game as primary, unset others
+        try await client
+            .from("event_games")
+            .update(["is_primary": AnyJSON.bool(false)])
+            .eq("event_id", value: eventId.uuidString)
+            .execute()
+
+        try await client
+            .from("event_games")
+            .update(["is_primary": AnyJSON.bool(true)])
+            .eq("event_id", value: eventId.uuidString)
+            .eq("game_id", value: gameId.uuidString)
             .execute()
     }
 

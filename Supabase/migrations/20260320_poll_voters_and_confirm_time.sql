@@ -83,11 +83,17 @@ begin
         raise exception 'Only the host can confirm a time option';
     end if;
 
-    -- Set confirmed time option on event
+    -- Set confirmed time option and end the poll (switch to fixed mode)
     update events
     set confirmed_time_option_id = p_time_option_id,
+        schedule_mode = 'fixed',
         updated_at = now()
     where id = p_event_id;
+
+    -- Remove non-confirmed time options (poll is over)
+    delete from time_options
+    where event_id = p_event_id
+      and id <> p_time_option_id;
 
     -- Auto-update invites: yes voters -> accepted, maybe voters -> maybe
     -- First: yes voters

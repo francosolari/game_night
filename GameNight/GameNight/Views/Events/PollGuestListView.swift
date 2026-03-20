@@ -28,8 +28,9 @@ struct PollGuestListView: View {
     }
 
     private func detailVoters(for option: TimeOption) -> [(id: UUID, name: String, avatarUrl: String?, voteType: String)] {
-        (voters[option.id] ?? [])
-            .map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl, voteType: $0.voteType) }
+        let all = voters[option.id] ?? []
+        let filtered = isHost ? all : all.filter { $0.voteType != "no" }
+        return filtered.map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl, voteType: $0.voteType) }
     }
 
     var body: some View {
@@ -76,14 +77,22 @@ struct PollGuestListView: View {
             selectedOption = option
         } label: {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                // Date
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(option.displayDate)
-                        .font(Theme.Typography.bodyMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    Text(option.displayTime)
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.dateAccent)
+                // Date — with subtle star if popular
+                HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(option.displayDate)
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Text(option.displayTime)
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.dateAccent)
+                    }
+                    Spacer()
+                    if popular {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.Colors.highlight)
+                    }
                 }
 
                 // Vote counts
@@ -112,19 +121,8 @@ struct PollGuestListView: View {
                     maxVisible: 3,
                     avatarSize: 20
                 )
-
-                if popular {
-                    Text("POPULAR")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundColor(Theme.Colors.primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(Theme.Colors.primary.opacity(0.12))
-                        )
-                }
             }
-            .frame(width: 140)
+            .frame(width: 140, alignment: .leading)
             .padding(Theme.Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
@@ -132,8 +130,8 @@ struct PollGuestListView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                             .stroke(
-                                popular ? Theme.Colors.primary.opacity(0.2) : Theme.Colors.divider,
-                                lineWidth: 1
+                                popular ? Theme.Colors.primary.opacity(0.25) : Theme.Colors.divider,
+                                lineWidth: popular ? 1.5 : 1
                             )
                     )
             )

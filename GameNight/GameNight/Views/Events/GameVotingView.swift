@@ -54,7 +54,8 @@ private struct GameVoteCard: View {
     }
 
     private var detailVoters: [(id: UUID, name: String, avatarUrl: String?, voteType: String)] {
-        voters.map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl, voteType: $0.voteType.rawValue) }
+        let filtered = isHost ? voters : voters.filter { $0.voteType != .no }
+        return filtered.map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl, voteType: $0.voteType.rawValue) }
     }
 
     private var isMostPopular: Bool {
@@ -147,7 +148,7 @@ private struct GameVoteCard: View {
                                 .foregroundColor(Theme.Colors.warning)
                         }
                     }
-                    if eventGame.noCount > 0 {
+                    if isHost && eventGame.noCount > 0 {
                         HStack(spacing: 2) {
                             StatusDot(color: Theme.Colors.error, size: 5)
                             Text("\(eventGame.noCount)")
