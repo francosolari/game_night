@@ -36,6 +36,13 @@ struct CreateEventView: View {
         self.onSaved = onSaved
     }
 
+    init(group: GameGroup, onSaved: ((GameEvent) -> Void)? = nil) {
+        _viewModel = StateObject(
+            wrappedValue: CreateEventViewModel(group: group)
+        )
+        self.onSaved = onSaved
+    }
+
     private var visibleSteps: [CreateEventViewModel.CreateStep] {
         CreateEventViewModel.CreateStep.allCases
     }

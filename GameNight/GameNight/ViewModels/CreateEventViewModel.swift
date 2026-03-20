@@ -171,6 +171,32 @@ final class CreateEventViewModel: ObservableObject {
         }
     }
 
+    convenience init(group: GameGroup) {
+        self.init()
+        title = "\(group.name) Game Night"
+        selectedGroup = group
+        scheduleMode = .fixed
+        fixedDate = Date()
+        fixedStartTime = DateTimePickerSheet.defaultTime(hour: 19)
+        hasDate = true
+
+        let members = group.members.map { member in
+            InviteeEntry(
+                id: UUID(),
+                name: member.displayName ?? member.phoneNumber,
+                phoneNumber: member.phoneNumber,
+                userId: member.userId,
+                tier: 1,
+                groupId: group.id,
+                groupEmoji: group.emoji,
+                groupName: group.name
+            )
+        }
+        invitees = members
+        completedSteps = Set(CreateStep.allCases.filter { $0 != .review })
+        currentStep = .review
+    }
+
     var isEditing: Bool { eventToEdit != nil }
 
     var isDraftEdit: Bool { eventToEdit?.status == .draft }

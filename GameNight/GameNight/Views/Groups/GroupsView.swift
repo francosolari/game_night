@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GroupsView: View {
     @StateObject private var viewModel = GroupsViewModel()
+    @EnvironmentObject var appState: AppState
     @State private var showCreateGroup = false
     @State private var toast: ToastItem?
 
@@ -49,22 +50,117 @@ struct GroupsView: View {
                         }
                         .frame(minHeight: 400)
                     } else {
-                        LazyVStack(spacing: Theme.Spacing.md) {
-                            ForEach(viewModel.groups) { group in
-                                NavigationLink {
-                                    GroupDetailView(group: group)
-                                } label: {
-                                    GroupCard(group: group)
+                        // My Groups — horizontal scroll bubbles
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            SectionHeader(title: "My Groups")
+                                .padding(.horizontal, Theme.Spacing.xl)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    ForEach(viewModel.groups) { group in
+                                        NavigationLink {
+                                            GroupDetailView(group: group)
+                                        } label: {
+                                            GroupBubble(group: group)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+
+                                    // New Group button
+                                    Button {
+                                        showCreateGroup = true
+                                    } label: {
+                                        VStack(spacing: Theme.Spacing.sm) {
+                                            ZStack {
+                                                Circle()
+                                                    .strokeBorder(Theme.Colors.border, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                                                    .frame(width: 56, height: 56)
+
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 20, weight: .medium))
+                                                    .foregroundColor(Theme.Colors.primary)
+                                            }
+
+                                            Text("New")
+                                                .font(Theme.Typography.caption)
+                                                .foregroundColor(Theme.Colors.textSecondary)
+                                        }
+                                        .frame(width: 72)
+                                    }
                                 }
-                                .buttonStyle(.plain)
+                                .padding(.horizontal, Theme.Spacing.xl)
                             }
                         }
-                        .padding(.horizontal, Theme.Spacing.xl)
+
+                        // Upcoming Events
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            SectionHeader(title: "Upcoming Events")
+                                .padding(.horizontal, Theme.Spacing.xl)
+
+                            if viewModel.upcomingEvents.isEmpty {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                    Text("No upcoming events across your groups")
+                                        .font(Theme.Typography.callout)
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, Theme.Spacing.xxl)
+                                .padding(.horizontal, Theme.Spacing.xl)
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: Theme.Spacing.md) {
+                                        ForEach(viewModel.upcomingEvents) { event in
+                                            NavigationLink {
+                                                EventDetailView(eventId: event.id)
+                                            } label: {
+                                                VerticalEventCard(event: event)
+                                                    .frame(width: 200)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    .padding(.horizontal, Theme.Spacing.xl)
+                                }
+                            }
+                        }
+
+                        // Recent Plays
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            SectionHeader(title: "Recent Plays")
+                                .padding(.horizontal, Theme.Spacing.xl)
+
+                            if viewModel.recentPlays.isEmpty {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    Image(systemName: "trophy")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                    Text("No plays logged yet")
+                                        .font(Theme.Typography.callout)
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, Theme.Spacing.xxl)
+                                .padding(.horizontal, Theme.Spacing.xl)
+                            } else {
+                                LazyVStack(spacing: Theme.Spacing.sm) {
+                                    ForEach(viewModel.recentPlays) { play in
+                                        RecentPlayRow(play: play, groups: viewModel.groups)
+                                    }
+                                }
+                                .padding(.horizontal, Theme.Spacing.xl)
+                            }
+                        }
                     }
                 }
                 .padding(.bottom, 100)
             }
             .background(Theme.Colors.background.ignoresSafeArea())
+            .navigationDestination(for: GameEvent.self) { event in
+                EventDetailView(eventId: event.id)
+            }
             .sheet(isPresented: $showCreateGroup) {
                 CreateGroupSheet(viewModel: viewModel, onResult: { resultToast in
                     toast = resultToast
@@ -74,70 +170,134 @@ struct GroupsView: View {
         }
         .task {
             await viewModel.loadGroups()
+            await viewModel.loadDashboardData()
         }
     }
 }
 
-// MARK: - Group Card
-struct GroupCard: View {
+// MARK: - Group Bubble
+struct GroupBubble: View {
     let group: GameGroup
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.lg) {
-            // Emoji avatar
+        VStack(spacing: Theme.Spacing.sm) {
             ZStack {
                 Circle()
                     .fill(Theme.Gradients.primary)
-                    .frame(width: 52, height: 52)
+                    .frame(width: 56, height: 56)
 
                 Text(group.emoji ?? "🎲")
-                    .font(.system(size: 24))
+                    .font(.system(size: 26))
             }
 
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(group.name)
-                    .font(Theme.Typography.headlineMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
+            Text(group.name)
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.textPrimary)
+                .lineLimit(1)
 
-                if let desc = group.description {
-                    Text(desc)
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.textSecondary)
-                        .lineLimit(1)
+            Text("\(group.memberCount)")
+                .font(Theme.Typography.caption2)
+                .foregroundColor(Theme.Colors.textTertiary)
+        }
+        .frame(width: 72)
+    }
+}
+
+// MARK: - Recent Play Row
+struct RecentPlayRow: View {
+    let play: Play
+    let groups: [GameGroup]
+
+    private var groupForPlay: GameGroup? {
+        guard let groupId = play.groupId else { return nil }
+        return groups.first { $0.id == groupId }
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            // Game thumbnail
+            ZStack {
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(Theme.Colors.primary.opacity(0.1))
+                    .frame(width: 44, height: 44)
+
+                if let url = play.game?.thumbnailUrl, let imageUrl = URL(string: url) {
+                    AsyncImage(url: imageUrl) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(Theme.Colors.primary)
+                    }
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+                } else {
+                    Image(systemName: "gamecontroller.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.Colors.primary)
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(play.game?.name ?? "Unknown Game")
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
 
                 HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 11))
-                    Text("\(group.memberCount) members")
+                    // Group badge
+                    if let group = groupForPlay {
+                        HStack(spacing: 2) {
+                            Text(group.emoji ?? "🎲")
+                                .font(.system(size: 10))
+                            Text(group.name)
+                                .font(Theme.Typography.caption2)
+                        }
+                        .foregroundColor(Theme.Colors.primary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Theme.Colors.primary.opacity(0.1)))
+                    }
+
+                    Text(play.playedAt.relativeDisplay)
                         .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
-                .foregroundColor(Theme.Colors.textTertiary)
             }
 
             Spacer()
 
-            // Member tier indicators
-            VStack(spacing: 2) {
-                let t1 = group.members.filter { $0.tier == 1 }.count
-                let t2 = group.members.filter { $0.tier == 2 }.count
-                if t1 > 0 {
-                    Text("T1: \(t1)")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.primary)
+            // Winner
+            if play.isCooperative {
+                if let result = play.cooperativeResult {
+                    HStack(spacing: 4) {
+                        Image(systemName: result == .won ? "trophy.fill" : "xmark.circle")
+                            .font(.system(size: 12))
+                        Text(result == .won ? "Won" : "Lost")
+                            .font(Theme.Typography.caption)
+                    }
+                    .foregroundColor(result == .won ? Theme.Colors.success : Theme.Colors.error)
                 }
-                if t2 > 0 {
-                    Text("T2: \(t2)")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.accent)
+            } else {
+                let winners = play.participants.filter(\.isWinner)
+                if !winners.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.Colors.accentWarm)
+                        Text(winners.map(\.displayName).joined(separator: ", "))
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
             }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14))
-                .foregroundColor(Theme.Colors.textTertiary)
         }
-        .cardStyle()
+        .padding(Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.cardBackground)
+        )
     }
 }
 
@@ -282,118 +442,6 @@ struct CreateGroupSheet: View {
     }
 }
 
-// MARK: - Group Detail Sheet
-struct GroupDetailSheet: View {
-    let group: GameGroup
-    @ObservedObject var viewModel: GroupsViewModel
-    @Environment(\.dismiss) var dismiss
-    @State private var showAddMembers = false
-    var onResult: ((ToastItem) -> Void)?
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xxl) {
-                    // Header
-                    VStack(spacing: Theme.Spacing.md) {
-                        ZStack {
-                            Circle()
-                                .fill(Theme.Gradients.primary)
-                                .frame(width: 80, height: 80)
-                            Text(group.emoji ?? "🎲")
-                                .font(.system(size: 40))
-                        }
-
-                        Text(group.name)
-                            .font(Theme.Typography.displaySmall)
-                            .foregroundColor(Theme.Colors.textPrimary)
-
-                        if let desc = group.description {
-                            Text(desc)
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                        }
-                    }
-
-                    // Add members button
-                    Button {
-                        showAddMembers = true
-                    } label: {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 14))
-                            Text("Add Members")
-                                .font(Theme.Typography.calloutMedium)
-                        }
-                        .foregroundColor(Theme.Colors.primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                .fill(Theme.Colors.primary.opacity(0.1))
-                        )
-                    }
-
-                    // Members list
-                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        Text("Members (\(group.memberCount))")
-                            .font(Theme.Typography.headlineMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-
-                        // Tier 1
-                        let tier1 = group.members.filter { $0.tier == 1 }
-                        if !tier1.isEmpty {
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                Text("Tier 1 — First Invite")
-                                    .font(Theme.Typography.label)
-                                    .foregroundColor(Theme.Colors.primary)
-
-                                ForEach(tier1) { member in
-                                    MemberRow(member: member, groupId: group.id, viewModel: viewModel)
-                                }
-                            }
-                        }
-
-                        // Tier 2
-                        let tier2 = group.members.filter { $0.tier == 2 }
-                        if !tier2.isEmpty {
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                Text("Tier 2 — Waitlist")
-                                    .font(Theme.Typography.label)
-                                    .foregroundColor(Theme.Colors.accent)
-
-                                ForEach(tier2) { member in
-                                    MemberRow(member: member, groupId: group.id, viewModel: viewModel)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(Theme.Spacing.xl)
-            }
-            .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .foregroundColor(Theme.Colors.primary)
-                }
-            }
-            .sheet(isPresented: $showAddMembers) {
-                ContactListSheet(
-                    excludedPhones: Set(group.members.map(\.phoneNumber)),
-                    onSelect: { contacts in
-                        Task {
-                            await viewModel.addMembers(to: group.id, contacts: contacts)
-                            onResult?(ToastItem(style: .success, message: "Added \(contacts.count) member\(contacts.count == 1 ? "" : "s")"))
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
 // MARK: - Member Row
 struct MemberRow: View {
     let member: GroupMember
@@ -416,13 +464,6 @@ struct MemberRow: View {
             Spacer()
 
             Menu {
-                Button("Tier 1 (First Invite)") {
-                    viewModel.updateMemberTier(memberId: member.id, groupId: groupId, tier: 1)
-                }
-                Button("Tier 2 (Waitlist)") {
-                    viewModel.updateMemberTier(memberId: member.id, groupId: groupId, tier: 2)
-                }
-                Divider()
                 Button("Remove", role: .destructive) {
                     Task { await viewModel.removeMember(id: member.id, from: groupId) }
                 }

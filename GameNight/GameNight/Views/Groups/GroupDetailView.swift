@@ -47,7 +47,7 @@ struct GroupDetailView: View {
                 // Quick actions
                 HStack(spacing: Theme.Spacing.md) {
                     Button {
-                        appState.showCreateEvent = true
+                        appState.scheduleNightGroup = viewModel.group
                     } label: {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: "calendar.badge.plus")
@@ -159,30 +159,8 @@ struct GroupDetailView: View {
                 )
             }
 
-            let tier1 = viewModel.group.members.filter { $0.tier == 1 }
-            if !tier1.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Tier 1 — First Invite")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.primary)
-
-                    ForEach(tier1) { member in
-                        MemberRow(member: member, groupId: viewModel.group.id, viewModel: groupsViewModel)
-                    }
-                }
-            }
-
-            let tier2 = viewModel.group.members.filter { $0.tier == 2 }
-            if !tier2.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Tier 2 — Waitlist")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.accent)
-
-                    ForEach(tier2) { member in
-                        MemberRow(member: member, groupId: viewModel.group.id, viewModel: groupsViewModel)
-                    }
-                }
+            ForEach(viewModel.group.members) { member in
+                MemberRow(member: member, groupId: viewModel.group.id, viewModel: groupsViewModel)
             }
 
             // Linked events section
