@@ -52,7 +52,7 @@ struct ContactListSheet: View {
             result.append(ic)
         }
 
-        return result
+        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private var filteredContacts: [UserContact] {

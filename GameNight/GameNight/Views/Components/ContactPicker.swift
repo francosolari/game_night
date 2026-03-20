@@ -73,14 +73,23 @@ struct ContactPickerSheet: View {
     @State private var showNativePicker = false
     @State private var showDeniedView = false
     @State private var isChecking = true
+    @State private var isSyncing = false
+    @State private var syncCount = 0
 
     let onSelect: ([UserContact]) -> Void
 
     var body: some View {
         ZStack {
             Theme.Colors.background.ignoresSafeArea()
-            if isChecking {
-                ProgressView().tint(Theme.Colors.primary)
+            if isChecking || isSyncing {
+                VStack(spacing: Theme.Spacing.lg) {
+                    ProgressView().tint(Theme.Colors.primary)
+                    if isSyncing {
+                        Text("Syncing contacts...")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                }
             } else if showDeniedView {
                 deniedView
             }
@@ -134,8 +143,9 @@ struct ContactPickerSheet: View {
 
         switch status {
         case .authorized:
+            // Full access — bulk-sync all device contacts into saved_contacts
             isChecking = false
-            showNativePicker = true
+            await syncAllContacts()
 
         case .notDetermined:
             let granted = (try? await picker.requestAccess()) ?? false
@@ -145,7 +155,8 @@ struct ContactPickerSheet: View {
                 if #available(iOS 18, *), newStatus == .limited {
                     showLimitedAlert = true
                 } else {
-                    showNativePicker = true
+                    // Full access granted — bulk-sync
+                    await syncAllContacts()
                 }
             } else {
                 showDeniedView = true
@@ -160,6 +171,29 @@ struct ContactPickerSheet: View {
             }
         }
     }
+
+    /// Fetches all device contacts and upserts them into saved_contacts.
+    /// Re-running catches any contacts added since the last sync.
+    private func syncAllContacts() async {
+        isSyncing = true
+        do {
+            let deviceContacts = try await ContactPickerService.shared.fetchLocalContacts()
+            guard !deviceContacts.isEmpty else {
+                isSyncing = false
+                onSelect([])
+                dismiss()
+                return
+            }
+            _ = try await SupabaseService.shared.saveContacts(deviceContacts)
+            isSyncing = false
+            onSelect(deviceContacts)
+            dismiss()
+        } catch {
+            // If sync fails, fall back to native picker
+            isSyncing = false
+            showNativePicker = true
+        }
+    }
 }
 
 // MARK: - Native CNContactPickerViewController wrapper
@@ -171,6 +205,10 @@ private struct NativeContactPicker: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> CNContactPickerViewController {
         let picker = CNContactPickerViewController()
         picker.delegate = context.coordinator
+        // Enable multi-select: tapping a contact checks it instead of dismissing.
+        // The predicate is always false so individual taps toggle selection;
+        // the user hits "Done" to confirm, which fires didSelect contacts:[].
+        picker.predicateForSelectionOfContact = NSPredicate(value: false)
         return picker
     }
 
@@ -181,10 +219,6 @@ private struct NativeContactPicker: UIViewControllerRepresentable {
 
         init(onSelect: @escaping ([UserContact]) -> Void) {
             self.onSelect = onSelect
-        }
-
-        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
-            map([contact])
         }
 
         func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) {
