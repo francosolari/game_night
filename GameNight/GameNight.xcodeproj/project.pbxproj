@@ -88,6 +88,7 @@
 		BBA5890D083FC90163BB8F1C /* ListEventCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D72031D7106E225252F4D3BC /* ListEventCard.swift */; };
 		BC682D9862847B7B0BBAB223 /* CreatorDetailContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ABD333EA9BC8C57F8773F45 /* CreatorDetailContent.swift */; };
 		C189CA60E4FFD650CAA0D477 /* DateTimePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C687BB107656027493FF5F5 /* DateTimePickerSheet.swift */; };
+		C2389378196778C4EB09366D /* TimePollDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEC396F9704C046ED87C3A5D /* TimePollDetailSheet.swift */; };
 		C3E2A27A1E58B4352B493195 /* TagFlowSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B8E4CC4D7BFC6FCB66627B /* TagFlowSection.swift */; };
 		C490E51116FD132D9BDE3239 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAFBC98FCB83FD971A6F753 /* Theme.swift */; };
 		C50FC1236834BE18DCDDB3D1 /* ShimmerLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320F17AF3B5B3C150DC53B6F /* ShimmerLayoutMetrics.swift */; };
@@ -255,6 +256,7 @@
 		F71178402D6DE3B28E8EA024 /* ActivityFeedItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFeedItem.swift; sourceTree = "<group>"; };
 		F7C8D2CD62321FDE27933183 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
 		FAC2A9C1BB5C965C30B05BA8 /* ContactListSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactListSheet.swift; sourceTree = "<group>"; };
+		FEC396F9704C046ED87C3A5D /* TimePollDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePollDetailSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -281,6 +283,7 @@
 				278A1FC48E581F583C994B89 /* PollGuestListView.swift */,
 				80EE92F65BC5F5527D0B68FE /* PollResultsDetailView.swift */,
 				724922A552EBBAAEEBA7605F /* RSVPSheet.swift */,
+				FEC396F9704C046ED87C3A5D /* TimePollDetailSheet.swift */,
 				C0727EF598F7D8D504F1643E /* CreateEventSteps */,
 			);
 			path = Events;
@@ -786,6 +789,7 @@
 				C3E2A27A1E58B4352B493195 /* TagFlowSection.swift in Sources */,
 				C490E51116FD132D9BDE3239 /* Theme.swift in Sources */,
 				AB7731B722DD26CABD4F1FBA /* TimeOptionPicker.swift in Sources */,
+				C2389378196778C4EB09366D /* TimePollDetailSheet.swift in Sources */,
 				A830ED73A705ED199878F0A6 /* ToastView.swift in Sources */,
 				69A66D4BC0C5C14C12D41F6F /* TriStateVoteButton.swift in Sources */,
 				E4229164F87DF49778D2BAFF /* User.swift in Sources */,

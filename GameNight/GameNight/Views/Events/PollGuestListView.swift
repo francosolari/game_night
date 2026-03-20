@@ -4,9 +4,11 @@ struct PollGuestListView: View {
     let timeOptions: [TimeOption]
     let voters: [UUID: [TimeOptionVoter]]
     let isHost: Bool
+    let pollVotes: [UUID: TimeOptionVoteType]
+    let onVote: (UUID, TimeOptionVoteType) async -> Void
     let onConfirmTime: ((UUID) async -> Void)?
 
-    @State private var selectedOption: TimeOption?
+    @State private var selectedOptionId: UUID?
 
     private func yesCount(for option: TimeOption) -> Int {
         voters[option.id]?.filter { $0.voteType == "yes" }.count ?? 0
@@ -25,12 +27,6 @@ struct PollGuestListView: View {
         (voters[option.id] ?? [])
             .filter { $0.voteType == "yes" || $0.voteType == "maybe" }
             .map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl) }
-    }
-
-    private func detailVoters(for option: TimeOption) -> [(id: UUID, name: String, avatarUrl: String?, voteType: String)] {
-        let all = voters[option.id] ?? []
-        let filtered = isHost ? all : all.filter { $0.voteType != "no" }
-        return filtered.map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl, voteType: $0.voteType) }
     }
 
     var body: some View {
@@ -53,17 +49,21 @@ struct PollGuestListView: View {
             }
         }
         .cardStyle()
-        .sheet(item: $selectedOption) { option in
-            PollResultsDetailView(
-                title: option.displayDate,
-                subtitle: option.displayTime,
-                voters: detailVoters(for: option),
-                isMostPopular: isMostPopular(option),
-                isHost: isHost,
-                onPickThis: isHost ? {
-                    await onConfirmTime?(option.id)
-                } : nil
-            )
+        .sheet(isPresented: Binding(
+            get: { selectedOptionId != nil },
+            set: { if !$0 { selectedOptionId = nil } }
+        )) {
+            if let optionId = selectedOptionId {
+                TimePollDetailSheet(
+                    timeOptions: timeOptions,
+                    voters: voters,
+                    isHost: isHost,
+                    pollVotes: pollVotes,
+                    initialOptionId: optionId,
+                    onVote: onVote,
+                    onConfirmTime: onConfirmTime
+                )
+            }
         }
     }
 
@@ -74,7 +74,7 @@ struct PollGuestListView: View {
         let popular = isMostPopular(option)
 
         Button {
-            selectedOption = option
+            selectedOptionId = option.id
         } label: {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 // Date — with subtle star if popular

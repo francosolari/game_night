@@ -69,6 +69,11 @@ struct EventDetailView: View {
                                     timeOptions: event.timeOptions,
                                     voters: viewModel.timeOptionVoters,
                                     isHost: viewModel.isOwner,
+                                    pollVotes: pollVotes,
+                                    onVote: { optionId, voteType in
+                                        pollVotes[optionId] = voteType
+                                        await viewModel.voteOnTimeOption(optionId: optionId, voteType: voteType)
+                                    },
                                     onConfirmTime: viewModel.isOwner ? { timeOptionId in
                                         await viewModel.confirmTimeOption(timeOptionId: timeOptionId)
                                     } : nil

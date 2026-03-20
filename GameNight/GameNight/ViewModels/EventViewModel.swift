@@ -307,6 +307,24 @@ final class EventViewModel: ObservableObject {
         }
     }
 
+    func voteOnTimeOption(optionId: UUID, voteType: TimeOptionVoteType) async {
+        guard let eventId = event?.id, let invite = myInvite else { return }
+        do {
+            // Re-submit all current votes with this one updated
+            myPollVotes[optionId] = voteType
+            let allVotes = myPollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
+            try await supabase.respondToInvite(
+                inviteId: invite.id,
+                status: invite.status,
+                timeVotes: allVotes,
+                suggestedTimes: nil
+            )
+            await refreshEventData(eventId: eventId)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     func confirmTimeOption(timeOptionId: UUID) async {
         guard let eventId = event?.id else { return }
         do {
