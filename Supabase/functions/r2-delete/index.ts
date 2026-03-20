@@ -1,50 +1,50 @@
 // Supabase Edge Function: Delete file from Cloudflare R2
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { S3Client, DeleteObjectCommand } from "https://esm.sh/@aws-sdk/client-s3@3.400.0";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.19";
+import { requireAuthenticatedUser } from "../_shared/auth.ts";
 
 const R2_ACCOUNT_ID = Deno.env.get("R2_ACCOUNT_ID")!;
 const R2_ACCESS_KEY_ID = Deno.env.get("R2_ACCESS_KEY_ID")!;
 const R2_SECRET_ACCESS_KEY = Deno.env.get("R2_SECRET_ACCESS_KEY")!;
 const R2_BUCKET = Deno.env.get("R2_BUCKET") || "game-night-storage";
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SB_PUBLISHABLE_KEY")!
-);
-
-const s3 = new S3Client({
+const r2 = new AwsClient({
+  accessKeyId: R2_ACCESS_KEY_ID,
+  secretAccessKey: R2_SECRET_ACCESS_KEY,
+  service: "s3",
   region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
 });
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return Response.json({ error: "Missing Authorization header" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
-      return Response.json({ error: "Invalid JWT" }, { status: 401 });
-    }
+    await requireAuthenticatedUser(req);
 
     const { path } = await req.json();
     if (!path) {
-      return Response.json({ error: "Missing 'path'" }, { status: 400 });
+      return new Response(
+        JSON.stringify({ error: "Missing 'path'" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
-    await s3.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: path }));
+    const endpoint = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${path}`;
+    const signed = await r2.sign(new Request(endpoint, { method: "DELETE" }));
+    const response = await fetch(signed);
 
-    return Response.json({ success: true });
+    if (!response.ok) {
+      throw new Error(`R2 delete failed: ${response.status}`);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
   } catch (error) {
+    if (error instanceof Response) return error;
     console.error("R2 delete error:", error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 });

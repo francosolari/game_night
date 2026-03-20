@@ -37,11 +37,12 @@ actor R2StorageService {
         request.httpBody = data
 
         print("[R2] PUT to R2, dataSize: \(data.count) bytes…")
-        let (_, urlResponse) = try await URLSession.shared.data(for: request)
+        let (responseData, urlResponse) = try await URLSession.shared.data(for: request)
         guard let httpResponse = urlResponse as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             let status = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
-            print("[R2] PUT failed, HTTP status: \(status)")
+            let body = String(data: responseData, encoding: .utf8) ?? "<non-utf8>"
+            print("[R2] PUT failed, HTTP status: \(status), body: \(body)")
             throw R2Error.uploadFailed
         }
         print("[R2] PUT succeeded, HTTP status: \((urlResponse as! HTTPURLResponse).statusCode)")
