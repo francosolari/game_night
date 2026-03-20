@@ -17,6 +17,9 @@ final class EventViewModel: ObservableObject {
     @Published var isPostingComment = false
     @Published var newCommentText = ""
 
+    // Poll voting
+    @Published var myPollVotes: [UUID: TimeOptionVoteType] = [:]
+
     // Game voting
     @Published var gameVotes: [GameVote] = []
     @Published var myGameVotes: [UUID: GameVoteType] = [:]
@@ -134,6 +137,11 @@ final class EventViewModel: ObservableObject {
             // Find my invite
             let session = try await supabase.client.auth.session
             self.myInvite = invites.first { $0.userId == session.user.id }
+
+            // Load poll votes for current user
+            if let invite = myInvite {
+                self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
+            }
 
             // Load activity feed and game votes
             await loadActivityFeed(eventId: id)
@@ -272,6 +280,8 @@ final class EventViewModel: ObservableObject {
                 suggestedTimes: suggestedTimes
             )
             myInvite?.status = status
+            // Keep local poll votes in sync
+            myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
         } catch {
             self.error = error.localizedDescription
         }

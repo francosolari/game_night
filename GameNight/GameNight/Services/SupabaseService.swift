@@ -574,55 +574,58 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func respondToInvite(inviteId: UUID, status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async throws {
-        // selected_time_option_ids stores 'yes' votes for backward compat
-        let yesIds = timeVotes.filter { $0.voteType == .yes }.map { $0.timeOptionId }
-
-        let updates: [String: AnyJSON] = [
-            "status": .string(status.rawValue),
-            "responded_at": .string(ISO8601DateFormatter().string(from: Date())),
-            "selected_time_option_ids": .array(yesIds.map { .string($0.uuidString) })
-        ]
-
-        try await client
-            .from("invites")
-            .update(updates)
-            .eq("id", value: inviteId.uuidString)
-            .execute()
-
-        // Delete existing votes for this invite, then insert new ones
-        try await client
-            .from("time_option_votes")
-            .delete()
-            .eq("invite_id", value: inviteId.uuidString)
-            .execute()
-
-        if !timeVotes.isEmpty {
-            struct VoteInsert: Encodable {
-                let timeOptionId: UUID
-                let inviteId: UUID
-                let voteType: String
-                enum CodingKeys: String, CodingKey {
-                    case timeOptionId = "time_option_id"
-                    case inviteId = "invite_id"
-                    case voteType = "vote_type"
-                }
+        struct VoteParam: Encodable {
+            let timeOptionId: String
+            let voteType: String
+            enum CodingKeys: String, CodingKey {
+                case timeOptionId = "time_option_id"
+                case voteType = "vote_type"
             }
-            let voteInserts = timeVotes.map { vote in
-                VoteInsert(timeOptionId: vote.timeOptionId, inviteId: inviteId, voteType: vote.voteType.rawValue)
+        }
+        struct SuggestedTimeParam: Encodable {
+            let date: String
+            let startTime: String
+            let endTime: String?
+            let label: String?
+            enum CodingKeys: String, CodingKey {
+                case date, label
+                case startTime = "start_time"
+                case endTime = "end_time"
             }
-            try await client
-                .from("time_option_votes")
-                .insert(voteInserts)
-                .execute()
+        }
+        struct RespondParams: Encodable {
+            let pInviteId: String
+            let pStatus: String
+            let pVotes: [VoteParam]
+            let pSuggestedTimes: [SuggestedTimeParam]
+            enum CodingKeys: String, CodingKey {
+                case pInviteId = "p_invite_id"
+                case pStatus = "p_status"
+                case pVotes = "p_votes"
+                case pSuggestedTimes = "p_suggested_times"
+            }
         }
 
-        // Insert suggested times if any
-        if let suggestedTimes, !suggestedTimes.isEmpty {
-            try await client
-                .from("time_options")
-                .insert(suggestedTimes)
-                .execute()
+        let iso = ISO8601DateFormatter()
+        let votes = timeVotes.map { VoteParam(timeOptionId: $0.timeOptionId.uuidString, voteType: $0.voteType.rawValue) }
+        let suggested = (suggestedTimes ?? []).map { t in
+            SuggestedTimeParam(
+                date: iso.string(from: t.date),
+                startTime: iso.string(from: t.startTime),
+                endTime: t.endTime.map { iso.string(from: $0) },
+                label: t.label
+            )
         }
+
+        // Use the respond_to_invite RPC which correctly sets event_participant_id on votes
+        try await client
+            .rpc("respond_to_invite", params: RespondParams(
+                pInviteId: inviteId.uuidString,
+                pStatus: status.rawValue,
+                pVotes: votes,
+                pSuggestedTimes: suggested
+            ))
+            .execute()
 
         // Trigger tiered invite processing on decline
         if status == .declined {
@@ -631,6 +634,32 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 body: ["invite_id": inviteId.uuidString]
             )
         }
+    }
+
+    func fetchMyPollVotes(inviteId: UUID) async throws -> [UUID: TimeOptionVoteType] {
+        struct VoteRow: Decodable {
+            let timeOptionId: UUID
+            let voteType: String
+            enum CodingKeys: String, CodingKey {
+                case timeOptionId = "time_option_id"
+                case voteType = "vote_type"
+            }
+        }
+
+        let rows: [VoteRow] = try await client
+            .from("time_option_votes")
+            .select("time_option_id, vote_type")
+            .eq("invite_id", value: inviteId.uuidString)
+            .execute()
+            .value
+
+        var result: [UUID: TimeOptionVoteType] = [:]
+        for row in rows {
+            if let voteType = TimeOptionVoteType(rawValue: row.voteType) {
+                result[row.timeOptionId] = voteType
+            }
+        }
+        return result
     }
 
     func createInvites(_ invites: [Invite]) async throws {

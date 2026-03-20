@@ -187,7 +187,7 @@ struct EventDetailView: View {
         } message: {
             Text("This can't be undone.")
         }
-        .alert("Couldn't delete event", isPresented: deleteErrorPresented) {
+        .alert("Something went wrong", isPresented: deleteErrorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.error ?? "Please try again.")
@@ -227,6 +227,7 @@ struct EventDetailView: View {
         .toast($toast)
         .task {
             await viewModel.loadEvent(id: eventId)
+            pollVotes = viewModel.myPollVotes
         }
     }
 
@@ -460,65 +461,57 @@ struct EventHeroHeader: View {
                     ), location: 1.0),
                 ], startPoint: .top, endPoint: .bottom)
 
-                // Content — single dense VStack, no extra gaps
-                VStack(alignment: .leading, spacing: 0) {
+                // Content — dense, no wasted vertical space
+                VStack(alignment: .leading, spacing: 4) {
                     // Title
                     Text(event.title)
                         .font(Theme.Typography.displayMedium.weight(.bold))
                         .foregroundColor(Theme.Colors.textPrimary)
                         .shadow(color: ThemeManager.shared.isDark ? .black.opacity(0.6) : .white.opacity(0.5), radius: 8, y: 0)
-                        .padding(.bottom, Theme.Spacing.xs)
 
-                    // Info row: location + host + date badge
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            // Location
-                            if let locationPresentation {
-                                heroLocationRow(locationPresentation)
-                            }
+                    // Date/time line
+                    if let timeOption = firstTimeOption {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.Colors.dateAccent)
 
-                            // Host
-                            if let host = event.host {
-                                HStack(spacing: 6) {
-                                    AvatarView(url: host.avatarUrl, size: 18)
-                                    Text("Hosted by \(host.displayName)")
-                                        .font(Theme.Typography.caption)
-                                        .foregroundColor(Theme.Colors.textSecondary)
-                                }
-                            }
-                        }
+                            heroDateTimeText(for: timeOption)
 
-                        Spacer()
-
-                        // Date badge + calendar
-                        if let timeOption = firstTimeOption {
-                            VStack(spacing: Theme.Spacing.xs) {
-                                DateBadge(
-                                    date: timeOption.date,
-                                    timeString: timeOption.displayTime,
-                                    relativeTime: relativeTimeLabel
+                            if let calendarTimeOption {
+                                CompactCalendarButton(
+                                    title: event.title,
+                                    startDate: calendarTimeOption.startTime,
+                                    endDate: calendarTimeOption.endTime,
+                                    location: event.locationAddress ?? event.location,
+                                    notes: event.description,
+                                    games: event.games,
+                                    hostName: event.host?.displayName
                                 )
-
-                                if let calendarTimeOption {
-                                    CompactCalendarButton(
-                                        title: event.title,
-                                        startDate: calendarTimeOption.startTime,
-                                        endDate: calendarTimeOption.endTime,
-                                        location: event.locationAddress ?? event.location,
-                                        notes: event.description,
-                                        games: event.games,
-                                        hostName: event.host?.displayName
-                                    )
-                                }
                             }
                         }
                     }
 
-                    // RSVP + player count — tight against host row
+                    // Location
+                    if let locationPresentation {
+                        heroLocationRow(locationPresentation)
+                    }
+
+                    // Host
+                    if let host = event.host {
+                        HStack(spacing: 6) {
+                            AvatarView(url: host.avatarUrl, size: 18)
+                            Text("Hosted by \(host.displayName)")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
+
+                    // RSVP + player count — immediately after details
                     if myInvite != nil || minPlayers > 0 {
                         Divider()
                             .background(Theme.Colors.divider)
-                            .padding(.vertical, 6)
+                            .padding(.top, 2)
 
                         HStack(spacing: Theme.Spacing.md) {
                             if let myInvite, let onRSVPTap {
@@ -582,6 +575,63 @@ struct EventHeroHeader: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    /// Renders "TODAY · 7:00 PM", "TOMORROW · 7:00 PM", or "Thursday, Mar 19 · 7:00 PM"
+    @ViewBuilder
+    private func heroDateTimeText(for timeOption: TimeOption) -> some View {
+        let relative = timeOption.relativeTimeDisplay
+        let isUrgent = relative == "Today" || relative == "Tomorrow"
+
+        let timeFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "h:mm a"
+            return f
+        }()
+        let timeStr = timeFormatter.string(from: timeOption.startTime)
+
+        if isUrgent {
+            HStack(spacing: 6) {
+                Text(relative.uppercased())
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Theme.Colors.dateAccent)
+                    )
+
+                Text("·")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                Text(timeStr)
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(Theme.Colors.dateAccent)
+            }
+        } else {
+            let dateFormatter: DateFormatter = {
+                let f = DateFormatter()
+                f.dateFormat = "EEEE, MMM d"
+                return f
+            }()
+            let dateStr = dateFormatter.string(from: timeOption.date)
+
+            HStack(spacing: 0) {
+                Text(dateStr)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("  ·  ")
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                Text(timeStr)
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(Theme.Colors.dateAccent)
+            }
+        }
     }
 
     @ViewBuilder
