@@ -16,6 +16,8 @@ import GameLibrary from "./pages/GameLibrary.tsx";
 import GameDetail from "./pages/GameDetail.tsx";
 import CreatorDetail from "./pages/CreatorDetail.tsx";
 import Calendar from "./pages/Calendar.tsx";
+import Groups from "./pages/Groups.tsx";
+import GroupDetail from "./pages/GroupDetail.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,8 @@ function AppRoutes() {
       <Route path="/games/:id" element={<GameDetail />} />
       <Route path="/games/:role/:name" element={<CreatorDetail />} />
       <Route path="/calendar" element={<Calendar />} />
+      <Route path="/groups" element={<Groups />} />
+      <Route path="/groups/:id" element={<GroupDetail />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

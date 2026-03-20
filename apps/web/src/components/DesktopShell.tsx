@@ -35,7 +35,7 @@ export function DesktopShell({ children }: Props) {
         <nav className="flex-1 px-3 space-y-1">
           <SidebarLink label="Home" icon={<IconHome />} href="/dashboard" active={isActive("/dashboard")} />
           <SidebarLink label="Games" icon={<IconDice />} href="/games" active={isActive("/games")} />
-          <SidebarLink label="Groups" icon={<IconGroups />} href="/dashboard" active={false} />
+          <SidebarLink label="Groups" icon={<IconGroups />} href="/groups" active={isActive("/groups")} />
           <SidebarLink label="Profile" icon={<IconProfile />} href="/profile" active={isActive("/profile")} />
         </nav>
 

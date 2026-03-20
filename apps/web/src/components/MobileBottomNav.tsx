@@ -26,7 +26,7 @@ export function MobileBottomNav() {
             <Plus className="w-6 h-6" strokeWidth={2.5} />
           </button>
         </div>
-        <TabBtn label="Groups" href="/dashboard" active={false} icon={<IconGroups />} />
+        <TabBtn label="Groups" href="/groups" active={path.startsWith("/groups")} icon={<IconGroups />} />
         <TabBtn label="Profile" href="/profile" active={path === "/profile"} icon={<IconProfile />} />
       </div>
     </nav>
