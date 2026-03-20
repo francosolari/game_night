@@ -148,6 +148,7 @@ struct GameLibraryView: View {
             .navigationDestination(for: GameFamilyDestination.self) { destination in
                 GameFamilyDetailView(destination: destination)
             }
+            .toast($viewModel.toast)
         }
         .task {
             await viewModel.loadLibrary()

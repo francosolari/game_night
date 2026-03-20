@@ -13,7 +13,6 @@ struct EventDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var showCreateGroupFromEvent = false
     @State private var showGuestListFullPage = false
-    @State private var toast: ToastItem?
     @State private var editSavePresentation = EventEditSavePresentation()
     @State private var heroStretchOffset: CGFloat = 0
     @State private var showRSVPSheet = false
@@ -170,7 +169,10 @@ struct EventDetailView: View {
             ContactListSheet(
                 excludedPhones: Set(viewModel.invites.map(\.phoneNumber)),
                 onSelect: { contacts in
-                    Task { await viewModel.inviteContacts(contacts) }
+                    Task {
+                        await viewModel.inviteContacts(contacts)
+                        viewModel.toast = ToastItem(style: .success, message: "\(contacts.count) invite\(contacts.count == 1 ? "" : "s") sent!")
+                    }
                 }
             )
         }
@@ -186,7 +188,7 @@ struct EventDetailView: View {
                 return
             }
             viewModel.applyEditedEvent(savedEvent)
-            toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
+            viewModel.toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
             Task { await viewModel.loadEvent(id: eventId) }
         }
         .confirmationDialog(
@@ -212,7 +214,7 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showCreateGroupFromEvent) {
             CreateGroupFromAttendeesSheet(invites: viewModel.invites, onResult: { resultToast in
-                toast = resultToast
+                viewModel.toast = resultToast
             })
         }
         .sheet(isPresented: $showRSVPSheet) {
@@ -229,6 +231,8 @@ struct EventDetailView: View {
                             timeVotes: status == .declined ? [] : votes,
                             suggestedTimes: nil
                         )
+                        let message = status == .accepted ? "You're going!" : status == .maybe ? "Maybe next time!" : "RSVP updated"
+                        viewModel.toast = ToastItem(style: .success, message: message)
                     }
                 )
             }
@@ -242,7 +246,7 @@ struct EventDetailView: View {
                 onInvite: { showInviteContacts = true }
             )
         }
-        .toast($toast)
+        .toast($viewModel.toast)
         .task {
             await viewModel.loadEvent(id: eventId)
             pollVotes = viewModel.myPollVotes

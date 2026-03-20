@@ -44,6 +44,11 @@ actor R2StorageService {
         return try await uploadImage(data: data, path: path)
     }
 
+    func uploadGameImage(data: Data, gameId: UUID) async throws -> String {
+        let path = "games/\(gameId.uuidString)/image.jpg"
+        return try await uploadImage(data: data, path: path)
+    }
+
     // MARK: - Delete
 
     func deleteImage(path: String) async throws {

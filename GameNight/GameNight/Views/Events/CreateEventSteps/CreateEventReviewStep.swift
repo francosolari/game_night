@@ -1,7 +1,15 @@
 import SwiftUI
+import PhotosUI
 
 struct CreateEventReviewStep: View {
     @ObservedObject var viewModel: CreateEventViewModel
+    @State private var selectedCoverItem: PhotosPickerItem?
+    @State private var isUploadingCover = false
+    @State private var coverUploadError: String?
+
+    private var hasCustomCover: Bool {
+        viewModel.pendingCoverImageUrl != nil || viewModel.eventToEdit?.coverImageUrl != nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
@@ -9,10 +17,7 @@ struct CreateEventReviewStep: View {
                 .font(Theme.Typography.displaySmall)
                 .foregroundColor(Theme.Colors.textPrimary)
 
-            // Cover art preview (only when no custom image)
-            if viewModel.eventToEdit?.coverImageUrl == nil {
-                coverArtSection
-            }
+            coverArtSection
 
             // Preview card
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
@@ -154,35 +159,124 @@ struct CreateEventReviewStep: View {
 
                 Spacer()
 
-                Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        viewModel.coverVariant += 1
+                if hasCustomCover {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.pendingCoverImageUrl = nil
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11))
+                            Text("Remove")
+                                .font(Theme.Typography.caption)
+                        }
+                        .foregroundColor(Theme.Colors.error)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Theme.Colors.error.opacity(0.1)))
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 12))
-                        Text("Shuffle")
-                            .font(Theme.Typography.caption)
+                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 8) {
+                        PhotosPicker(selection: $selectedCoverItem, matching: .images) {
+                            HStack(spacing: 4) {
+                                if isUploadingCover {
+                                    ProgressView().scaleEffect(0.7)
+                                } else {
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.system(size: 12))
+                                }
+                                Text(isUploadingCover ? "Uploading…" : "Upload")
+                                    .font(Theme.Typography.caption)
+                            }
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.12)))
+                        }
+                        .disabled(isUploadingCover)
+                        .buttonStyle(.plain)
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                viewModel.coverVariant += 1
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 12))
+                                Text("Shuffle")
+                                    .font(Theme.Typography.caption)
+                            }
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .foregroundColor(Theme.Colors.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule()
-                            .fill(Theme.Colors.primary.opacity(0.12))
-                    )
                 }
-                .buttonStyle(.plain)
             }
 
-            GenerativeEventCover(
-                title: viewModel.title,
-                eventId: viewModel.eventToEdit?.id ?? viewModel.previewEventId,
-                variant: viewModel.coverVariant
-            )
-            .frame(height: 140)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+            if let uploadedUrl = viewModel.pendingCoverImageUrl ?? viewModel.eventToEdit?.coverImageUrl,
+               let url = URL(string: uploadedUrl) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color(Theme.Colors.backgroundElevated)
+                        .overlay(ProgressView())
+                }
+                .frame(height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+            } else {
+                GenerativeEventCover(
+                    title: viewModel.title,
+                    eventId: viewModel.eventToEdit?.id ?? viewModel.previewEventId,
+                    variant: viewModel.coverVariant
+                )
+                .frame(height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.md))
+            }
+
+            if let err = coverUploadError {
+                Text(err)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.error)
+            }
+        }
+        .onChange(of: selectedCoverItem) { _, item in
+            guard let item else { return }
+            Task { await uploadCoverPhoto(item) }
+        }
+    }
+
+    private func uploadCoverPhoto(_ item: PhotosPickerItem) async {
+        isUploadingCover = true
+        coverUploadError = nil
+        defer { isUploadingCover = false; selectedCoverItem = nil }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data),
+                  let jpeg = image.jpegData(compressionQuality: 0.85) else {
+                coverUploadError = "Could not load image"
+                return
+            }
+
+            let eventId = viewModel.eventToEdit?.id ?? viewModel.previewEventId
+            let publicUrl = try await R2StorageService.shared.uploadEventCover(data: jpeg, eventId: eventId)
+
+            // If editing an existing saved event, persist to DB immediately
+            if let existingId = viewModel.eventToEdit?.id {
+                try await SupabaseService.shared.updateEventCoverImageUrl(eventId: existingId, coverImageUrl: publicUrl)
+            }
+
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.pendingCoverImageUrl = publicUrl
+            }
+        } catch {
+            coverUploadError = "Upload failed. Please try again."
         }
     }
 }

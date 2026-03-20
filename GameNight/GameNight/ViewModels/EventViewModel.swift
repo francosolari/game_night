@@ -28,6 +28,9 @@ final class EventViewModel: ObservableObject {
     @Published var timeOptionVoters: [UUID: [TimeOptionVoter]] = [:]
     @Published var gameVoterDetails: [UUID: [GameVoterInfo]] = [:]
 
+    // Toast notifications
+    @Published var toast: ToastItem?
+
     private let supabase = SupabaseService.shared
     private var realtimeChannel: RealtimeChannelV2?
     private var activityChannel: RealtimeChannelV2?
@@ -339,6 +342,7 @@ final class EventViewModel: ObservableObject {
             }
             // Refresh to show final state (poll ended, guest list restored)
             await refreshEventData(eventId: eventId)
+            toast = ToastItem(style: .success, message: "Time confirmed!")
         } catch {
             self.error = error.localizedDescription
         }
@@ -378,6 +382,7 @@ final class EventViewModel: ObservableObject {
             }
             // Refresh to show final state
             await refreshEventData(eventId: eventId)
+            toast = ToastItem(style: .success, message: "Game locked in!")
         } catch {
             self.error = error.localizedDescription
         }

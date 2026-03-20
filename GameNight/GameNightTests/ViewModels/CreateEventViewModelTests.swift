@@ -1043,6 +1043,12 @@ private final class StubEventEditorService: EventEditingProviding {
 
     func updateGame(_ game: Game) async throws {}
 
+    func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws {}
+
+    func updateEventCoverImageUrl(eventId: UUID, coverImageUrl: String) async throws {
+        storedEvent?.coverImageUrl = coverImageUrl
+    }
+
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {}
 
     func fetchGameLibrary() async throws -> [GameLibraryEntry] {

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct GameDetailView: View {
     @StateObject private var viewModel: GameDetailViewModel
@@ -7,6 +8,9 @@ struct GameDetailView: View {
     @State private var isEditingManualGame = false
     @State private var manualDraftGame: Game?
     @State private var isSavingManualGame = false
+    @State private var selectedImageItem: PhotosPickerItem?
+    @State private var isUploadingImage = false
+    @State private var imageUploadError: String?
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -53,10 +57,49 @@ struct GameDetailView: View {
                             .offset(x: Theme.Spacing.xl * 0.5, y: Theme.Spacing.sm * 0.5)
                             .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
                     }
+
+                    if isEditingManualGame {
+                        PhotosPicker(selection: $selectedImageItem, matching: .images) {
+                            ZStack {
+                                Color.black.opacity(0.35)
+                                VStack(spacing: 6) {
+                                    if isUploadingImage {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: displayedGame.imageUrl == nil ? "photo.badge.plus" : "camera.fill")
+                                            .font(.system(size: 24, weight: .semibold))
+                                            .foregroundColor(.white)
+                                        Text(displayedGame.imageUrl == nil ? "Add Photo" : "Change Photo")
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(.white.opacity(0.9))
+                                    }
+                                }
+                            }
+                        }
+                        .disabled(isUploadingImage)
+                        .buttonStyle(.plain)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.lg))
+
+                        if let err = imageUploadError {
+                            Text(err)
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.6))
+                                .cornerRadius(6)
+                                .padding(Theme.Spacing.sm)
+                        }
+                    }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.lg)
                 .padding(.bottom, -Theme.Spacing.xl)
+                .onChange(of: selectedImageItem) { _, item in
+                    guard let item else { return }
+                    Task { await uploadGameImage(item) }
+                }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     // 2. Title cluster
@@ -290,6 +333,32 @@ struct GameDetailView: View {
         manualDraftGame = nil
         isEditingManualGame = false
         isSavingManualGame = false
+        selectedImageItem = nil
+        imageUploadError = nil
+    }
+
+    private func uploadGameImage(_ item: PhotosPickerItem) async {
+        isUploadingImage = true
+        imageUploadError = nil
+        defer { isUploadingImage = false; selectedImageItem = nil }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data),
+                  let jpeg = uiImage.jpegData(compressionQuality: 0.85) else {
+                imageUploadError = "Could not load image"
+                return
+            }
+
+            let gameId = viewModel.game.id
+            let publicUrl = try await R2StorageService.shared.uploadGameImage(data: jpeg, gameId: gameId)
+            try await SupabaseService.shared.updateGameImageUrl(gameId: gameId, imageUrl: publicUrl)
+
+            manualDraftGame?.imageUrl = publicUrl
+            viewModel.game.imageUrl = publicUrl
+        } catch {
+            imageUploadError = "Upload failed. Please try again."
+        }
     }
 
     private func saveManualGameEdits() async {

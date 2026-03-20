@@ -7,6 +7,7 @@ protocol EventEditingProviding: AnyObject {
     func fetchEvent(id: UUID) async throws -> GameEvent
     func createEvent(_ event: GameEvent) async throws -> GameEvent
     func updateEvent(_ event: GameEvent) async throws
+    func updateEventCoverImageUrl(eventId: UUID, coverImageUrl: String) async throws
     func createTimeOptions(_ timeOptions: [TimeOption]) async throws
     func upsertTimeOptions(_ timeOptions: [TimeOption]) async throws
     func deleteTimeOptions(eventId: UUID) async throws
@@ -22,6 +23,7 @@ protocol EventEditingProviding: AnyObject {
     func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact]
     func upsertGame(_ game: Game) async throws -> Game
     func updateGame(_ game: Game) async throws
+    func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
     func fetchGameLibrary() async throws -> [GameLibraryEntry]
     func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws
@@ -428,6 +430,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .from("events")
             .update(event)
             .eq("id", value: event.id.uuidString)
+            .execute()
+    }
+
+    func updateEventCoverImageUrl(eventId: UUID, coverImageUrl: String) async throws {
+        let updates: [String: AnyJSON] = ["cover_image_url": .string(coverImageUrl)]
+        try await client
+            .from("events")
+            .update(updates)
+            .eq("id", value: eventId.uuidString)
             .execute()
     }
 
@@ -839,6 +850,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .from("games")
             .update(game)
             .eq("id", value: game.id.uuidString)
+            .execute()
+    }
+
+    func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws {
+        let updates: [String: AnyJSON] = ["image_url": .string(imageUrl)]
+        try await client
+            .from("games")
+            .update(updates)
+            .eq("id", value: gameId.uuidString)
             .execute()
     }
 
