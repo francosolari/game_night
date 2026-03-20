@@ -67,7 +67,7 @@ private struct GameVoteCard: View {
             // Larger thumbnail
             NavigationLink(value: game) {
                 VStack(spacing: Theme.Spacing.sm) {
-                    if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                    if let url = game.imageUrl ?? game.thumbnailUrl, let imageUrl = URL(string: url) {
                         AsyncImage(url: imageUrl) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {

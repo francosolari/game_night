@@ -99,6 +99,7 @@ struct EventDetailView: View {
                     .padding(.bottom, Theme.Spacing.xxl)
                 }
             }
+            .scrollIndicators(.hidden)
             .refreshable {
                 await viewModel.refreshEventData(eventId: eventId)
                 pollVotes = viewModel.myPollVotes
@@ -783,7 +784,7 @@ struct PrimaryGameCard: View {
             NavigationLink(value: game) {
                 HStack(spacing: Theme.Spacing.md) {
                     // Thumbnail
-                    if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                    if let url = game.imageUrl ?? game.thumbnailUrl, let imageUrl = URL(string: url) {
                         AsyncImage(url: imageUrl) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
@@ -850,7 +851,7 @@ struct PrimaryGameCard: View {
                                 if let oGame = eGame.game {
                                     NavigationLink(value: oGame) {
                                         HStack(spacing: 4) {
-                                            if let url = oGame.thumbnailUrl, let imageUrl = URL(string: url) {
+                                            if let url = oGame.imageUrl ?? oGame.thumbnailUrl, let imageUrl = URL(string: url) {
                                                 AsyncImage(url: imageUrl) { image in
                                                     image.resizable().aspectRatio(contentMode: .fill)
                                                 } placeholder: {
@@ -961,6 +962,7 @@ struct InviteListSheet: View {
                 .padding(Theme.Spacing.xl)
             }
             .background(Theme.Colors.background.ignoresSafeArea())
+            .scrollIndicators(.hidden)
             .navigationTitle("Guest List")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

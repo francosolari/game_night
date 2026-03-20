@@ -37,8 +37,9 @@ struct ImageCropPicker: UIViewControllerRepresentable {
             let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage
             parent.isPresented = false
             if let image {
-                // Resize to max 1200px on longest side to keep uploads reasonable
-                parent.onImagePicked(image.resizedForUpload())
+                // Enforce square with letterboxing, then resize to max 1200px
+                let squareImage = image.croppedToSquare()
+                parent.onImagePicked(squareImage.resizedForUpload())
             }
         }
 
@@ -49,6 +50,48 @@ struct ImageCropPicker: UIViewControllerRepresentable {
 }
 
 extension UIImage {
+    /// Crop to square aspect ratio with letterboxing for wide images.
+    /// Maintains content without cutting off by adding transparent bars on top/bottom for wide images.
+    func croppedToSquare() -> UIImage {
+        let size = self.size
+        let minDimension = min(size.width, size.height)
+
+        // If already square (or close), return as-is
+        if abs(size.width - size.height) < 1 {
+            return self
+        }
+
+        // If width > height (wide image), letterbox vertically
+        if size.width > size.height {
+            let squareSize = CGSize(width: minDimension, height: minDimension)
+            let renderer = UIGraphicsImageRenderer(size: squareSize)
+            return renderer.image { context in
+                // Fill with transparent background
+                UIColor.clear.setFill()
+                context.fill(CGRect(origin: .zero, size: squareSize))
+
+                // Draw image centered
+                let x = (squareSize.width - size.width) / 2
+                let y = (squareSize.height - size.height) / 2
+                self.draw(at: CGPoint(x: x, y: y))
+            }
+        } else {
+            // Height > width (tall image), letterbox horizontally
+            let squareSize = CGSize(width: minDimension, height: minDimension)
+            let renderer = UIGraphicsImageRenderer(size: squareSize)
+            return renderer.image { context in
+                // Fill with transparent background
+                UIColor.clear.setFill()
+                context.fill(CGRect(origin: .zero, size: squareSize))
+
+                // Draw image centered
+                let x = (squareSize.width - size.width) / 2
+                let y = (squareSize.height - size.height) / 2
+                self.draw(at: CGPoint(x: x, y: y))
+            }
+        }
+    }
+
     /// Resize to maxDimension on the longest side, maintaining aspect ratio.
     func resizedForUpload(maxDimension: CGFloat = 1200) -> UIImage {
         let size = self.size

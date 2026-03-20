@@ -15,7 +15,7 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-                VStack(spacing: Theme.Spacing.xxl) {
+            VStack(spacing: Theme.Spacing.xxl) {
                     // Header
                     HStack {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
@@ -195,6 +195,7 @@ struct HomeView: View {
                 .padding(.bottom, 100) // Tab bar clearance
             }
             .background(Theme.Colors.background.ignoresSafeArea())
+            .scrollIndicators(.hidden)
             .refreshable {
                 await viewModel.loadData()
             }

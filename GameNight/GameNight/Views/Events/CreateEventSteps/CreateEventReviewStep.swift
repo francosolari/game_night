@@ -304,14 +304,16 @@ struct CreateEventReviewStep: View {
 
             let eventId = viewModel.eventToEdit?.id ?? viewModel.previewEventId
             let publicUrl = try await R2StorageService.shared.uploadEventCover(data: jpeg, eventId: eventId)
+            let cacheBustedUrl = publicUrl + "?v=\(Int(Date().timeIntervalSince1970))"
 
             // If editing an existing saved event, persist to DB immediately
             if let existingId = viewModel.eventToEdit?.id {
-                try await SupabaseService.shared.updateEventCoverImageUrl(eventId: existingId, coverImageUrl: publicUrl)
+                try await SupabaseService.shared.updateEventCoverImageUrl(eventId: existingId, coverImageUrl: cacheBustedUrl)
             }
 
             withAnimation(.easeInOut(duration: 0.2)) {
-                viewModel.pendingCoverImageUrl = publicUrl
+                viewModel.coverImageRemoved = false
+                viewModel.pendingCoverImageUrl = cacheBustedUrl
             }
         } catch {
             coverUploadError = "Upload failed: \(error.localizedDescription)"
