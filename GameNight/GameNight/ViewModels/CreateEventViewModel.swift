@@ -178,7 +178,7 @@ final class CreateEventViewModel: ObservableObject {
         scheduleMode = .fixed
         fixedDate = Date()
         fixedStartTime = DateTimePickerSheet.defaultTime(hour: 19)
-        hasDate = true
+        hasDate = false
 
         let members = group.members.map { member in
             InviteeEntry(

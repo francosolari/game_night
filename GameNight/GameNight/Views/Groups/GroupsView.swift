@@ -5,9 +5,10 @@ struct GroupsView: View {
     @EnvironmentObject var appState: AppState
     @State private var showCreateGroup = false
     @State private var toast: ToastItem?
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(spacing: Theme.Spacing.xxl) {
                     // Header
@@ -113,13 +114,10 @@ struct GroupsView: View {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
                                         ForEach(viewModel.upcomingEvents) { event in
-                                            NavigationLink {
-                                                EventDetailView(eventId: event.id)
-                                            } label: {
-                                                VerticalEventCard(event: event)
-                                                    .frame(width: 200)
+                                            VerticalEventCard(event: event) {
+                                                navigationPath.append(event)
                                             }
-                                            .buttonStyle(.plain)
+                                            .frame(width: 200)
                                         }
                                     }
                                     .padding(.horizontal, Theme.Spacing.xl)
@@ -160,6 +158,9 @@ struct GroupsView: View {
             .background(Theme.Colors.background.ignoresSafeArea())
             .navigationDestination(for: GameEvent.self) { event in
                 EventDetailView(eventId: event.id)
+            }
+            .navigationDestination(for: Game.self) { game in
+                GameDetailView(game: game)
             }
             .sheet(isPresented: $showCreateGroup) {
                 CreateGroupSheet(viewModel: viewModel, onResult: { resultToast in

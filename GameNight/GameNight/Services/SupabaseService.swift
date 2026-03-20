@@ -67,7 +67,7 @@ private struct EventSoftDeletePatch: Encodable {
 @MainActor
 final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingProviding {
     static let shared = SupabaseService()
-    static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*)"
+    static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*), groups(id, name, emoji)"
 
     let client: SupabaseClient
 

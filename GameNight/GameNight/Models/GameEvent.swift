@@ -27,6 +27,7 @@ struct GameEvent: Identifiable, Codable {
     var requirePlusOneNames: Bool
     var coverImageUrl: String?
     var groupId: UUID?
+    var group: EventGroup?
     var coverVariant: Int
     var draftInvitees: [DraftInvitee]?
     var deletedAt: Date?
@@ -71,6 +72,7 @@ struct GameEvent: Identifiable, Codable {
         case requirePlusOneNames = "require_plus_one_names"
         case coverImageUrl = "cover_image_url"
         case groupId = "group_id"
+        case group = "groups"
         case coverVariant = "cover_variant"
         case draftInvitees = "draft_invitees"
         case deletedAt = "deleted_at"
@@ -104,6 +106,7 @@ struct GameEvent: Identifiable, Codable {
         allowMaybeRSVP: Bool = true,
         requirePlusOneNames: Bool = false,
         groupId: UUID? = nil,
+        group: EventGroup? = nil,
         coverImageUrl: String? = nil,
         coverVariant: Int = 0,
         draftInvitees: [DraftInvitee]? = nil,
@@ -136,6 +139,7 @@ struct GameEvent: Identifiable, Codable {
         self.allowMaybeRSVP = allowMaybeRSVP
         self.requirePlusOneNames = requirePlusOneNames
         self.groupId = groupId
+        self.group = group
         self.coverImageUrl = coverImageUrl
         self.coverVariant = coverVariant
         self.draftInvitees = draftInvitees
@@ -171,6 +175,7 @@ struct GameEvent: Identifiable, Codable {
         allowMaybeRSVP = try container.decodeIfPresent(Bool.self, forKey: .allowMaybeRSVP) ?? true
         requirePlusOneNames = try container.decodeIfPresent(Bool.self, forKey: .requirePlusOneNames) ?? false
         groupId = try container.decodeIfPresent(UUID.self, forKey: .groupId)
+        group = try? container.decodeIfPresent(EventGroup.self, forKey: .group)
         coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
         coverVariant = try container.decodeIfPresent(Int.self, forKey: .coverVariant) ?? 0
         draftInvitees = try container.decodeIfPresent([DraftInvitee].self, forKey: .draftInvitees)
@@ -552,4 +557,10 @@ extension GameEvent {
         createdAt: Date(),
         updatedAt: Date()
     )
+}
+
+struct EventGroup: Codable {
+    let id: UUID
+    let name: String
+    let emoji: String?
 }

@@ -62,10 +62,16 @@ struct VerticalEventCard: View {
                     // Group badge
                     if event.groupId != nil {
                         HStack(spacing: 4) {
-                            Image(systemName: "person.3.fill")
-                                .font(.system(size: 8))
-                            Text("Group Event")
+                            if let emoji = event.group?.emoji {
+                                Text(emoji)
+                                    .font(.system(size: 9))
+                            } else {
+                                Image(systemName: "person.3.fill")
+                                    .font(.system(size: 8))
+                            }
+                            Text(event.group?.name ?? "Group Event")
                                 .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1)
                         }
                         .foregroundColor(Theme.Colors.primary)
                         .padding(.horizontal, 6)

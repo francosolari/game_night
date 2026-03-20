@@ -8,6 +8,7 @@ struct CreateEventReviewStep: View {
     @State private var showInlineGameAdd = false
     @State private var inlineGameName = ""
     @State private var isAddingGame = false
+    @State private var showDateTimePicker = false
 
     private var hasCustomCover: Bool {
         !viewModel.coverImageRemoved &&
@@ -94,9 +95,29 @@ struct CreateEventReviewStep: View {
 
                 // Schedule
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text(viewModel.scheduleMode == .fixed ? "Date" : "Time Options")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.textTertiary)
+                    HStack {
+                        Text(viewModel.scheduleMode == .fixed ? "Date" : "Time Options")
+                            .font(Theme.Typography.label)
+                            .foregroundColor(Theme.Colors.textTertiary)
+
+                        Spacer()
+
+                        Button {
+                            showDateTimePicker = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: viewModel.hasDate || !viewModel.timeOptions.isEmpty ? "pencil" : "plus")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text(viewModel.hasDate || !viewModel.timeOptions.isEmpty ? "Edit" : "Add Date")
+                                    .font(Theme.Typography.caption)
+                            }
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain)
+                    }
 
                     if viewModel.scheduleMode == .fixed {
                         HStack(spacing: Theme.Spacing.sm) {
@@ -123,27 +144,33 @@ struct CreateEventReviewStep: View {
                                         .foregroundColor(Theme.Colors.textPrimary)
                                 }
                             } else {
-                                Text("Date not set")
-                                    .font(Theme.Typography.bodyMedium)
+                                Text("No date set — tap Edit to pick one")
+                                    .font(Theme.Typography.callout)
                                     .foregroundColor(Theme.Colors.textTertiary)
                             }
                         }
                     } else {
-                        ForEach(viewModel.timeOptions) { option in
-                            HStack {
-                                Text(option.displayDate)
-                                    .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
-                                Text(option.displayTime)
-                                    .font(Theme.Typography.callout)
-                                    .foregroundColor(Theme.Colors.textSecondary)
+                        if viewModel.timeOptions.isEmpty {
+                            Text("No time options — tap Add Date")
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        } else {
+                            ForEach(viewModel.timeOptions) { option in
+                                HStack {
+                                    Text(option.displayDate)
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                    Text(option.displayTime)
+                                        .font(Theme.Typography.callout)
+                                        .foregroundColor(Theme.Colors.textSecondary)
+                                }
                             }
-                        }
 
-                        if viewModel.allowTimeSuggestions {
-                            Text("Time suggestions enabled")
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.Colors.accent)
+                            if viewModel.allowTimeSuggestions {
+                                Text("Time suggestions enabled")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.accent)
+                            }
                         }
                     }
                 }
@@ -179,6 +206,17 @@ struct CreateEventReviewStep: View {
                             .fill(Theme.Colors.error.opacity(0.1))
                     )
             }
+        }
+        .sheet(isPresented: $showDateTimePicker) {
+            DateTimePickerSheet(
+                date: $viewModel.fixedDate,
+                startTime: $viewModel.fixedStartTime,
+                endDate: $viewModel.fixedEndDate,
+                endTime: $viewModel.fixedEndTime,
+                hasEndTime: $viewModel.hasEndTime,
+                hasDate: $viewModel.hasDate,
+                timezone: $viewModel.selectedTimezone
+            )
         }
     }
 
