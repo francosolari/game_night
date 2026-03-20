@@ -10,6 +10,7 @@ final class GroupsViewModel: ObservableObject {
     @Published var showCreateGroup = false
 
     private let supabase = SupabaseService.shared
+    private var inviteCounts: [UUID: Int] = [:]
 
     func loadGroups() async {
         isLoading = true
@@ -134,9 +135,24 @@ final class GroupsViewModel: ObservableObject {
             .filter { $0.effectiveStartDate >= now && $0.status == .published }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
 
+        // Fetch invite counts for upcoming events
+        let eventIds = upcomingEvents.map(\.id)
+        if !eventIds.isEmpty {
+            do {
+                inviteCounts = try await supabase.fetchAcceptedInviteCounts(eventIds: eventIds)
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+
         recentPlays = allPlays
             .sorted { $0.playedAt > $1.playedAt }
             .prefix(5)
             .map { $0 }
+    }
+
+    func confirmedCount(for eventId: UUID) -> Int {
+        let acceptedInvites = inviteCounts[eventId] ?? 0
+        return acceptedInvites + 1  // +1 for the host
     }
 }

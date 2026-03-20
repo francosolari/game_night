@@ -114,7 +114,10 @@ struct GroupsView: View {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
                                         ForEach(viewModel.upcomingEvents) { event in
-                                            VerticalEventCard(event: event) {
+                                            VerticalEventCard(
+                                                event: event,
+                                                confirmedCount: viewModel.confirmedCount(for: event.id)
+                                            ) {
                                                 navigationPath.append(event)
                                             }
                                             .frame(width: 200)

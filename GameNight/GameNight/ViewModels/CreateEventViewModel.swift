@@ -179,6 +179,8 @@ final class CreateEventViewModel: ObservableObject {
         fixedDate = Date()
         fixedStartTime = DateTimePickerSheet.defaultTime(hour: 19)
         hasDate = false
+        minPlayers = 2
+        maxPlayers = group.memberCount
 
         let members = group.members.map { member in
             InviteeEntry(
