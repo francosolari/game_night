@@ -1359,7 +1359,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
-    func confirmGame(eventId: UUID, gameId: UUID) async throws {
+    func confirmGame(eventId: UUID, gameId: UUID, gameName: String) async throws {
         // Set confirmed game and end game voting
         let updates: [String: AnyJSON] = [
             "confirmed_game_id": .string(gameId.uuidString),
@@ -1383,6 +1383,19 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .update(["is_primary": AnyJSON.bool(true)])
             .eq("event_id", value: eventId.uuidString)
             .eq("game_id", value: gameId.uuidString)
+            .execute()
+
+        // Post game_confirmed announcement to activity feed
+        let session = try await client.auth.session
+        let announcement: [String: AnyJSON] = [
+            "event_id": .string(eventId.uuidString),
+            "user_id": .string(session.user.id.uuidString),
+            "type": .string("game_confirmed"),
+            "content": .string(gameName)
+        ]
+        try await client
+            .from("activity_feed")
+            .insert(announcement)
             .execute()
     }
 

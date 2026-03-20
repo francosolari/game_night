@@ -364,8 +364,9 @@ final class EventViewModel: ObservableObject {
 
     func confirmGame(gameId: UUID) async {
         guard let eventId = event?.id else { return }
+        let gameName = event?.games.first(where: { $0.gameId == gameId })?.game?.name ?? "a game"
         do {
-            try await supabase.confirmGame(eventId: eventId, gameId: gameId)
+            try await supabase.confirmGame(eventId: eventId, gameId: gameId, gameName: gameName)
             event?.confirmedGameId = gameId
             event?.allowGameVoting = false
             // Notify invitees (fire-and-forget)

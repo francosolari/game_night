@@ -88,6 +88,8 @@ struct ActivityFeedView: View {
                         case .single(let item):
                             if item.type == .rsvpUpdate {
                                 RSVPUpdateRow(item: item)
+                            } else if item.type == .dateConfirmed || item.type == .gameConfirmed {
+                                SystemEventRow(item: item)
                             } else {
                                 CommentRow(
                                     item: item,
@@ -320,6 +322,53 @@ private struct GroupedRSVPRow: View {
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.vertical, 6)
+    }
+}
+
+// MARK: - System Event Row (date_confirmed / game_confirmed)
+
+private struct SystemEventRow: View {
+    let item: ActivityFeedItem
+
+    private var icon: String {
+        item.type == .dateConfirmed ? "calendar.badge.checkmark" : "gamecontroller.fill"
+    }
+
+    private var label: String {
+        if item.type == .dateConfirmed {
+            if let iso = item.content, let date = ISO8601DateFormatter().date(from: iso) {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "EEE, MMM d 'at' h:mm a"
+                return "Date confirmed: \(formatter.string(from: date))"
+            }
+            return "Date confirmed"
+        } else {
+            let name = item.content ?? "a game"
+            return "\(name) selected for the night"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Theme.Colors.primary)
+                .frame(width: 20)
+
+            Text(label)
+                .font(Theme.Typography.caption)
+                .fontWeight(.medium)
+                .foregroundColor(Theme.Colors.textSecondary)
+
+            Spacer()
+
+            Text(item.createdAt.relativeDisplay)
+                .font(.system(size: 10))
+                .foregroundColor(Theme.Colors.textTertiary.opacity(0.7))
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.vertical, 8)
+        .background(Theme.Colors.primary.opacity(0.05))
     }
 }
 

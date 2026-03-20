@@ -183,7 +183,19 @@ private struct NativeContactPicker: UIViewControllerRepresentable {
             self.onSelect = onSelect
         }
 
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+            map([contact])
+        }
+
         func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) {
+            map(contacts)
+        }
+
+        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+            onSelect([])
+        }
+
+        private func map(_ contacts: [CNContact]) {
             let userContacts = contacts.compactMap { contact -> UserContact? in
                 guard let phone = contact.phoneNumbers.first?.value.stringValue else { return nil }
                 let name = [contact.givenName, contact.familyName]
@@ -199,10 +211,6 @@ private struct NativeContactPicker: UIViewControllerRepresentable {
                 )
             }
             onSelect(userContacts)
-        }
-
-        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
-            onSelect([])
         }
     }
 }

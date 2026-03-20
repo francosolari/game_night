@@ -230,3 +230,18 @@ extension View {
         modifier(FadeInModifier(delay: delay))
     }
 }
+
+// MARK: - Keyboard Dismissal
+extension View {
+    /// Dismisses the keyboard when the user taps outside a text field.
+    func hideKeyboardOnTap() -> some View {
+        self.simultaneousGesture(
+            TapGesture().onEnded {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil, from: nil, for: nil
+                )
+            }
+        )
+    }
+}

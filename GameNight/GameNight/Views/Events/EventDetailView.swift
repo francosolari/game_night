@@ -100,6 +100,10 @@ struct EventDetailView: View {
                     .padding(.bottom, Theme.Spacing.xxl)
                 }
             }
+            .refreshable {
+                await viewModel.refreshEventData(eventId: eventId)
+                pollVotes = viewModel.myPollVotes
+            }
             .disabled(viewModel.isDeleting)
 
             // Delete overlay
