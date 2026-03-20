@@ -6,7 +6,7 @@ struct PlayLoggingSheet: View {
     @State private var toast: ToastItem?
     @State private var showGamePicker = false
     @State private var showDatePicker = false
-    @State private var guestNameByGame: [UUID: String] = [:]
+    @State private var showContactPicker = false
     @State private var durationText = ""
 
     let event: GameEvent?
@@ -217,27 +217,19 @@ struct PlayLoggingSheet: View {
             }
 
             // Participants
-            if let participants = viewModel.participantsByGame[game.id], !participants.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Players")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.textSecondary)
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Players")
+                    .font(Theme.Typography.label)
+                    .foregroundColor(Theme.Colors.textSecondary)
 
+                if let participants = viewModel.participantsByGame[game.id], !participants.isEmpty {
                     ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
                         participantRow(gameId: game.id, index: index, participant: participant, isCoop: isCoop.wrappedValue)
                     }
-
-                    // Add guest player
-                    addGuestRow(gameId: game.id)
                 }
-            } else {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Players")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.textSecondary)
 
-                    addGuestRow(gameId: game.id)
-                }
+                // Add from contacts
+                addPlayerButton
             }
 
             // Notes
@@ -398,42 +390,28 @@ struct PlayLoggingSheet: View {
         }
     }
 
-    // MARK: - Add Guest
+    // MARK: - Add Player
 
-    private func addGuestRow(gameId: UUID) -> some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "person.badge.plus")
-                .font(.system(size: 14))
-                .foregroundColor(Theme.Colors.textTertiary)
-
-            let binding = Binding(
-                get: { guestNameByGame[gameId] ?? "" },
-                set: { guestNameByGame[gameId] = $0 }
-            )
-            TextField("Add a player...", text: binding)
-                .font(Theme.Typography.callout)
-                .foregroundColor(Theme.Colors.textPrimary)
-                .onSubmit {
-                    submitGuest(gameId: gameId)
-                }
-
-            if let name = guestNameByGame[gameId], !name.isEmpty {
-                Button {
-                    submitGuest(gameId: gameId)
-                } label: {
-                    Text("Add")
-                        .font(Theme.Typography.calloutMedium)
-                        .foregroundColor(Theme.Colors.primary)
-                }
+    private var addPlayerButton: some View {
+        Button {
+            showContactPicker = true
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "person.badge.plus")
+                    .font(.system(size: 14))
+                Text("Add a player...")
+                    .font(Theme.Typography.callout)
             }
+            .foregroundColor(Theme.Colors.primary)
         }
         .padding(.vertical, Theme.Spacing.xs)
-    }
-
-    private func submitGuest(gameId: UUID) {
-        guard let name = guestNameByGame[gameId], !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        viewModel.addGuestParticipant(name: name.trimmingCharacters(in: .whitespaces), gameId: gameId)
-        guestNameByGame[gameId] = ""
+        .sheet(isPresented: $showContactPicker) {
+            ContactListSheet(
+                excludedPhones: viewModel.existingPhoneNumbers
+            ) { contacts in
+                viewModel.addParticipantsFromContacts(contacts)
+            }
+        }
     }
 
     // MARK: - Confirm

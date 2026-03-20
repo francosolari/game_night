@@ -29,6 +29,19 @@ final class PlayLoggingViewModel: ObservableObject {
     var eventId: UUID?
     var groupId: UUID?
 
+    /// Phone numbers already in the participant list — used to exclude from contact picker
+    var existingPhoneNumbers: Set<String> {
+        var phones = Set<String>()
+        for drafts in participantsByGame.values {
+            for d in drafts {
+                if let phone = d.phoneNumber {
+                    phones.insert(phone)
+                }
+            }
+        }
+        return phones
+    }
+
     private let supabase = SupabaseService.shared
 
     func prefillFromEvent(_ event: GameEvent, invites: [Invite]) {
@@ -83,6 +96,7 @@ final class PlayLoggingViewModel: ObservableObject {
     func prefillFromGroup(_ group: GameGroup) {
         groupId = group.id
 
+        // Show all group members but none pre-selected — user picks who played
         var drafts: [PlayParticipantDraft] = []
         for member in group.members {
             drafts.append(PlayParticipantDraft(
@@ -90,12 +104,14 @@ final class PlayLoggingViewModel: ObservableObject {
                 userId: member.userId,
                 phoneNumber: member.phoneNumber,
                 displayName: member.displayName ?? "Player",
-                isPlaying: true,
+                isPlaying: false,
                 isWinner: false
             ))
         }
 
         // No games preselected — user picks from library
+        // Store drafts so they're available when games are added
+        groupMemberDrafts = drafts
         for gameId in selectedGameIds {
             participantsByGame[gameId] = drafts
             notesByGame[gameId] = ""
@@ -103,15 +119,29 @@ final class PlayLoggingViewModel: ObservableObject {
         }
     }
 
+    /// Cached group member drafts so new games get the same member list
+    var groupMemberDrafts: [PlayParticipantDraft] = []
+
     func addGame(_ game: Game) {
         guard !availableGames.contains(where: { $0.id == game.id }) else { return }
         availableGames.append(game)
         selectedGameIds.insert(game.id)
 
-        // Copy participants from first game if available
+        // Copy participants from first game if available, else use group member drafts
         if let firstGameId = participantsByGame.keys.first,
            let existingParticipants = participantsByGame[firstGameId] {
             participantsByGame[game.id] = existingParticipants.map { p in
+                PlayParticipantDraft(
+                    id: UUID(),
+                    userId: p.userId,
+                    phoneNumber: p.phoneNumber,
+                    displayName: p.displayName,
+                    isPlaying: p.isPlaying,
+                    isWinner: false
+                )
+            }
+        } else if !groupMemberDrafts.isEmpty {
+            participantsByGame[game.id] = groupMemberDrafts.map { p in
                 PlayParticipantDraft(
                     id: UUID(),
                     userId: p.userId,
@@ -128,16 +158,24 @@ final class PlayLoggingViewModel: ObservableObject {
         isCooperativeByGame[game.id] = false
     }
 
-    func addGuestParticipant(name: String, gameId: UUID) {
-        let guest = PlayParticipantDraft(
-            id: UUID(),
-            userId: nil,
-            phoneNumber: nil,
-            displayName: name,
-            isPlaying: true,
-            isWinner: false
-        )
-        participantsByGame[gameId, default: []].append(guest)
+    func addParticipantsFromContacts(_ contacts: [UserContact]) {
+        for contact in contacts {
+            let draft = PlayParticipantDraft(
+                id: UUID(),
+                userId: nil,
+                phoneNumber: contact.phoneNumber,
+                displayName: contact.name,
+                isPlaying: true,
+                isWinner: false
+            )
+            // Add to all selected games
+            for gameId in selectedGameIds {
+                // Skip if already present (match by phone)
+                let existing = participantsByGame[gameId] ?? []
+                if existing.contains(where: { $0.phoneNumber == contact.phoneNumber }) { continue }
+                participantsByGame[gameId, default: []].append(draft)
+            }
+        }
     }
 
     func checkExistingPlays() async {
