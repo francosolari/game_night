@@ -573,6 +573,28 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return invites
     }
 
+    func fetchInvite(id: UUID) async throws -> Invite {
+        let invite: Invite = try await client
+            .from("invites")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+        return invite
+    }
+
+    func fetchUserById(_ userId: UUID) async throws -> User {
+        let user: User = try await client
+            .from("users")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value
+        return user
+    }
+
     func respondToInvite(inviteId: UUID, status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async throws {
         struct VoteParam: Encodable {
             let timeOptionId: String
@@ -627,6 +649,23 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             ))
             .execute()
 
+        // Auto-save the host as a contact (fire-and-forget) — fetch the invite to get hostUserId
+        Task {
+            if let invite = try? await fetchInvite(id: inviteId),
+               let hostId = invite.hostUserId {
+                if let hostUser = try? await fetchUserById(hostId) {
+                    let contact = UserContact(
+                        id: UUID(),
+                        name: hostUser.displayName,
+                        phoneNumber: hostUser.phoneNumber,
+                        avatarUrl: hostUser.avatarUrl,
+                        isAppUser: true
+                    )
+                    try? await saveContacts([contact])
+                }
+            }
+        }
+
         // Trigger tiered invite processing on decline
         if status == .declined {
             try await invokeAuthenticatedFunction(
@@ -674,6 +713,20 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .from("invites")
             .insert(normalizedInvites)
             .execute()
+
+        // Auto-save invitees as contacts (fire-and-forget)
+        Task {
+            let contacts = normalizedInvites.map { invite in
+                UserContact(
+                    id: UUID(),
+                    name: invite.displayName ?? invite.phoneNumber,
+                    phoneNumber: invite.phoneNumber,
+                    avatarUrl: nil,
+                    isAppUser: invite.userId != nil
+                )
+            }
+            try? await saveContacts(contacts)
+        }
 
         // Trigger SMS sending for active invites
         let activeInvites = normalizedInvites.filter { $0.isActive }
@@ -1077,6 +1130,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
         return saved
+    }
+
+    func autoSaveInviteContact(name: String, phoneNumber: String, isAppUser: Bool) async {
+        let contact = UserContact(id: UUID(), name: name, phoneNumber: phoneNumber, avatarUrl: nil, isAppUser: isAppUser)
+        try? await saveContacts([contact])
     }
 
     func deleteSavedContact(id: UUID) async throws {

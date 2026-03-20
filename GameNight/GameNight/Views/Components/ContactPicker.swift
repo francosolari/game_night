@@ -43,9 +43,17 @@ struct ContactRow: View {
                 Spacer()
 
                 if contact.isAppUser {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(Theme.Colors.success)
+                    HStack(spacing: 4) {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.system(size: 10))
+                        Text("cardboardwithme")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.Colors.primary)
+                    .clipShape(Capsule())
                 }
             }
             .padding(.horizontal, Theme.Spacing.xl)
@@ -56,250 +64,145 @@ struct ContactRow: View {
     }
 }
 
-// MARK: - Device Contact Picker (reads phone contacts)
+// MARK: - Native Contact Picker (replaces over-engineered custom sheet)
+/// Wraps CNContactPickerViewController — the system native picker.
+/// Handles all access levels: full, limited, denied.
 struct ContactPickerSheet: View {
     @Environment(\.dismiss) var dismiss
-    @State private var contacts: [UserContact] = []
-    @State private var currentUserPhone: String?
-    @State private var searchText = ""
-    @State private var selectedIds = Set<UUID>()
-    @State private var isLoading = true
-    @State private var permissionDenied = false
-    @State private var isLimited = false
-    @State private var showLimitedAccessPicker = false
-    @State private var error: String?
+    @State private var showLimitedAlert = false
+    @State private var showNativePicker = false
+    @State private var showDeniedView = false
+    @State private var isChecking = true
 
     let onSelect: ([UserContact]) -> Void
 
-    private var filteredContacts: [UserContact] {
-        if searchText.isEmpty { return contacts }
-        return contacts.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.phoneNumber.contains(searchText)
-        }
-    }
-
     var body: some View {
-        baseView
-            .modifier(LimitedContactAccessPickerModifier(
-                isPresented: $showLimitedAccessPicker,
-                onSelection: { identifiers in
-                    Task { await handleLimitedAccessSelection(identifiers: identifiers) }
-                }
-            ))
-    }
-
-    private var baseView: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Privacy banner
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Theme.Colors.accent)
-
-                    Text("Only contacts you select are shared. We never upload your full address book.")
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textSecondary)
-                }
-                .padding(Theme.Spacing.md)
-                .frame(maxWidth: .infinity)
-                .background(Theme.Colors.accent.opacity(0.08))
-
-                if permissionDenied {
-                    permissionDeniedView
-                } else if isLoading {
-                    LoadingView(message: "Reading contacts locally...")
-                } else {
-                    // Limited access banner
-                    if isLimited {
-                        Button {
-                            requestMoreAccess()
-                        } label: {
-                            HStack(spacing: Theme.Spacing.sm) {
-                                Image(systemName: "person.badge.plus")
-                                    .font(.system(size: 14))
-                                Text("Share more contacts with Game Night")
-                                    .font(Theme.Typography.calloutMedium)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(Theme.Colors.primary)
-                            .padding(Theme.Spacing.md)
-                            .background(Theme.Colors.primary.opacity(0.08))
-                        }
-                    }
-
-                    SearchBar(text: $searchText, placeholder: "Search contacts...")
-                        .padding(.horizontal, Theme.Spacing.xl)
-                        .padding(.vertical, Theme.Spacing.md)
-
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(filteredContacts) { contact in
-                                ContactRow(
-                                    contact: contact,
-                                    isSelected: selectedIds.contains(contact.id)
-                                ) {
-                                    if selectedIds.contains(contact.id) {
-                                        selectedIds.remove(contact.id)
-                                    } else {
-                                        selectedIds.insert(contact.id)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .background(Theme.Colors.background.ignoresSafeArea())
-            .navigationTitle("Phone Contacts")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(Theme.Colors.textSecondary)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add (\(selectedIds.count))") {
-                        let selected = contacts.filter { selectedIds.contains($0.id) }
-                        onSelect(selected)
-                        dismiss()
-                    }
-                    .font(Theme.Typography.bodySemibold)
-                    .foregroundColor(selectedIds.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.primary)
-                    .disabled(selectedIds.isEmpty)
-                }
+        ZStack {
+            Theme.Colors.background.ignoresSafeArea()
+            if isChecking {
+                ProgressView().tint(Theme.Colors.primary)
+            } else if showDeniedView {
+                deniedView
             }
         }
-        .task {
-            await loadContacts()
+        .task { await checkAndPresent() }
+        .alert("Limited Contact Access", isPresented: $showLimitedAlert) {
+            Button("Edit Selected Contacts") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { dismiss() }
+        } message: {
+            Text("If you've picked Limited Access, then you can use Edit Selected Contacts to select the new contacts that haven't synced yet.")
+        }
+        .sheet(isPresented: $showNativePicker, onDismiss: { dismiss() }) {
+            NativeContactPicker(onSelect: onSelect)
         }
     }
 
-    private var permissionDeniedView: some View {
+    private var deniedView: some View {
         VStack(spacing: Theme.Spacing.xl) {
             Spacer()
-
             Image(systemName: "person.crop.circle.badge.xmark")
                 .font(.system(size: 48))
                 .foregroundColor(Theme.Colors.textTertiary)
-
             Text("Contact Access Needed")
                 .font(Theme.Typography.headlineLarge)
                 .foregroundColor(Theme.Colors.textPrimary)
-
             Text("To invite friends, allow contact access in Settings. We only read contacts locally and never upload your address book.")
                 .font(Theme.Typography.body)
                 .foregroundColor(Theme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.Spacing.xxxl)
-
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
+                dismiss()
             }
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, Theme.Spacing.jumbo)
-
             Spacer()
         }
     }
 
-    private func loadContacts() async {
+    private func checkAndPresent() async {
         let picker = ContactPickerService.shared
         let status = await picker.authorizationStatus
 
         switch status {
         case .authorized:
-            break
+            isChecking = false
+            showNativePicker = true
+
         case .notDetermined:
             let granted = (try? await picker.requestAccess()) ?? false
-            if !granted {
-                permissionDenied = true
-                isLoading = false
-                return
-            }
-            // Check if we got limited after requesting
-            if #available(iOS 18, *) {
+            isChecking = false
+            if granted {
                 let newStatus = await picker.authorizationStatus
-                isLimited = (newStatus == .limited)
-            }
-        default:
-            if #available(iOS 18, *), status == .limited {
-                isLimited = true
+                if #available(iOS 18, *), newStatus == .limited {
+                    showLimitedAlert = true
+                } else {
+                    showNativePicker = true
+                }
             } else {
-                permissionDenied = true
-                isLoading = false
-                return
+                showDeniedView = true
+            }
+
+        default:
+            isChecking = false
+            if #available(iOS 18, *), status == .limited {
+                showLimitedAlert = true
+            } else {
+                showDeniedView = true
             }
         }
-
-        do {
-            async let currentUserResult = try? SupabaseService.shared.fetchCurrentUser()
-            let fetchedContacts = try await picker.fetchLocalContacts()
-            if let currentUser = await currentUserResult {
-                currentUserPhone = ContactPickerService.normalizePhone(currentUser.phoneNumber)
-            }
-            contacts = filterOutCurrentUser(from: fetchedContacts)
-        } catch {
-            self.error = "Couldn't read contacts"
-        }
-        isLoading = false
-    }
-
-    private func requestMoreAccess() {
-        if #available(iOS 18, *) {
-            showLimitedAccessPicker = true
-        } else if let url = URL(string: UIApplication.openSettingsURLString) {
-            UIApplication.shared.open(url)
-        }
-    }
-
-    private func handleLimitedAccessSelection(identifiers: [String]) async {
-        let picker = ContactPickerService.shared
-
-        if identifiers.isEmpty {
-            contacts = filterOutCurrentUser(from: (try? await picker.fetchLocalContacts()) ?? contacts)
-            return
-        }
-
-        let addedContacts = (try? await picker.fetchContacts(withIdentifiers: identifiers)) ?? []
-        guard !addedContacts.isEmpty else {
-            contacts = filterOutCurrentUser(from: (try? await picker.fetchLocalContacts()) ?? contacts)
-            return
-        }
-
-        let existingPhones = Set(contacts.map(\.phoneNumber))
-        let uniqueNewContacts = addedContacts.filter { !existingPhones.contains($0.phoneNumber) }
-
-        if uniqueNewContacts.isEmpty {
-            contacts = filterOutCurrentUser(from: (try? await picker.fetchLocalContacts()) ?? contacts)
-        } else {
-            contacts.append(contentsOf: filterOutCurrentUser(from: uniqueNewContacts))
-        }
-    }
-
-    private func filterOutCurrentUser(from contacts: [UserContact]) -> [UserContact] {
-        guard let currentUserPhone else { return contacts }
-        return contacts.filter { ContactPickerService.normalizePhone($0.phoneNumber) != currentUserPhone }
     }
 }
 
-private struct LimitedContactAccessPickerModifier: ViewModifier {
-    @Binding var isPresented: Bool
-    let onSelection: ([String]) -> Void
+// MARK: - Native CNContactPickerViewController wrapper
+private struct NativeContactPicker: UIViewControllerRepresentable {
+    let onSelect: ([UserContact]) -> Void
 
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 18, *) {
-            content.contactAccessPicker(isPresented: $isPresented) { identifiers in
-                onSelection(identifiers)
+    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
+
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
+
+    class Coordinator: NSObject, CNContactPickerDelegate {
+        let onSelect: ([UserContact]) -> Void
+
+        init(onSelect: @escaping ([UserContact]) -> Void) {
+            self.onSelect = onSelect
+        }
+
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) {
+            let userContacts = contacts.compactMap { contact -> UserContact? in
+                guard let phone = contact.phoneNumbers.first?.value.stringValue else { return nil }
+                let name = [contact.givenName, contact.familyName]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+                guard !name.isEmpty else { return nil }
+                return UserContact(
+                    id: UUID(),
+                    name: name,
+                    phoneNumber: ContactPickerService.normalizePhone(phone),
+                    avatarUrl: nil,
+                    isAppUser: false
+                )
             }
-        } else {
-            content
+            onSelect(userContacts)
+        }
+
+        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+            onSelect([])
         }
     }
 }
