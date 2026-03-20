@@ -1307,6 +1307,58 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    // MARK: - Poll Voter Details
+
+    func fetchTimeOptionVoters(eventId: UUID) async throws -> [TimeOptionVoter] {
+        let voters: [TimeOptionVoter] = try await client
+            .rpc("fetch_time_poll_voters", params: ["p_event_id": eventId.uuidString])
+            .execute()
+            .value
+        return voters
+    }
+
+    private struct GameVoterRow: Decodable {
+        let gameId: UUID
+        let voteType: String
+        let userId: UUID
+        let displayName: String
+        let avatarUrl: String?
+
+        enum CodingKeys: String, CodingKey {
+            case gameId = "game_id"
+            case voteType = "vote_type"
+            case userId = "user_id"
+            case displayName = "display_name"
+            case avatarUrl = "avatar_url"
+        }
+    }
+
+    func fetchGameVoterDetails(eventId: UUID) async throws -> [GameVoterInfo] {
+        let rows: [GameVoterRow] = try await client
+            .rpc("fetch_game_poll_voters", params: ["p_event_id": eventId.uuidString])
+            .execute()
+            .value
+        return rows.compactMap { row in
+            guard let voteType = GameVoteType(rawValue: row.voteType) else { return nil }
+            return GameVoterInfo(
+                gameId: row.gameId,
+                userId: row.userId,
+                displayName: row.displayName,
+                avatarUrl: row.avatarUrl,
+                voteType: voteType
+            )
+        }
+    }
+
+    func confirmTimeOption(eventId: UUID, timeOptionId: UUID) async throws {
+        try await client
+            .rpc("confirm_time_option", params: [
+                "p_event_id": eventId.uuidString,
+                "p_time_option_id": timeOptionId.uuidString
+            ])
+            .execute()
+    }
+
     func confirmGame(eventId: UUID, gameId: UUID) async throws {
         let updates: [String: AnyJSON] = [
             "confirmed_game_id": .string(gameId.uuidString)

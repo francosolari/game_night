@@ -46,6 +46,7 @@ struct EventDetailView: View {
                             confirmedCount: viewModel.inviteSummary.accepted,
                             minPlayers: event.minPlayers,
                             maxPlayers: event.maxPlayers,
+                            hasPollsActive: viewModel.hasPollsActive,
                             onRSVPTap: { showRSVPSheet = true }
                         )
 
@@ -62,20 +63,28 @@ struct EventDetailView: View {
                                 }
                             }
 
-                            // 4. Schedule Section
-                            scheduleSection(event)
-
-                            // 5. Guest List (inline preview)
-                            GuestListTabsView(
-                                summary: viewModel.inviteSummary,
-                                visibilityMode: guestListVisibilityMode,
-                                isHost: viewModel.isOwner,
-                                actionTitle: viewModel.canInviteGuests ? "Invite" : nil,
-                                onAction: viewModel.canInviteGuests ? {
-                                    showInviteContacts = true
-                                } : nil,
-                                onViewAll: { showGuestListFullPage = true }
-                            )
+                            // 4. Guest List / Poll Guest List
+                            if viewModel.hasDatePollPending {
+                                PollGuestListView(
+                                    timeOptions: event.timeOptions,
+                                    voters: viewModel.timeOptionVoters,
+                                    isHost: viewModel.isOwner,
+                                    onConfirmTime: viewModel.isOwner ? { timeOptionId in
+                                        await viewModel.confirmTimeOption(timeOptionId: timeOptionId)
+                                    } : nil
+                                )
+                            } else {
+                                GuestListTabsView(
+                                    summary: viewModel.inviteSummary,
+                                    visibilityMode: guestListVisibilityMode,
+                                    isHost: viewModel.isOwner,
+                                    actionTitle: viewModel.canInviteGuests ? "Invite" : nil,
+                                    onAction: viewModel.canInviteGuests ? {
+                                        showInviteContacts = true
+                                    } : nil,
+                                    onViewAll: { showGuestListFullPage = true }
+                                )
+                            }
 
                             // 7. Activity Feed
                             ActivityFeedView(viewModel: viewModel, isHost: viewModel.isOwner)
@@ -262,6 +271,7 @@ struct EventDetailView: View {
                     myVotes: viewModel.myGameVotes,
                     isHost: viewModel.isOwner,
                     confirmedGameId: event.confirmedGameId,
+                    voterDetails: viewModel.gameVoterDetails,
                     onVote: { gameId, voteType in
                         await viewModel.voteForGame(gameId: gameId, voteType: voteType)
                     },
@@ -278,49 +288,6 @@ struct EventDetailView: View {
                     PrimaryGameCard(game: game, eventGame: primaryGame, otherGames: otherEventGames)
                 }
             }
-        }
-    }
-
-    // MARK: - Schedule Section
-
-    @ViewBuilder
-    private func scheduleSection(_ event: GameEvent) -> some View {
-        if event.scheduleMode == .poll && event.timeOptions.count > 1 {
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                SectionHeader(title: "When")
-
-                if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                    Text("Vote on the times that work for you:")
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.textSecondary)
-
-                    PollVotingView(
-                        timeOptions: event.timeOptions,
-                        votes: $pollVotes
-                    )
-
-                    if event.allowTimeSuggestions {
-                        Button {
-                            showTimeSuggestion = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "plus.circle")
-                                Text("Suggest another time")
-                            }
-                            .font(Theme.Typography.calloutMedium)
-                            .foregroundColor(Theme.Colors.accent)
-                        }
-                    }
-                } else {
-                    TimeOptionPicker(
-                        timeOptions: event.timeOptions,
-                        selectedIds: $selectedTimeIds,
-                        allowMultiple: false,
-                        showVoteCounts: true
-                    )
-                }
-            }
-            .cardStyle()
         }
     }
 
@@ -403,6 +370,7 @@ struct EventHeroHeader: View {
     var confirmedCount: Int = 0
     var minPlayers: Int = 0
     var maxPlayers: Int? = nil
+    var hasPollsActive: Bool = false
     var onRSVPTap: (() -> Void)? = nil
     private let heroHeight: CGFloat = 330
 
@@ -548,7 +516,7 @@ struct EventHeroHeader: View {
                         Image(systemName: "envelope.open.fill")
                             .font(.system(size: 14))
                             .foregroundColor(Theme.Colors.primary)
-                        Text("RSVP")
+                        Text(hasPollsActive ? "RSVP & Vote" : "RSVP")
                             .font(Theme.Typography.bodyMedium)
                             .foregroundColor(Theme.Colors.primary)
                         Image(systemName: "chevron.right")
@@ -571,6 +539,10 @@ struct EventHeroHeader: View {
                     Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
                         .font(.system(size: 10, weight: .heavy))
                         .foregroundColor(Theme.Colors.textTertiary)
+                } else if !isPending && hasPollsActive {
+                    Text("View Polls")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(Theme.Colors.primary)
                 }
             }
         }

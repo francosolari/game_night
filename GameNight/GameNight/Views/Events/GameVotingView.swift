@@ -5,6 +5,7 @@ struct GameVotingView: View {
     let myVotes: [UUID: GameVoteType]
     let isHost: Bool
     let confirmedGameId: UUID?
+    var voterDetails: [UUID: [GameVoterInfo]] = [:]
     let onVote: (UUID, GameVoteType) async -> Void
     let onConfirm: ((UUID) async -> Void)?
 
@@ -19,6 +20,7 @@ struct GameVotingView: View {
                             myVote: myVotes[game.id],
                             isConfirmed: confirmedGameId == game.id,
                             isHost: isHost,
+                            voters: voterDetails[game.id] ?? [],
                             onVote: { voteType in
                                 await onVote(game.id, voteType)
                             },
@@ -39,8 +41,25 @@ private struct GameVoteCard: View {
     let myVote: GameVoteType?
     let isConfirmed: Bool
     let isHost: Bool
+    let voters: [GameVoterInfo]
     let onVote: (GameVoteType) async -> Void
     let onConfirm: (() async -> Void)?
+
+    @State private var showVoterDetail = false
+
+    private var voterTuples: [(id: UUID, name: String, avatarUrl: String?)] {
+        voters
+            .filter { $0.voteType == .yes || $0.voteType == .maybe }
+            .map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl) }
+    }
+
+    private var detailVoters: [(id: UUID, name: String, avatarUrl: String?, voteType: String)] {
+        voters.map { (id: $0.userId, name: $0.displayName, avatarUrl: $0.avatarUrl, voteType: $0.voteType.rawValue) }
+    }
+
+    private var isMostPopular: Bool {
+        eventGame.yesCount > 0
+    }
 
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
@@ -109,31 +128,42 @@ private struct GameVoteCard: View {
                 ) { Task { await onVote(.no) } }
             }
 
-            // Vote tally
-            HStack(spacing: 6) {
-                if eventGame.yesCount > 0 {
-                    HStack(spacing: 2) {
-                        StatusDot(color: Theme.Colors.success, size: 5)
-                        Text("\(eventGame.yesCount)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Theme.Colors.success)
+            // Vote tally + voter avatars
+            VStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    if eventGame.yesCount > 0 {
+                        HStack(spacing: 2) {
+                            StatusDot(color: Theme.Colors.success, size: 5)
+                            Text("\(eventGame.yesCount)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Theme.Colors.success)
+                        }
+                    }
+                    if eventGame.maybeCount > 0 {
+                        HStack(spacing: 2) {
+                            StatusDot(color: Theme.Colors.warning, size: 5)
+                            Text("\(eventGame.maybeCount)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Theme.Colors.warning)
+                        }
+                    }
+                    if eventGame.noCount > 0 {
+                        HStack(spacing: 2) {
+                            StatusDot(color: Theme.Colors.error, size: 5)
+                            Text("\(eventGame.noCount)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Theme.Colors.error)
+                        }
                     }
                 }
-                if eventGame.maybeCount > 0 {
-                    HStack(spacing: 2) {
-                        StatusDot(color: Theme.Colors.warning, size: 5)
-                        Text("\(eventGame.maybeCount)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Theme.Colors.warning)
-                    }
-                }
-                if eventGame.noCount > 0 {
-                    HStack(spacing: 2) {
-                        StatusDot(color: Theme.Colors.error, size: 5)
-                        Text("\(eventGame.noCount)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Theme.Colors.error)
-                    }
+
+                if !voterTuples.isEmpty {
+                    VoterAvatarStack(
+                        voters: voterTuples,
+                        maxVisible: 3,
+                        avatarSize: 18,
+                        onTap: { showVoterDetail = true }
+                    )
                 }
             }
 
@@ -148,6 +178,27 @@ private struct GameVoteCard: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Capsule().fill(Theme.Colors.success.opacity(0.15)))
+            }
+
+            // Host "Pick This" button
+            if isHost && !isConfirmed, let onConfirm {
+                Button {
+                    Task { await onConfirm() }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 10))
+                        Text("Pick This")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule().fill(Theme.Colors.primary)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
         .frame(width: 160)
@@ -171,6 +222,18 @@ private struct GameVoteCard: View {
                     Label("Confirm This Game", systemImage: "checkmark.seal.fill")
                 }
             }
+        }
+        .sheet(isPresented: $showVoterDetail) {
+            PollResultsDetailView(
+                title: game.name,
+                subtitle: nil,
+                voters: detailVoters,
+                isMostPopular: isMostPopular,
+                isHost: isHost,
+                onPickThis: isHost && !isConfirmed ? {
+                    await onConfirm?()
+                } : nil
+            )
         }
     }
 }

@@ -24,6 +24,10 @@ final class EventViewModel: ObservableObject {
     @Published var gameVotes: [GameVote] = []
     @Published var myGameVotes: [UUID: GameVoteType] = [:]
 
+    // Poll voter details
+    @Published var timeOptionVoters: [UUID: [TimeOptionVoter]] = [:]
+    @Published var gameVoterDetails: [UUID: [GameVoterInfo]] = [:]
+
     private let supabase = SupabaseService.shared
     private var realtimeChannel: RealtimeChannelV2?
     private var activityChannel: RealtimeChannelV2?
@@ -65,6 +69,24 @@ final class EventViewModel: ObservableObject {
             allowGuestInvites: event.allowGuestInvites,
             now: Date()
         )
+    }
+
+    var hasPollsActive: Bool {
+        guard let event else { return false }
+        let hasUnconfirmedTimePoll = event.scheduleMode == .poll
+            && event.timeOptions.count > 1
+            && event.confirmedTimeOptionId == nil
+        let hasUnconfirmedGamePoll = event.allowGameVoting
+            && event.games.count > 1
+            && event.confirmedGameId == nil
+        return hasUnconfirmedTimePoll || hasUnconfirmedGamePoll
+    }
+
+    var hasDatePollPending: Bool {
+        guard let event else { return false }
+        return event.scheduleMode == .poll
+            && event.timeOptions.count > 1
+            && event.confirmedTimeOptionId == nil
     }
 
     var canSeeActivityFeed: Bool {
@@ -143,9 +165,10 @@ final class EventViewModel: ObservableObject {
                 self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
             }
 
-            // Load activity feed and game votes
+            // Load activity feed, game votes, and poll voter details
             await loadActivityFeed(eventId: id)
             await loadGameVotes(eventId: id, currentUserId: session.user.id)
+            await loadPollVoterDetails(eventId: id)
 
             // Subscribe to realtime updates
             if subscribedEventId != id {
@@ -161,6 +184,29 @@ final class EventViewModel: ObservableObject {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Silently refresh event, invites, and poll voter details without flashing loading state.
+    func refreshEventData(eventId: UUID) async {
+        do {
+            async let eventResult = supabase.fetchEvent(id: eventId)
+            async let invitesResult = supabase.fetchInvites(eventId: eventId)
+
+            self.event = try await eventResult
+            self.invites = try await invitesResult
+
+            let session = try await supabase.client.auth.session
+            self.myInvite = invites.first { $0.userId == session.user.id }
+
+            if let invite = myInvite {
+                self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
+            }
+
+            await loadPollVoterDetails(eventId: eventId)
+            await loadGameVotes(eventId: eventId, currentUserId: session.user.id)
+        } catch {
+            // Non-critical for background refresh
+        }
     }
 
     func loadActivityFeed(eventId: UUID) async {
@@ -239,6 +285,47 @@ final class EventViewModel: ObservableObject {
         }
     }
 
+    func loadPollVoterDetails(eventId: UUID) async {
+        do {
+            // Time poll voters
+            let timeVoters = try await supabase.fetchTimeOptionVoters(eventId: eventId)
+            var grouped: [UUID: [TimeOptionVoter]] = [:]
+            for voter in timeVoters {
+                grouped[voter.timeOptionId, default: []].append(voter)
+            }
+            self.timeOptionVoters = grouped
+
+            // Game poll voters
+            let gameVoters = try await supabase.fetchGameVoterDetails(eventId: eventId)
+            var byGame: [UUID: [GameVoterInfo]] = [:]
+            for voter in gameVoters {
+                byGame[voter.gameId, default: []].append(voter)
+            }
+            self.gameVoterDetails = byGame
+        } catch {
+            // Non-critical
+        }
+    }
+
+    func confirmTimeOption(timeOptionId: UUID) async {
+        guard let eventId = event?.id else { return }
+        do {
+            try await supabase.confirmTimeOption(eventId: eventId, timeOptionId: timeOptionId)
+            event?.confirmedTimeOptionId = timeOptionId
+            // Notify invitees (fire-and-forget)
+            Task {
+                try? await supabase.invokeAuthenticatedFunction(
+                    "notify-poll-confirmed",
+                    body: ["event_id": eventId.uuidString, "type": "time"]
+                )
+            }
+            // Refresh to show final state (poll ended, guest list restored)
+            await refreshEventData(eventId: eventId)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     func voteForGame(gameId: UUID, voteType: GameVoteType) async {
         guard let eventId = event?.id else { return }
         do {
@@ -250,10 +337,8 @@ final class EventViewModel: ObservableObject {
                 try await supabase.upsertGameVote(eventId: eventId, gameId: gameId, voteType: voteType)
                 myGameVotes[gameId] = voteType
             }
-            // Reload event to get updated vote counts
-            if let event = try? await supabase.fetchEvent(id: eventId) {
-                self.event = event
-            }
+            // Refresh event + voter details without loading flash
+            await refreshEventData(eventId: eventId)
         } catch {
             self.error = error.localizedDescription
         }
@@ -264,6 +349,16 @@ final class EventViewModel: ObservableObject {
         do {
             try await supabase.confirmGame(eventId: eventId, gameId: gameId)
             event?.confirmedGameId = gameId
+            event?.allowGameVoting = false
+            // Notify invitees (fire-and-forget)
+            Task {
+                try? await supabase.invokeAuthenticatedFunction(
+                    "notify-poll-confirmed",
+                    body: ["event_id": eventId.uuidString, "type": "game"]
+                )
+            }
+            // Refresh to show final state
+            await refreshEventData(eventId: eventId)
         } catch {
             self.error = error.localizedDescription
         }
@@ -282,6 +377,10 @@ final class EventViewModel: ObservableObject {
             myInvite?.status = status
             // Keep local poll votes in sync
             myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
+            // Refresh event data without flashing loading state
+            if let eventId = event?.id {
+                await refreshEventData(eventId: eventId)
+            }
         } catch {
             self.error = error.localizedDescription
         }
