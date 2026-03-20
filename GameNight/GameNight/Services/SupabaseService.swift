@@ -255,14 +255,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         _ functionName: String,
         body: some Encodable
     ) async throws {
-        let session = try await client.auth.session
-        try await client.functions.invoke(
-            functionName,
-            options: .init(
-                headers: ["Authorization": "Bearer \(session.accessToken)"],
-                body: body
-            )
-        )
+        try await client.functions.invoke(functionName, options: .init(body: body))
     }
 
     func invokeAuthenticatedFunction<Response: Decodable>(
@@ -270,15 +263,27 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         body: some Encodable,
         decoder: JSONDecoder = JSONDecoder()
     ) async throws -> Response {
-        let session = try await client.auth.session
-        return try await client.functions.invoke(
-            functionName,
-            options: .init(
-                headers: ["Authorization": "Bearer \(session.accessToken)"],
-                body: body
-            ),
-            decoder: decoder
-        )
+        // Let the SDK handle auth — it correctly handles the new sb_publishable_ key format.
+        // Do NOT pass Authorization manually; the SDK injects the session JWT automatically.
+        print("[Supabase] invokeAuthenticatedFunction<\(Response.self)> '\(functionName)' via SDK")
+        do {
+            let result: Response = try await client.functions.invoke(
+                functionName,
+                options: .init(body: body),
+                decoder: decoder
+            )
+            print("[Supabase] '\(functionName)' succeeded")
+            return result
+        } catch let err as FunctionsError {
+            switch err {
+            case .httpError(let code, let data):
+                let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+                print("[Supabase] '\(functionName)' HTTP \(code): \(body)")
+            case .relayError:
+                print("[Supabase] '\(functionName)' relay error")
+            }
+            throw err
+        }
     }
 
     private func betaEnsureUserURL() throws -> URL {

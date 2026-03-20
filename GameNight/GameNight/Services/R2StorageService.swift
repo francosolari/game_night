@@ -10,14 +10,25 @@ actor R2StorageService {
     // MARK: - Upload
 
     func uploadImage(data: Data, path: String, contentType: String = "image/jpeg") async throws -> String {
+        print("[R2] uploadImage called — path: \(path), dataSize: \(data.count) bytes")
+
         // Get pre-signed upload URL from Edge Function
-        let response: UploadURLResponse = try await supabase.invokeAuthenticatedFunction(
-            "r2-upload-url",
-            body: [
-                "path": path,
-                "content_type": contentType
-            ]
-        )
+        print("[R2] invoking edge function r2-upload-url…")
+        let response: UploadURLResponse
+        do {
+            response = try await supabase.invokeAuthenticatedFunction(
+                "r2-upload-url",
+                body: [
+                    "path": path,
+                    "content_type": contentType
+                ]
+            )
+        } catch {
+            print("[R2] edge function error (\(type(of: error))): \(error)")
+            throw error
+        }
+        print("[R2] got presigned uploadUrl prefix: \(String(response.uploadUrl.prefix(60)))…")
+        print("[R2] publicUrl: \(response.publicUrl)")
 
         // Upload directly to R2 using pre-signed URL
         var request = URLRequest(url: URL(string: response.uploadUrl)!)
@@ -25,11 +36,15 @@ actor R2StorageService {
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
 
+        print("[R2] PUT to R2, dataSize: \(data.count) bytes…")
         let (_, urlResponse) = try await URLSession.shared.data(for: request)
         guard let httpResponse = urlResponse as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let status = (urlResponse as? HTTPURLResponse)?.statusCode ?? -1
+            print("[R2] PUT failed, HTTP status: \(status)")
             throw R2Error.uploadFailed
         }
+        print("[R2] PUT succeeded, HTTP status: \((urlResponse as! HTTPURLResponse).statusCode)")
 
         return response.publicUrl
     }
