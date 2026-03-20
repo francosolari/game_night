@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* BrandGuide.Warm — light mode */
+    --background: 36 53% 96%;          /* cream #FAF7F2 */
+    --foreground: 27 38% 13%;          /* espresso #2C1F14 */
+
+    --card: 34 37% 89%;               /* sand #EDE6DA */
+    --card-foreground: 27 38% 13%;
+
+    --popover: 36 53% 96%;
+    --popover-foreground: 27 38% 13%;
+
+    --primary: 94 19% 48%;            /* sage #7E9163 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 34 37% 89%;          /* sand */
+    --secondary-foreground: 27 38% 13%;
+
+    --muted: 32 32% 84%;              /* deepSand #E3DACB */
+    --muted-foreground: 27 29% 43%;   /* cardboard #8B6F4E */
+
+    --accent: 18 47% 53%;             /* terracotta #C4704B */
+    --accent-foreground: 36 53% 96%;
+
+    --destructive: 4 51% 47%;         /* error #B5433A */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 30% 81%;             /* borderSand #DDD3C3 */
+    --input: 30 30% 81%;
+    --ring: 94 19% 48%;               /* sage */
+
+    --radius: 0.625rem;               /* 10px — Theme.CornerRadius.md */
+
+    --sidebar-background: 34 37% 89%;
+    --sidebar-foreground: 27 38% 13%;
+    --sidebar-primary: 94 19% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 32 32% 84%;
+    --sidebar-accent-foreground: 27 38% 13%;
+    --sidebar-border: 30 30% 81%;
+    --sidebar-ring: 94 19% 48%;
+  }
+
+  .dark {
+    /* BrandGuide.Dark — dark mode */
+    --background: 24 16% 7%;          /* #14110F */
+    --foreground: 37 44% 92%;         /* textPrimary #F3EDE3 */
+
+    --card: 27 15% 12%;              /* cardBackground #231E1A */
+    --card-foreground: 37 44% 92%;
+
+    --popover: 27 15% 12%;
+    --popover-foreground: 37 44% 92%;
+
+    --primary: 94 21% 55%;           /* #8FA576 */
+    --primary-foreground: 37 44% 92%;
+
+    --secondary: 26 16% 9%;          /* backgroundElevated #1B1714 */
+    --secondary-foreground: 37 44% 92%;
+
+    --muted: 27 15% 14%;             /* cardBackgroundHover #2A241F */
+    --muted-foreground: 28 18% 55%;  /* textTertiary #9F8D7A */
+
+    --accent: 20 54% 61%;            /* secondaryAccent #D08A68 */
+    --accent-foreground: 37 44% 92%;
+
+    --destructive: 9 47% 57%;        /* error #C56B5C */
+    --destructive-foreground: 37 44% 92%;
+
+    --border: 24 14% 20%;            /* #3A312B */
+    --input: 24 14% 20%;
+    --ring: 94 21% 55%;
+
+    --sidebar-background: 24 18% 8%;
+    --sidebar-foreground: 37 44% 92%;
+    --sidebar-primary: 94 21% 55%;
+    --sidebar-primary-foreground: 37 44% 92%;
+    --sidebar-accent: 27 15% 14%;
+    --sidebar-accent-foreground: 37 44% 92%;
+    --sidebar-border: 24 14% 20%;
+    --sidebar-ring: 94 21% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Outfit', sans-serif;
+    overscroll-behavior-y: auto;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    overflow: -moz-scrollbars-none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
