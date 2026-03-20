@@ -55,7 +55,7 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
   }, [myInvite, hasPollsActive]);
 
   return (
-    <div className="relative w-full" style={{ height: "330px" }}>
+    <div className="relative w-full h-[330px] md:h-[280px] md:rounded-xl md:overflow-hidden">
       {/* Cover */}
       {coverImage ? (
         <img src={coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -138,12 +138,14 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
               )}
 
               {event.min_players > 0 && (
-                <PlayerCountIndicator
-                  confirmedCount={confirmedCount}
-                  minPlayers={event.min_players}
-                  maxPlayers={event.max_players}
-                  size="standard"
-                />
+                <div className="md:hidden">
+                  <PlayerCountIndicator
+                    confirmedCount={confirmedCount}
+                    minPlayers={event.min_players}
+                    maxPlayers={event.max_players}
+                    size="standard"
+                  />
+                </div>
               )}
             </div>
 

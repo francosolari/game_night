@@ -16,7 +16,7 @@ export function MobileBottomNav() {
     >
       <div className="flex items-center px-2 pt-2 pb-1">
         <TabBtn label="Home" href="/dashboard" active={path === "/dashboard" || path === "/"} icon={<IconHome />} />
-        <TabBtn label="Games" href="/dashboard" active={false} icon={<IconDice />} />
+        <TabBtn label="Games" href="/games" active={path.startsWith("/games")} icon={<IconDice />} />
         <div className="flex-1 flex justify-center">
           <button
             onClick={() => navigate("/events/new")}

@@ -305,3 +305,87 @@ export function buildInviteSummary(invites: Invite[], event: GameEvent): InviteS
     waitlistedUsers: mapUsers(waitlisted),
   };
 }
+
+// ─── Game Library Types ───
+
+export interface GameLibraryEntry {
+  id: string;
+  user_id: string;
+  game_id: string;
+  game?: Game | null;
+  category_id?: string | null;
+  rating?: number | null;
+  play_count: number;
+  added_at: string;
+  notes?: string | null;
+}
+
+export interface GameCategory {
+  id: string;
+  user_id: string;
+  name: string;
+  icon?: string | null;
+  sort_order: number;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface GameFamily {
+  id: string;
+  name: string;
+  bgg_family_id: number;
+}
+
+// ─── Game Helper Functions ───
+
+export function complexityLabel(weight: number): string {
+  if (weight <= 1.5) return "Light";
+  if (weight <= 2.0) return "Light-Medium";
+  if (weight <= 3.0) return "Medium";
+  if (weight <= 3.5) return "Medium-Heavy";
+  return "Heavy";
+}
+
+export function complexityColorClass(weight: number): string {
+  if (weight <= 2.0) return "bg-green-500/10 text-green-600";
+  if (weight <= 3.5) return "bg-amber-500/10 text-amber-600";
+  return "bg-red-500/10 text-red-600";
+}
+
+export function ratingColorClass(rating: number): string {
+  if (rating >= 8.5) return "text-green-600";
+  if (rating >= 7.0) return "text-lime-600";
+  if (rating >= 4.0) return "text-amber-600";
+  return "text-red-600";
+}
+
+export function playerCountDisplay(game: Game): string {
+  if (game.min_players === game.max_players) return `${game.min_players} players`;
+  return `${game.min_players}–${game.max_players} players`;
+}
+
+export function playtimeDisplay(game: Game): string {
+  if (game.min_playtime === game.max_playtime) return `${game.min_playtime} min`;
+  return `${game.min_playtime}–${game.max_playtime} min`;
+}
+
+export function formatPlayerRanges(values?: number[] | null): string | null {
+  if (!values || values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let end = sorted[0];
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === end + 1) {
+      end = sorted[i];
+    } else {
+      ranges.push(start === end ? `${start}` : `${start}–${end}`);
+      start = sorted[i];
+      end = sorted[i];
+    }
+  }
+  ranges.push(start === end ? `${start}` : `${start}–${end}`);
+  return ranges.join(", ");
+}
