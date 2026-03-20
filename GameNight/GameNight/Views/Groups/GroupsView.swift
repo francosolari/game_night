@@ -3,7 +3,6 @@ import SwiftUI
 struct GroupsView: View {
     @StateObject private var viewModel = GroupsViewModel()
     @State private var showCreateGroup = false
-    @State private var selectedGroup: GameGroup?
     @State private var toast: ToastItem?
 
     var body: some View {
@@ -52,9 +51,12 @@ struct GroupsView: View {
                     } else {
                         LazyVStack(spacing: Theme.Spacing.md) {
                             ForEach(viewModel.groups) { group in
-                                GroupCard(group: group) {
-                                    selectedGroup = group
+                                NavigationLink {
+                                    GroupDetailView(group: group)
+                                } label: {
+                                    GroupCard(group: group)
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
@@ -65,11 +67,6 @@ struct GroupsView: View {
             .background(Theme.Colors.background.ignoresSafeArea())
             .sheet(isPresented: $showCreateGroup) {
                 CreateGroupSheet(viewModel: viewModel, onResult: { resultToast in
-                    toast = resultToast
-                })
-            }
-            .sheet(item: $selectedGroup) { group in
-                GroupDetailSheet(group: group, viewModel: viewModel, onResult: { resultToast in
                     toast = resultToast
                 })
             }
@@ -84,67 +81,63 @@ struct GroupsView: View {
 // MARK: - Group Card
 struct GroupCard: View {
     let group: GameGroup
-    let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Theme.Spacing.lg) {
-                // Emoji avatar
-                ZStack {
-                    Circle()
-                        .fill(Theme.Gradients.primary)
-                        .frame(width: 52, height: 52)
+        HStack(spacing: Theme.Spacing.lg) {
+            // Emoji avatar
+            ZStack {
+                Circle()
+                    .fill(Theme.Gradients.primary)
+                    .frame(width: 52, height: 52)
 
-                    Text(group.emoji ?? "🎲")
-                        .font(.system(size: 24))
-                }
-
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                    Text(group.name)
-                        .font(Theme.Typography.headlineMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-
-                    if let desc = group.description {
-                        Text(desc)
-                            .font(Theme.Typography.callout)
-                            .foregroundColor(Theme.Colors.textSecondary)
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 11))
-                        Text("\(group.memberCount) members")
-                            .font(Theme.Typography.caption)
-                    }
-                    .foregroundColor(Theme.Colors.textTertiary)
-                }
-
-                Spacer()
-
-                // Member tier indicators
-                VStack(spacing: 2) {
-                    let t1 = group.members.filter { $0.tier == 1 }.count
-                    let t2 = group.members.filter { $0.tier == 2 }.count
-                    if t1 > 0 {
-                        Text("T1: \(t1)")
-                            .font(Theme.Typography.caption2)
-                            .foregroundColor(Theme.Colors.primary)
-                    }
-                    if t2 > 0 {
-                        Text("T2: \(t2)")
-                            .font(Theme.Typography.caption2)
-                            .foregroundColor(Theme.Colors.accent)
-                    }
-                }
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(Theme.Colors.textTertiary)
+                Text(group.emoji ?? "🎲")
+                    .font(.system(size: 24))
             }
-            .cardStyle()
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(group.name)
+                    .font(Theme.Typography.headlineMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                if let desc = group.description {
+                    Text(desc)
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 11))
+                    Text("\(group.memberCount) members")
+                        .font(Theme.Typography.caption)
+                }
+                .foregroundColor(Theme.Colors.textTertiary)
+            }
+
+            Spacer()
+
+            // Member tier indicators
+            VStack(spacing: 2) {
+                let t1 = group.members.filter { $0.tier == 1 }.count
+                let t2 = group.members.filter { $0.tier == 2 }.count
+                if t1 > 0 {
+                    Text("T1: \(t1)")
+                        .font(Theme.Typography.caption2)
+                        .foregroundColor(Theme.Colors.primary)
+                }
+                if t2 > 0 {
+                    Text("T2: \(t2)")
+                        .font(Theme.Typography.caption2)
+                        .foregroundColor(Theme.Colors.accent)
+                }
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14))
+                .foregroundColor(Theme.Colors.textTertiary)
         }
-        .buttonStyle(.plain)
+        .cardStyle()
     }
 }
 

@@ -1485,6 +1485,201 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         return channel
     }
+
+    // MARK: - Plays
+
+    static let playSelect = "*, game:games(*), play_participants(*), logged_by_user:users!logged_by(*)"
+
+    func createPlay(_ play: Play) async throws -> Play {
+        let created: Play = try await client
+            .from("plays")
+            .insert(play)
+            .select(Self.playSelect)
+            .single()
+            .execute()
+            .value
+        return created
+    }
+
+    func createPlayParticipants(_ participants: [PlayParticipant]) async throws {
+        guard !participants.isEmpty else { return }
+        try await client
+            .from("play_participants")
+            .insert(participants)
+            .execute()
+    }
+
+    func fetchPlaysForEvent(eventId: UUID) async throws -> [Play] {
+        let plays: [Play] = try await client
+            .from("plays")
+            .select(Self.playSelect)
+            .eq("event_id", value: eventId.uuidString)
+            .order("played_at", ascending: false)
+            .execute()
+            .value
+        return plays
+    }
+
+    func fetchPlaysForGroup(groupId: UUID) async throws -> [Play] {
+        let plays: [Play] = try await client
+            .from("plays")
+            .select(Self.playSelect)
+            .eq("group_id", value: groupId.uuidString)
+            .order("played_at", ascending: false)
+            .execute()
+            .value
+        return plays
+    }
+
+    func updatePlay(_ play: Play) async throws {
+        try await client
+            .from("plays")
+            .update(play)
+            .eq("id", value: play.id.uuidString)
+            .execute()
+    }
+
+    func deletePlay(id: UUID) async throws {
+        try await client
+            .from("plays")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Group Events
+
+    func fetchEventsForGroup(groupId: UUID) async throws -> [GameEvent] {
+        let events: [GameEvent] = try await client
+            .from("events")
+            .select(Self.eventSelect)
+            .eq("group_id", value: groupId.uuidString)
+            .is("deleted_at", value: nil)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        return events
+    }
+
+    func fetchCompletedEventsNeedingPlayLog(userId: UUID) async throws -> [GameEvent] {
+        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        let formatter = ISO8601DateFormatter()
+        let cutoff = formatter.string(from: sevenDaysAgo)
+
+        // Fetch completed events where user is host
+        let hostedEvents: [GameEvent] = try await client
+            .from("events")
+            .select(Self.eventSelect)
+            .eq("host_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("updated_at", value: cutoff)
+            .is("deleted_at", value: nil)
+            .execute()
+            .value
+
+        // Fetch completed events where user has accepted invite
+        let invitedEventIds: [UUID] = try await {
+            struct InvRow: Decodable { let eventId: UUID; enum CodingKeys: String, CodingKey { case eventId = "event_id" } }
+            let rows: [InvRow] = try await client
+                .from("invites")
+                .select("event_id")
+                .eq("user_id", value: userId.uuidString)
+                .eq("status", value: "accepted")
+                .execute()
+                .value
+            return rows.map(\.eventId)
+        }()
+
+        var invitedEvents: [GameEvent] = []
+        if !invitedEventIds.isEmpty {
+            invitedEvents = try await client
+                .from("events")
+                .select(Self.eventSelect)
+                .in("id", values: invitedEventIds.map(\.uuidString))
+                .eq("status", value: "completed")
+                .gte("updated_at", value: cutoff)
+                .is("deleted_at", value: nil)
+                .execute()
+                .value
+        }
+
+        // Merge and deduplicate
+        var byId = Dictionary(uniqueKeysWithValues: hostedEvents.map { ($0.id, $0) })
+        for e in invitedEvents { byId[e.id] = e }
+        let allCompleted = Array(byId.values)
+
+        // Filter out events where this user already logged a play
+        let eventIds = allCompleted.map(\.id)
+        guard !eventIds.isEmpty else { return [] }
+
+        let existingPlays: [Play] = try await client
+            .from("plays")
+            .select("id, event_id")
+            .eq("logged_by", value: userId.uuidString)
+            .in("event_id", values: eventIds.map(\.uuidString))
+            .execute()
+            .value
+
+        let loggedEventIds = Set(existingPlays.compactMap(\.eventId))
+        return allCompleted.filter { !loggedEventIds.contains($0.id) }
+    }
+
+    // MARK: - Group Messages
+
+    func fetchGroupMessages(groupId: UUID) async throws -> [GroupMessage] {
+        let messages: [GroupMessage] = try await client
+            .from("group_messages")
+            .select("*, user:users(*)")
+            .eq("group_id", value: groupId.uuidString)
+            .order("created_at")
+            .execute()
+            .value
+        return messages
+    }
+
+    func postGroupMessage(groupId: UUID, content: String, parentId: UUID?) async throws {
+        let session = try await client.auth.session
+        var entry: [String: AnyJSON] = [
+            "group_id": .string(groupId.uuidString),
+            "user_id": .string(session.user.id.uuidString),
+            "content": .string(content)
+        ]
+        if let parentId {
+            entry["parent_id"] = .string(parentId.uuidString)
+        }
+        try await client
+            .from("group_messages")
+            .insert(entry)
+            .execute()
+    }
+
+    func deleteGroupMessage(id: UUID) async throws {
+        try await client
+            .from("group_messages")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func subscribeToGroupMessages(groupId: UUID, onUpdate: @escaping () -> Void) -> RealtimeChannelV2 {
+        let channel = client.realtimeV2.channel("group-messages-\(groupId.uuidString)")
+
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "group_messages",
+            filter: .eq("group_id", value: groupId)
+        )
+
+        Task {
+            try? await channel.subscribeWithError()
+            for await _ in changes {
+                onUpdate()
+            }
+        }
+
+        return channel
+    }
 }
 
 // MARK: - AnyJSON Helper

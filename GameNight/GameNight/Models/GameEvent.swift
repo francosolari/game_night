@@ -26,6 +26,7 @@ struct GameEvent: Identifiable, Codable {
     var allowMaybeRSVP: Bool
     var requirePlusOneNames: Bool
     var coverImageUrl: String?
+    var groupId: UUID?
     var coverVariant: Int
     var draftInvitees: [DraftInvitee]?
     var deletedAt: Date?
@@ -69,6 +70,7 @@ struct GameEvent: Identifiable, Codable {
         case allowMaybeRSVP = "allow_maybe_rsvp"
         case requirePlusOneNames = "require_plus_one_names"
         case coverImageUrl = "cover_image_url"
+        case groupId = "group_id"
         case coverVariant = "cover_variant"
         case draftInvitees = "draft_invitees"
         case deletedAt = "deleted_at"
@@ -101,6 +103,7 @@ struct GameEvent: Identifiable, Codable {
         plusOneLimit: Int = 0,
         allowMaybeRSVP: Bool = true,
         requirePlusOneNames: Bool = false,
+        groupId: UUID? = nil,
         coverImageUrl: String? = nil,
         coverVariant: Int = 0,
         draftInvitees: [DraftInvitee]? = nil,
@@ -132,6 +135,7 @@ struct GameEvent: Identifiable, Codable {
         self.plusOneLimit = plusOneLimit
         self.allowMaybeRSVP = allowMaybeRSVP
         self.requirePlusOneNames = requirePlusOneNames
+        self.groupId = groupId
         self.coverImageUrl = coverImageUrl
         self.coverVariant = coverVariant
         self.draftInvitees = draftInvitees
@@ -166,6 +170,7 @@ struct GameEvent: Identifiable, Codable {
         plusOneLimit = try container.decodeIfPresent(Int.self, forKey: .plusOneLimit) ?? 0
         allowMaybeRSVP = try container.decodeIfPresent(Bool.self, forKey: .allowMaybeRSVP) ?? true
         requirePlusOneNames = try container.decodeIfPresent(Bool.self, forKey: .requirePlusOneNames) ?? false
+        groupId = try container.decodeIfPresent(UUID.self, forKey: .groupId)
         coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
         coverVariant = try container.decodeIfPresent(Int.self, forKey: .coverVariant) ?? 0
         draftInvitees = try container.decodeIfPresent([DraftInvitee].self, forKey: .draftInvitees)
@@ -199,6 +204,7 @@ struct GameEvent: Identifiable, Codable {
         try container.encode(plusOneLimit, forKey: .plusOneLimit)
         try container.encode(allowMaybeRSVP, forKey: .allowMaybeRSVP)
         try container.encode(requirePlusOneNames, forKey: .requirePlusOneNames)
+        try container.encodeIfPresent(groupId, forKey: .groupId)
         try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
         try container.encode(coverVariant, forKey: .coverVariant)
         try container.encodeIfPresent(draftInvitees, forKey: .draftInvitees)

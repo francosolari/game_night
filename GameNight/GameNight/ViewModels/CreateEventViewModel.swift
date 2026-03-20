@@ -710,6 +710,7 @@ final class CreateEventViewModel: ObservableObject {
             plusOneLimit: plusOneLimit,
             allowMaybeRSVP: allowMaybeRSVP,
             requirePlusOneNames: requirePlusOneNames,
+            groupId: selectedGroup?.id ?? existingEvent?.groupId,
             coverImageUrl: coverImageRemoved ? nil : (pendingCoverImageUrl ?? existingEvent?.coverImageUrl),
             coverVariant: coverVariant,
             draftInvitees: status == .draft ? orderedInvitees().map { entry in

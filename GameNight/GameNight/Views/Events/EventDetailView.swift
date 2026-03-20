@@ -16,6 +16,9 @@ struct EventDetailView: View {
     @State private var editSavePresentation = EventEditSavePresentation()
     @State private var heroStretchOffset: CGFloat = 0
     @State private var showRSVPSheet = false
+    @State private var showPlayLogging = false
+    @State private var eventPlays: [Play] = []
+    @State private var selectedPlay: Play?
 
     private var deleteErrorPresented: Binding<Bool> {
         Binding(
@@ -88,6 +91,11 @@ struct EventDetailView: View {
                                     } : nil,
                                     onViewAll: { showGuestListFullPage = true }
                                 )
+                            }
+
+                            // 5. Play Logging (completed events)
+                            if event.status == .completed {
+                                playLoggingSection(event)
                             }
 
                             // 7. Activity Feed
@@ -247,11 +255,72 @@ struct EventDetailView: View {
                 onInvite: { showInviteContacts = true }
             )
         }
+        .sheet(isPresented: $showPlayLogging) {
+            if let event = viewModel.event {
+                PlayLoggingSheet(event: event, invites: viewModel.invites)
+            }
+        }
+        .onChange(of: showPlayLogging) { _, isPresented in
+            if !isPresented {
+                Task { await loadEventPlays() }
+            }
+        }
+        .navigationDestination(item: $selectedPlay) { play in
+            PlayDetailView(
+                play: play,
+                currentUserId: SupabaseService.shared.client.auth.currentSession?.user.id
+            ) {
+                try? await SupabaseService.shared.deletePlay(id: play.id)
+                await loadEventPlays()
+            }
+        }
         .toast($viewModel.toast)
         .task {
             await viewModel.loadEvent(id: eventId)
             pollVotes = viewModel.myPollVotes
+            await loadEventPlays()
         }
+    }
+
+    private func loadEventPlays() async {
+        guard let event = viewModel.event, event.status == .completed else { return }
+        eventPlays = (try? await SupabaseService.shared.fetchPlaysForEvent(eventId: eventId)) ?? []
+    }
+
+    // MARK: - Play Logging Section
+
+    @ViewBuilder
+    private func playLoggingSection(_ event: GameEvent) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            SectionHeader(title: "What did you play?")
+
+            if !eventPlays.isEmpty {
+                ForEach(eventPlays) { play in
+                    PlayCard(play: play) {
+                        selectedPlay = play
+                    }
+                }
+            }
+
+            Button {
+                showPlayLogging = true
+            } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: eventPlays.isEmpty ? "trophy" : "plus.circle")
+                        .font(.system(size: 14))
+                    Text(eventPlays.isEmpty ? "Log Plays" : "Log Another")
+                        .font(Theme.Typography.calloutMedium)
+                }
+                .foregroundColor(Theme.Colors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.primary.opacity(0.1))
+                )
+            }
+        }
+        .cardStyle()
     }
 
     // MARK: - Games Section
