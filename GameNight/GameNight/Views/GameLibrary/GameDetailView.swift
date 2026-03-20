@@ -7,6 +7,9 @@ struct GameDetailView: View {
     @State private var isEditingManualGame = false
     @State private var manualDraftGame: Game?
     @State private var isSavingManualGame = false
+    @State private var showImageCropPicker = false
+    @State private var isUploadingImage = false
+    @State private var imageUploadError: String?
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -53,10 +56,68 @@ struct GameDetailView: View {
                             .offset(x: Theme.Spacing.xl * 0.5, y: Theme.Spacing.sm * 0.5)
                             .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
                     }
+
+                    if isEditingManualGame {
+                        // Full-frame tap area for upload/change
+                        Button {
+                            showImageCropPicker = true
+                        } label: {
+                            ZStack {
+                                Color.black.opacity(0.35)
+                                VStack(spacing: 6) {
+                                    if isUploadingImage {
+                                        ProgressView().tint(.white)
+                                    } else {
+                                        Image(systemName: displayedGame.imageUrl == nil ? "photo.badge.plus" : "camera.fill")
+                                            .font(.system(size: 24, weight: .semibold))
+                                            .foregroundColor(.white)
+                                        Text(displayedGame.imageUrl == nil ? "Add Photo" : "Change Photo")
+                                            .font(Theme.Typography.caption)
+                                            .foregroundColor(.white.opacity(0.9))
+                                    }
+                                }
+                            }
+                        }
+                        .disabled(isUploadingImage)
+                        .buttonStyle(.plain)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.lg))
+
+                        if let err = imageUploadError {
+                            Text(err)
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.6))
+                                .cornerRadius(6)
+                                .padding(Theme.Spacing.sm)
+                        }
+                    }
+                }
+                // Remove photo button — top-trailing when editing and image exists
+                .overlay(alignment: .topTrailing) {
+                    if isEditingManualGame, displayedGame.imageUrl != nil, !isUploadingImage {
+                        Button {
+                            Task { await removeGameImage() }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white)
+                                .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(Theme.Spacing.sm)
+                    }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.lg)
                 .padding(.bottom, -Theme.Spacing.xl)
+                .fullScreenCover(isPresented: $showImageCropPicker) {
+                    ImageCropPicker(isPresented: $showImageCropPicker) { image in
+                        Task { await uploadGameImage(image) }
+                    }
+                    .ignoresSafeArea()
+                }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     // 2. Title cluster
@@ -290,6 +351,39 @@ struct GameDetailView: View {
         manualDraftGame = nil
         isEditingManualGame = false
         isSavingManualGame = false
+        imageUploadError = nil
+    }
+
+    private func uploadGameImage(_ image: UIImage) async {
+        isUploadingImage = true
+        imageUploadError = nil
+        defer { isUploadingImage = false }
+
+        do {
+            guard let jpeg = image.jpegData(compressionQuality: 0.85) else {
+                imageUploadError = "Could not process image"
+                return
+            }
+
+            let gameId = viewModel.game.id
+            let publicUrl = try await R2StorageService.shared.uploadGameImage(data: jpeg, gameId: gameId)
+            try await SupabaseService.shared.updateGameImageUrl(gameId: gameId, imageUrl: publicUrl)
+
+            manualDraftGame?.imageUrl = publicUrl
+            viewModel.game.imageUrl = publicUrl
+        } catch {
+            imageUploadError = "Upload failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func removeGameImage() async {
+        do {
+            try await SupabaseService.shared.clearGameImageUrl(gameId: viewModel.game.id)
+            manualDraftGame?.imageUrl = nil
+            viewModel.game.imageUrl = nil
+        } catch {
+            imageUploadError = "Could not remove photo"
+        }
     }
 
     private func saveManualGameEdits() async {

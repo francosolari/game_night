@@ -47,6 +47,15 @@ supabase/.temp
 
 # Local git worktrees
 .worktrees/
+/.superpowers/brainstorm/69786-1773788362/.server.log
+/.superpowers/brainstorm/69786-1773788362/.server.pid
+/.superpowers/brainstorm/69786-1773788362/.server-stopped
+/.superpowers/brainstorm/69786-1773788362/palette-exploration.html
+/.superpowers/brainstorm/69786-1773788362/palette-v2.html
+/.superpowers/brainstorm/69786-1773788362/palette-v3.html
+/.superpowers/brainstorm/69786-1773788362/palette-v4.html
+/.superpowers/brainstorm/69786-1773788362/palette-v5-claude-inspired.html
+/.superpowers/brainstorm/69786-1773788362/waiting.html
 /.superpowers/brainstorm/80967-1773632508/.server.log
 /.superpowers/brainstorm/80967-1773632508/.server.pid
 /.superpowers/brainstorm/80967-1773632508/.server-stopped
@@ -55,4 +64,3 @@ supabase/.temp
 /.superpowers/brainstorm/80967-1773632508/event-detail-layout.html
 /.superpowers/brainstorm/80967-1773632508/game-voting-v3.html
 /.superpowers/brainstorm/80967-1773632508/waiting.html
-/.claude/worktrees/schedule-redesign/

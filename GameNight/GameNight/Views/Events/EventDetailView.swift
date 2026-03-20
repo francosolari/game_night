@@ -13,8 +13,9 @@ struct EventDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var showCreateGroupFromEvent = false
     @State private var showGuestListFullPage = false
-    @State private var toast: ToastItem?
     @State private var editSavePresentation = EventEditSavePresentation()
+    @State private var heroStretchOffset: CGFloat = 0
+    @State private var showRSVPSheet = false
 
     private var deleteErrorPresented: Binding<Bool> {
         Binding(
@@ -34,181 +35,78 @@ struct EventDetailView: View {
                     LoadingView()
                 } else if let event = viewModel.event {
                     VStack(spacing: 0) {
-                        // Hero Header with date badge
+                        // 1. Hero cover with overlay (title, RSVP, location, host, date badge)
                         EventHeroHeader(
                             event: event,
-                            locationPresentation: locationPresentation(for: event)
+                            locationPresentation: locationPresentation(for: event),
+                            calendarTimeOption: calendarTimeOption(for: event),
+                            myInvite: viewModel.myInvite,
+                            rsvpDeadline: event.rsvpDeadline,
+                            confirmedCount: viewModel.inviteSummary.accepted,
+                            minPlayers: event.minPlayers,
+                            maxPlayers: event.maxPlayers,
+                            hasPollsActive: viewModel.hasPollsActive,
+                            onRSVPTap: { showRSVPSheet = true }
                         )
 
                         VStack(spacing: Theme.Spacing.xxl) {
-                            // RSVP Section (prominent, right after hero)
-                            if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                                RSVPSection(
-                                    deadlineText: rsvpDeadlineText(for: event),
-                                    onAccept: {
-                                        let votes = buildTimeVotes(for: event)
-                                        await viewModel.respondToInvite(
-                                            status: .accepted,
-                                            timeVotes: votes,
-                                            suggestedTimes: nil
-                                        )
-                                    },
-                                    onDecline: {
-                                        await viewModel.respondToInvite(
-                                            status: .declined,
-                                            timeVotes: [],
-                                            suggestedTimes: nil
-                                        )
-                                    },
-                                    onMaybe: {
-                                        let votes = buildTimeVotes(for: event)
-                                        await viewModel.respondToInvite(
-                                            status: .maybe,
-                                            timeVotes: votes,
-                                            suggestedTimes: nil
-                                        )
-                                    },
-                                    isSending: viewModel.isSending
-                                )
-                            } else if let myInvite = viewModel.myInvite {
-                                VStack(spacing: Theme.Spacing.xs) {
-                                    HStack {
-                                        Image(systemName: myInvite.status.icon)
-                                        Text("You're \(myInvite.status.displayLabel.lowercased())")
-                                            .font(Theme.Typography.bodyMedium)
-                                    }
-                                    .foregroundColor(myInvite.status.color)
+                            // 2. Games Section ("What We're Playing") — first for visibility
+                            gamesSection(event)
 
-                                    if let deadlineText = rsvpDeadlineText(for: event) {
-                                        Text(deadlineText)
-                                            .font(Theme.Typography.caption)
-                                            .foregroundColor(Theme.Colors.textTertiary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(Theme.Spacing.lg)
-                                .background(
-                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                        .fill(myInvite.status.color.opacity(0.1))
-                                )
-                            }
-
-                            // Unified Games Section
-                            if event.allowGameVoting && event.games.count > 1 {
-                                GameVotingView(
-                                    eventGames: event.games,
-                                    myVotes: viewModel.myGameVotes,
-                                    isHost: viewModel.isOwner,
-                                    confirmedGameId: event.confirmedGameId,
-                                    onVote: { gameId, voteType in
-                                        await viewModel.voteForGame(gameId: gameId, voteType: voteType)
-                                    },
-                                    onConfirm: viewModel.isOwner ? { gameId in
-                                        await viewModel.confirmGame(gameId: gameId)
-                                    } : nil
-                                )
-                            } else if !event.games.isEmpty {
-                                if let primaryGame = event.games.first(where: { $0.isPrimary }) ?? event.games.first,
-                                   let game = primaryGame.game {
-                                    let otherEventGames = event.games.filter { $0.id != primaryGame.id }
-                                    PrimaryGameCard(game: game, eventGame: primaryGame, otherGames: otherEventGames)
-                                }
-                            }
-
-                            // Player Count Indicator
-                            if event.minPlayers > 0 {
-                                PlayerCountIndicator(
-                                    confirmedCount: viewModel.inviteSummary.accepted,
-                                    minPlayers: event.minPlayers,
-                                    maxPlayers: event.maxPlayers
-                                )
-                            }
-
-                            // Schedule Section (poll mode or add-to-calendar)
-                            if event.scheduleMode == .poll && event.timeOptions.count > 1 {
-                                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                                    SectionHeader(title: "Schedule Poll")
-
-                                    if let myInvite = viewModel.myInvite, myInvite.status == .pending {
-                                        Text("Vote on the times that work for you:")
-                                            .font(Theme.Typography.callout)
-                                            .foregroundColor(Theme.Colors.textSecondary)
-
-                                        PollVotingView(
-                                            timeOptions: event.timeOptions,
-                                            votes: $pollVotes
-                                        )
-
-                                        if event.allowTimeSuggestions {
-                                            Button {
-                                                showTimeSuggestion = true
-                                            } label: {
-                                                HStack {
-                                                    Image(systemName: "plus.circle")
-                                                    Text("Suggest another time")
-                                                }
-                                                .font(Theme.Typography.calloutMedium)
-                                                .foregroundColor(Theme.Colors.accent)
-                                            }
-                                        }
-                                    } else {
-                                        TimeOptionPicker(
-                                            timeOptions: event.timeOptions,
-                                            selectedIds: $selectedTimeIds,
-                                            allowMultiple: false,
-                                            showVoteCounts: true
-                                        )
-                                    }
-                                }
-                                .cardStyle()
-                            }
-
-                            // Add to Calendar
-                            if let timeOption = calendarTimeOption(for: event) {
-                                AddToCalendarButton(
-                                    title: event.title,
-                                    startDate: timeOption.startTime,
-                                    endDate: timeOption.endTime,
-                                    location: event.locationAddress ?? event.location,
-                                    notes: event.description,
-                                    games: event.games,
-                                    hostName: event.host?.displayName
-                                )
-                            }
-
-                            // Guest List Tabs (inline, swipeable)
-                            GuestListTabsView(
-                                summary: viewModel.inviteSummary,
-                                visibilityMode: guestListVisibilityMode,
-                                isHost: viewModel.isOwner,
-                                actionTitle: viewModel.canInviteGuests ? "Invite" : nil,
-                                onAction: viewModel.canInviteGuests ? {
-                                    showInviteContacts = true
-                                } : nil,
-                                onViewAll: { showGuestListFullPage = true }
-                            )
-
-                            // Activity Feed
-                            ActivityFeedView(viewModel: viewModel, isHost: viewModel.isOwner)
-
-                            // Description
+                            // 3. Description
                             if let desc = event.description, !desc.isEmpty {
                                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                    SectionHeader(title: "Details")
                                     Text(desc)
                                         .font(Theme.Typography.body)
                                         .foregroundColor(Theme.Colors.textSecondary)
                                 }
-                                .cardStyle()
                             }
+
+                            // 4. Guest List / Poll Guest List
+                            if viewModel.hasDatePollPending {
+                                PollGuestListView(
+                                    timeOptions: event.timeOptions,
+                                    voters: viewModel.timeOptionVoters,
+                                    isHost: viewModel.isOwner,
+                                    pollVotes: pollVotes,
+                                    onVote: { optionId, voteType in
+                                        pollVotes[optionId] = voteType
+                                        await viewModel.voteOnTimeOption(optionId: optionId, voteType: voteType)
+                                    },
+                                    onConfirmTime: viewModel.isOwner ? { timeOptionId in
+                                        await viewModel.confirmTimeOption(timeOptionId: timeOptionId)
+                                    } : nil
+                                )
+                            } else {
+                                GuestListTabsView(
+                                    summary: viewModel.inviteSummary,
+                                    visibilityMode: guestListVisibilityMode,
+                                    isHost: viewModel.isOwner,
+                                    actionTitle: viewModel.canInviteGuests ? "Invite" : nil,
+                                    onAction: viewModel.canInviteGuests ? {
+                                        showInviteContacts = true
+                                    } : nil,
+                                    onViewAll: { showGuestListFullPage = true }
+                                )
+                            }
+
+                            // 7. Activity Feed
+                            ActivityFeedView(viewModel: viewModel, isHost: viewModel.isOwner)
                         }
-                        .padding(Theme.Spacing.xl)
+                        .padding(.horizontal, Theme.Spacing.xl)
+                        .padding(.top, Theme.Spacing.xl)
                     }
-                    .padding(.bottom, 100)
+                    .padding(.bottom, Theme.Spacing.xxl)
                 }
+            }
+            .scrollIndicators(.hidden)
+            .refreshable {
+                await viewModel.refreshEventData(eventId: eventId)
+                pollVotes = viewModel.myPollVotes
             }
             .disabled(viewModel.isDeleting)
 
+            // Delete overlay
             if viewModel.isDeleting {
                 Theme.Colors.overlay
                     .ignoresSafeArea()
@@ -272,7 +170,10 @@ struct EventDetailView: View {
             ContactListSheet(
                 excludedPhones: Set(viewModel.invites.map(\.phoneNumber)),
                 onSelect: { contacts in
-                    Task { await viewModel.inviteContacts(contacts) }
+                    Task {
+                        await viewModel.inviteContacts(contacts)
+                        viewModel.toast = ToastItem(style: .success, message: "\(contacts.count) invite\(contacts.count == 1 ? "" : "s") sent!")
+                    }
                 }
             )
         }
@@ -288,7 +189,7 @@ struct EventDetailView: View {
                 return
             }
             viewModel.applyEditedEvent(savedEvent)
-            toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
+            viewModel.toast = EventEditToastFactory.makeSuccessToast(for: savedEvent)
             Task { await viewModel.loadEvent(id: eventId) }
         }
         .confirmationDialog(
@@ -307,15 +208,35 @@ struct EventDetailView: View {
         } message: {
             Text("This can't be undone.")
         }
-        .alert("Couldn't delete event", isPresented: deleteErrorPresented) {
+        .alert("Something went wrong", isPresented: deleteErrorPresented) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.error ?? "Please try again.")
         }
         .sheet(isPresented: $showCreateGroupFromEvent) {
             CreateGroupFromAttendeesSheet(invites: viewModel.invites, onResult: { resultToast in
-                toast = resultToast
+                viewModel.toast = resultToast
             })
+        }
+        .sheet(isPresented: $showRSVPSheet) {
+            if let event = viewModel.event {
+                RSVPSheet(
+                    event: event,
+                    currentStatus: viewModel.myInvite?.status,
+                    isSending: viewModel.isSending,
+                    pollVotes: $pollVotes,
+                    onSubmit: { status in
+                        let votes = buildTimeVotes(for: event)
+                        await viewModel.respondToInvite(
+                            status: status,
+                            timeVotes: status == .declined ? [] : votes,
+                            suggestedTimes: nil
+                        )
+                        let message = status == .accepted ? "You're going!" : status == .maybe ? "Maybe next time!" : "RSVP updated"
+                        viewModel.toast = ToastItem(style: .success, message: message)
+                    }
+                )
+            }
         }
         .sheet(isPresented: $showGuestListFullPage) {
             GuestListFullPageView(
@@ -326,11 +247,65 @@ struct EventDetailView: View {
                 onInvite: { showInviteContacts = true }
             )
         }
-        .toast($toast)
+        .toast($viewModel.toast)
         .task {
             await viewModel.loadEvent(id: eventId)
+            pollVotes = viewModel.myPollVotes
         }
     }
+
+    // MARK: - Games Section
+
+    @ViewBuilder
+    private func gamesSection(_ event: GameEvent) -> some View {
+        if event.allowGameVoting && event.games.count > 1 {
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                SectionHeader(title: "What We're Playing")
+
+                // Quorum warning banner
+                if event.minPlayers > 0 && viewModel.inviteSummary.accepted < event.minPlayers {
+                    let needed = event.minPlayers - viewModel.inviteSummary.accepted
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+                        Text("\(needed) more player\(needed == 1 ? "" : "s") needed")
+                            .font(Theme.Typography.caption)
+                    }
+                    .foregroundColor(Theme.Colors.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Theme.Spacing.sm)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .fill(Theme.Colors.warning.opacity(0.1))
+                    )
+                }
+
+                GameVotingView(
+                    eventGames: event.games,
+                    myVotes: viewModel.myGameVotes,
+                    isHost: viewModel.isOwner,
+                    confirmedGameId: event.confirmedGameId,
+                    voterDetails: viewModel.gameVoterDetails,
+                    onVote: { gameId, voteType in
+                        await viewModel.voteForGame(gameId: gameId, voteType: voteType)
+                    },
+                    onConfirm: viewModel.isOwner ? { gameId in
+                        await viewModel.confirmGame(gameId: gameId)
+                    } : nil
+                )
+            }
+        } else if !event.games.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                if let primaryGame = event.games.first(where: { $0.isPrimary }) ?? event.games.first,
+                   let game = primaryGame.game {
+                    let otherEventGames = event.games.filter { $0.id != primaryGame.id }
+                    PrimaryGameCard(game: game, eventGame: primaryGame, otherGames: otherEventGames)
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
 
     private func buildTimeVotes(for event: GameEvent) -> [TimeOptionVote] {
         if event.scheduleMode == .poll && event.timeOptions.count > 1 {
@@ -340,15 +315,14 @@ struct EventDetailView: View {
         }
     }
 
-
     private var guestListVisibilityMode: GuestListVisibilityMode {
         guard viewModel.accessPolicy?.canViewGuestList ?? true else {
-            return .countsOnly(message: "RSVP to see who's going.")
+            return .countsWithBlocker(message: "RSVP to see who's going.")
         }
         if viewModel.isOwner || viewModel.hasRSVPd {
             return .fullList
         }
-        return .countsOnly(message: "RSVP to see who's going.")
+        return .countsWithBlocker(message: "RSVP to see who's going.")
     }
 
     private func locationPresentation(for event: GameEvent) -> EventLocationPresentation? {
@@ -371,11 +345,9 @@ struct EventDetailView: View {
         return nil
     }
 
-    private func rsvpDeadlineText(for event: GameEvent) -> String? {
-        guard let deadline = event.rsvpDeadline else { return nil }
-        return RSVPDeadlineDisplay.label(for: deadline)
-    }
 }
+
+// MARK: - Supporting Types
 
 enum EventEditToastFactory {
     static func makeSuccessToast(for event: GameEvent) -> ToastItem {
@@ -401,116 +373,281 @@ struct EventEditSavePresentation {
     }
 }
 
-// MARK: - Event Hero Header (redesigned with date badge)
+// MARK: - Event Hero Header (overlay layout with gradient scrim)
+
 struct EventHeroHeader: View {
     let event: GameEvent
-    let locationPresentation: EventLocationPresentation?
+    var locationPresentation: EventLocationPresentation? = nil
+    var calendarTimeOption: TimeOption? = nil
+    var myInvite: Invite? = nil
+    var rsvpDeadline: Date? = nil
+    var confirmedCount: Int = 0
+    var minPlayers: Int = 0
+    var maxPlayers: Int? = nil
+    var hasPollsActive: Bool = false
+    var onRSVPTap: (() -> Void)? = nil
+    private let heroHeight: CGFloat = 330
+
     @Environment(\.openURL) private var openURL
     @State private var showMapPicker = false
-    private let heroHeight: CGFloat = 260
-
-    private var firstTimeOption: TimeOption? {
-        event.timeOptions.first
-    }
 
     private var coverImageURL: URL? {
         guard let urlString = event.preferredCoverImageURLString else { return nil }
         return URL(string: urlString)
     }
 
+    private var firstTimeOption: TimeOption? {
+        event.timeOptions.first
+    }
+
+    private var relativeTimeLabel: String {
+        guard let timeOption = firstTimeOption else { return "" }
+        return timeOption.relativeTimeDisplay
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            coverBackground
-                .frame(height: heroHeight)
+        GeometryReader { geo in
+            let minY = geo.frame(in: .global).minY
+            let stretchHeight = minY > 0 ? heroHeight + minY : heroHeight
 
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0.03),
-                    Color.black.opacity(0.26)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: heroHeight)
+            ZStack(alignment: .bottom) {
+                // Cover image — full bleed
+                coverBackground
+                    .frame(width: geo.size.width, height: stretchHeight)
+                    .clipped()
 
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                // Frosted material that fades in from mid → bottom
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, ThemeManager.shared.isDark ? .dark : .light)
+                    .mask(
+                        LinearGradient(stops: [
+                            .init(color: .clear, location: 0.0),
+                            .init(color: .clear, location: 0.35),
+                            .init(color: .black.opacity(0.6), location: 0.55),
+                            .init(color: .black, location: 0.68),
+                        ], startPoint: .top, endPoint: .bottom)
+                    )
+
+                // Subtle tint over the material area — warm cream in light, dark in dark
+                LinearGradient(stops: [
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .clear, location: 0.55),
+                    .init(color: (ThemeManager.shared.isDark
+                        ? Color(red: 0.08, green: 0.07, blue: 0.06).opacity(0.4)
+                        : Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.25)
+                    ), location: 0.72),
+                    .init(color: (ThemeManager.shared.isDark
+                        ? Color(red: 0.08, green: 0.07, blue: 0.06).opacity(0.55)
+                        : Color(red: 0.96, green: 0.94, blue: 0.90).opacity(0.35)
+                    ), location: 1.0),
+                ], startPoint: .top, endPoint: .bottom)
+
+                // Content — dense, no wasted vertical space
+                VStack(alignment: .leading, spacing: 4) {
                     // Title
                     Text(event.title)
                         .font(Theme.Typography.displayMedium.weight(.bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .shadow(color: ThemeManager.shared.isDark ? .black.opacity(0.6) : .white.opacity(0.5), radius: 8, y: 0)
 
-                    // Status Pill
-                    HStack(spacing: Theme.Spacing.md) {
-                        Text(event.status.rawValue.capitalized)
-                            .font(Theme.Typography.caption2)
-                            .foregroundColor(Theme.Colors.accentLight)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(.black.opacity(0.28)))
-                    }
+                    // Date/time line
+                    if let timeOption = firstTimeOption {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.Colors.dateAccent)
 
-                    // Location line (simplified)
-                    if let locationPresentation {
-                        locationRow(locationPresentation)
-                        .padding(.top, 4)
-                    }
+                            heroDateTimeText(for: timeOption)
 
-                    if let host = event.host {
-                        HStack(spacing: 8) {
-                            AvatarView(url: host.avatarUrl, size: 24)
-                            Text("Hosted by \(host.displayName)")
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(.white.opacity(0.88))
+                            if let calendarTimeOption {
+                                CompactCalendarButton(
+                                    title: event.title,
+                                    startDate: calendarTimeOption.startTime,
+                                    endDate: calendarTimeOption.endTime,
+                                    location: event.locationAddress ?? event.location,
+                                    notes: event.description,
+                                    games: event.games,
+                                    hostName: event.host?.displayName
+                                )
+                            }
                         }
-                        .padding(.top, 4)
+                    }
+
+                    // Location
+                    if let locationPresentation {
+                        heroLocationRow(locationPresentation)
+                    }
+
+                    // Host
+                    if let host = event.host {
+                        HStack(spacing: 6) {
+                            AvatarView(url: host.avatarUrl, size: 18)
+                            Text("Hosted by \(host.displayName)")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                        }
+                    }
+
+                    // RSVP + player count — immediately after details
+                    if myInvite != nil || minPlayers > 0 {
+                        Divider()
+                            .background(Theme.Colors.divider)
+                            .padding(.top, 2)
+
+                        HStack(spacing: Theme.Spacing.md) {
+                            if let myInvite, let onRSVPTap {
+                                heroRSVPRow(invite: myInvite, onTap: onRSVPTap)
+                            }
+
+                            Spacer()
+
+                            if minPlayers > 0 {
+                                PlayerCountIndicator(
+                                    confirmedCount: confirmedCount,
+                                    minPlayers: minPlayers,
+                                    maxPlayers: maxPlayers
+                                )
+                            }
+                        }
                     }
                 }
-
-                Spacer()
-
-                if let timeOption = firstTimeOption {
-                    DateBadge(
-                        date: timeOption.date,
-                        timeString: timeOption.displayTime,
-                        relativeTime: timeOption.relativeTimeDisplay
-                    )
-                }
+                .padding(Theme.Spacing.xl)
             }
-            .padding(Theme.Spacing.xl)
+            .offset(y: minY > 0 ? -minY : 0)
         }
         .frame(height: heroHeight)
-        .clipped()
+    }
+
+    // MARK: - RSVP Row
+    @ViewBuilder
+    private func heroRSVPRow(invite: Invite, onTap: @escaping () -> Void) -> some View {
+        let isPending = invite.status == .pending
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if isPending {
+                        Image(systemName: "envelope.open.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Theme.Colors.primary)
+                        Text(hasPollsActive ? "RSVP & Vote" : "RSVP")
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.primary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    } else {
+                        Image(systemName: invite.status.icon)
+                            .font(.system(size: 14))
+                            .foregroundColor(invite.status.color)
+                        Text(invite.status.rsvpDisplayLabel)
+                            .font(Theme.Typography.bodyMedium)
+                            .foregroundColor(Theme.Colors.textPrimary)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                }
+
+                if let rsvpDeadline {
+                    Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                } else if !isPending && hasPollsActive {
+                    Text("View Polls")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(Theme.Colors.primary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Renders "TODAY · 7:00 PM", "TOMORROW · 7:00 PM", or "Thursday, Mar 19 · 7:00 PM"
+    @ViewBuilder
+    private func heroDateTimeText(for timeOption: TimeOption) -> some View {
+        let relative = timeOption.relativeTimeDisplay
+        let isUrgent = relative == "Today" || relative == "Tomorrow"
+
+        let timeFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "h:mm a"
+            return f
+        }()
+        let timeStr = timeFormatter.string(from: timeOption.startTime)
+
+        if isUrgent {
+            HStack(spacing: 6) {
+                Text(relative.uppercased())
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Theme.Colors.dateAccent)
+                    )
+
+                Text("·")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                Text(timeStr)
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(Theme.Colors.dateAccent)
+            }
+        } else {
+            let dateFormatter: DateFormatter = {
+                let f = DateFormatter()
+                f.dateFormat = "EEEE, MMM d"
+                return f
+            }()
+            let dateStr = dateFormatter.string(from: timeOption.date)
+
+            HStack(spacing: 0) {
+                Text(dateStr)
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("  ·  ")
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textTertiary)
+
+                Text(timeStr)
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(Theme.Colors.dateAccent)
+            }
+        }
     }
 
     @ViewBuilder
-    private func locationRow(_ locationPresentation: EventLocationPresentation) -> some View {
-        let content = HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "mappin.circle.fill")
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.82))
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(locationPresentation.title)
-                    .font(Theme.Typography.callout)
-                    .foregroundColor(.white.opacity(0.9))
+    private func heroLocationRow(_ presentation: EventLocationPresentation) -> some View {
+        let content = VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.Colors.textSecondary)
+                Text(presentation.title)
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
                     .lineLimit(1)
-                if let subtitle = locationPresentation.subtitle {
-                    Text(subtitle)
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(.white.opacity(0.72))
-                        .lineLimit(1)
+                if presentation.mapsURL != nil {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
             }
-            if locationPresentation.mapsURL != nil {
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.72))
-                    .padding(.top, 3)
+
+            if let subtitle = presentation.subtitle {
+                Text(subtitle)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .lineLimit(1)
+                    .padding(.leading, 19)
             }
         }
 
-        if locationPresentation.mapsURL != nil {
+        if presentation.mapsURL != nil {
             Button {
                 showMapPicker = true
             } label: {
@@ -518,13 +655,13 @@ struct EventHeroHeader: View {
             }
             .buttonStyle(.plain)
             .confirmationDialog("Open in", isPresented: $showMapPicker, titleVisibility: .visible) {
-                if let url = locationPresentation.mapsURL {
+                if let url = presentation.mapsURL {
                     Button("Apple Maps") { openURL(url) }
                 }
-                if let url = locationPresentation.googleMapsURL {
+                if let url = presentation.googleMapsURL {
                     Button("Google Maps") { openURL(url) }
                 }
-                if let url = locationPresentation.wazeURL {
+                if let url = presentation.wazeURL {
                     Button("Waze") { openURL(url) }
                 }
                 Button("Cancel", role: .cancel) {}
@@ -551,6 +688,7 @@ struct EventHeroHeader: View {
 }
 
 // MARK: - Date Badge
+
 struct DateBadge: View {
     let date: Date
     var timeString: String? = nil
@@ -626,6 +764,7 @@ struct DateBadge: View {
 }
 
 // MARK: - Primary Game Card with Pills
+
 struct PrimaryGameCard: View {
     @EnvironmentObject var themeManager: ThemeManager
     let game: Game
@@ -645,7 +784,7 @@ struct PrimaryGameCard: View {
             NavigationLink(value: game) {
                 HStack(spacing: Theme.Spacing.md) {
                     // Thumbnail
-                    if let url = game.thumbnailUrl, let imageUrl = URL(string: url) {
+                    if let url = game.imageUrl ?? game.thumbnailUrl, let imageUrl = URL(string: url) {
                         AsyncImage(url: imageUrl) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
@@ -705,14 +844,14 @@ struct PrimaryGameCard: View {
                         .font(Theme.Typography.caption2)
                         .foregroundColor(Theme.Colors.textTertiary)
                         .padding(.trailing, 4)
-                    
+
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: Theme.Spacing.md) {
                             ForEach(otherGames) { eGame in
                                 if let oGame = eGame.game {
                                     NavigationLink(value: oGame) {
                                         HStack(spacing: 4) {
-                                            if let url = oGame.thumbnailUrl, let imageUrl = URL(string: url) {
+                                            if let url = oGame.imageUrl ?? oGame.thumbnailUrl, let imageUrl = URL(string: url) {
                                                 AsyncImage(url: imageUrl) { image in
                                                     image.resizable().aspectRatio(contentMode: .fill)
                                                 } placeholder: {
@@ -754,6 +893,7 @@ struct PrimaryGameCard: View {
 }
 
 // MARK: - Game Info Pill
+
 struct GamePill: View {
     let icon: String
     let text: String
@@ -775,53 +915,8 @@ struct GamePill: View {
     }
 }
 
-// MARK: - RSVP Section
-struct RSVPSection: View {
-    var deadlineText: String? = nil
-    let onAccept: () async -> Void
-    let onDecline: () async -> Void
-    let onMaybe: () async -> Void
-    var isSending: Bool
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            if let deadlineText {
-                Text(deadlineText)
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.textTertiary)
-            }
-
-            Text("Are you in?")
-                .font(Theme.Typography.headlineMedium)
-                .foregroundColor(Theme.Colors.textPrimary)
-
-            if isSending {
-                ProgressView()
-                    .tint(Theme.Colors.primary)
-            } else {
-                Button("I'm Going!") {
-                    Task { await onAccept() }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-
-                HStack(spacing: Theme.Spacing.md) {
-                    Button("Maybe") {
-                        Task { await onMaybe() }
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-
-                    Button("Can't Go") {
-                        Task { await onDecline() }
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                }
-            }
-        }
-        .cardStyle()
-    }
-}
-
 // MARK: - Guest Count Badge
+
 struct GuestCountBadge: View {
     let count: Int
     let label: String
@@ -841,6 +936,7 @@ struct GuestCountBadge: View {
 }
 
 // MARK: - Invite List Sheet (kept for backward compatibility)
+
 struct InviteListSheet: View {
     let invites: [Invite]
     let summary: InviteSummary
@@ -866,6 +962,7 @@ struct InviteListSheet: View {
                 .padding(Theme.Spacing.xl)
             }
             .background(Theme.Colors.background.ignoresSafeArea())
+            .scrollIndicators(.hidden)
             .navigationTitle("Guest List")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -886,9 +983,7 @@ struct InviteSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack(spacing: Theme.Spacing.sm) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
+                StatusDot(color: color)
                 Text("\(title) (\(users.count))")
                     .font(Theme.Typography.headlineMedium)
                     .foregroundColor(Theme.Colors.textPrimary)

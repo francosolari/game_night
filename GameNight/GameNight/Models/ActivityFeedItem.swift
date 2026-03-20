@@ -19,6 +19,8 @@ struct ActivityFeedItem: Identifiable, Codable {
         case comment
         case rsvpUpdate = "rsvp_update"
         case announcement
+        case dateConfirmed = "date_confirmed"
+        case gameConfirmed = "game_confirmed"
     }
 
     enum CodingKeys: String, CodingKey {

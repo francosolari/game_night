@@ -483,6 +483,36 @@ struct TimeOptionVote: Codable {
     }
 }
 
+// MARK: - Poll Voter Models
+
+struct TimeOptionVoter: Identifiable, Codable {
+    let timeOptionId: UUID
+    let voteType: String
+    let userId: UUID
+    let displayName: String
+    let avatarUrl: String?
+
+    var id: String { "\(timeOptionId)-\(userId)" }
+
+    enum CodingKeys: String, CodingKey {
+        case timeOptionId = "time_option_id"
+        case voteType = "vote_type"
+        case userId = "user_id"
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+    }
+}
+
+struct GameVoterInfo: Identifiable {
+    let gameId: UUID
+    let userId: UUID
+    var displayName: String
+    var avatarUrl: String?
+    var voteType: GameVoteType
+
+    var id: String { "\(gameId)-\(userId)" }
+}
+
 // MARK: - Preview Data
 extension GameEvent {
     static let preview = GameEvent(

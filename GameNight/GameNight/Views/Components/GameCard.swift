@@ -14,8 +14,8 @@ struct GameCard: View {
 
     private var content: some View {
         HStack(spacing: Theme.Spacing.md) {
-            // Thumbnail
-            GameThumbnail(url: game.thumbnailUrl, size: 72)
+            // Thumbnail (prefer custom image, fall back to BGG thumbnail)
+            GameThumbnail(url: game.imageUrl ?? game.thumbnailUrl, size: 72)
 
             // Info
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
@@ -83,7 +83,7 @@ struct CompactGameCard: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            GameThumbnail(url: game.thumbnailUrl, size: 44)
+            GameThumbnail(url: game.imageUrl ?? game.thumbnailUrl, size: 44)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {

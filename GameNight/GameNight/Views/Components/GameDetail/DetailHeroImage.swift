@@ -14,7 +14,8 @@ struct DetailHeroImage: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 280)
+                        .frame(maxHeight: 280)
+                        .background(Color.black.opacity(0.05))
                         .clipped()
                 } placeholder: {
                     fallbackView
@@ -29,6 +30,8 @@ struct DetailHeroImage: View {
                     .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
             }
         }
+        .frame(maxWidth: .infinity)
+        .frame(maxHeight: 280)
         .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.lg))
     }
 

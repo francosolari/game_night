@@ -12,6 +12,7 @@ struct ContactListSheet: View {
     @State private var isLoading = true
     @State private var showDevicePicker = false
     @State private var selectedIds = Set<UUID>()
+    @State private var importedContacts: [UserContact] = []
 
     /// Phone numbers already in the invite list — these contacts won't be shown
     let excludedPhones: Set<String>
@@ -43,6 +44,12 @@ struct ContactListSheet: View {
             guard !seen.contains(sc.phoneNumber) else { continue }
             seen.insert(sc.phoneNumber)
             result.append(sc.asUserContact)
+        }
+
+        for ic in importedContacts {
+            guard !seen.contains(ic.phoneNumber) else { continue }
+            seen.insert(ic.phoneNumber)
+            result.append(ic)
         }
 
         return result
@@ -157,7 +164,8 @@ struct ContactListSheet: View {
         }
         .sheet(isPresented: $showDevicePicker) {
             ContactPickerSheet { deviceContacts in
-                // Save to Supabase, then add to our local list
+                guard !deviceContacts.isEmpty else { return }
+                // Save to Supabase in background
                 Task {
                     let supabase = SupabaseService.shared
                     let saved = (try? await supabase.saveContacts(deviceContacts)) ?? []
@@ -167,9 +175,13 @@ struct ContactListSheet: View {
                         }
                     }
                 }
-                // Add device contacts directly to selection
-                onSelect(deviceContacts)
-                dismiss()
+                // Pre-select imported contacts in the list — user confirms with "Add (N)"
+                for contact in deviceContacts {
+                    if !importedContacts.contains(where: { $0.phoneNumber == contact.phoneNumber }) {
+                        importedContacts.append(contact)
+                    }
+                    selectedIds.insert(contact.id)
+                }
             }
         }
         .task {

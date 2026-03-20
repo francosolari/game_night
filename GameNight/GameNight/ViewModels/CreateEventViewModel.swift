@@ -49,6 +49,8 @@ final class CreateEventViewModel: ObservableObject {
     @Published var isSaving = false
     @Published var error: String?
     @Published var createdEvent: GameEvent?
+    @Published var pendingCoverImageUrl: String?
+    @Published var coverImageRemoved: Bool = false
     let eventToEdit: GameEvent?
 
     @Published var gameSearchQuery = ""
@@ -708,7 +710,7 @@ final class CreateEventViewModel: ObservableObject {
             plusOneLimit: plusOneLimit,
             allowMaybeRSVP: allowMaybeRSVP,
             requirePlusOneNames: requirePlusOneNames,
-            coverImageUrl: existingEvent?.coverImageUrl,
+            coverImageUrl: coverImageRemoved ? nil : (pendingCoverImageUrl ?? existingEvent?.coverImageUrl),
             coverVariant: coverVariant,
             draftInvitees: status == .draft ? orderedInvitees().map { entry in
                 DraftInvitee(

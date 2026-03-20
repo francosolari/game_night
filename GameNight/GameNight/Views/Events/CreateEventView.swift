@@ -103,6 +103,8 @@ struct CreateEventView: View {
                     }
                     .padding(.bottom, 120)
                 }
+                .scrollDismissesKeyboard(.interactively)
+                .hideKeyboardOnTap()
                 .background(Theme.Colors.background.ignoresSafeArea())
                 .gesture(
                     DragGesture(minimumDistance: 50, coordinateSpace: .local)

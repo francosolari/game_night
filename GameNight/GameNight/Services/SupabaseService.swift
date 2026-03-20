@@ -7,6 +7,7 @@ protocol EventEditingProviding: AnyObject {
     func fetchEvent(id: UUID) async throws -> GameEvent
     func createEvent(_ event: GameEvent) async throws -> GameEvent
     func updateEvent(_ event: GameEvent) async throws
+    func updateEventCoverImageUrl(eventId: UUID, coverImageUrl: String) async throws
     func createTimeOptions(_ timeOptions: [TimeOption]) async throws
     func upsertTimeOptions(_ timeOptions: [TimeOption]) async throws
     func deleteTimeOptions(eventId: UUID) async throws
@@ -22,6 +23,7 @@ protocol EventEditingProviding: AnyObject {
     func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact]
     func upsertGame(_ game: Game) async throws -> Game
     func updateGame(_ game: Game) async throws
+    func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
     func fetchGameLibrary() async throws -> [GameLibraryEntry]
     func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws
@@ -253,14 +255,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         _ functionName: String,
         body: some Encodable
     ) async throws {
-        let session = try await client.auth.session
-        try await client.functions.invoke(
-            functionName,
-            options: .init(
-                headers: ["Authorization": "Bearer \(session.accessToken)"],
-                body: body
-            )
-        )
+        try await client.functions.invoke(functionName, options: .init(body: body))
     }
 
     func invokeAuthenticatedFunction<Response: Decodable>(
@@ -268,15 +263,27 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         body: some Encodable,
         decoder: JSONDecoder = JSONDecoder()
     ) async throws -> Response {
-        let session = try await client.auth.session
-        return try await client.functions.invoke(
-            functionName,
-            options: .init(
-                headers: ["Authorization": "Bearer \(session.accessToken)"],
-                body: body
-            ),
-            decoder: decoder
-        )
+        // Let the SDK handle auth — it correctly handles the new sb_publishable_ key format.
+        // Do NOT pass Authorization manually; the SDK injects the session JWT automatically.
+        print("[Supabase] invokeAuthenticatedFunction<\(Response.self)> '\(functionName)' via SDK")
+        do {
+            let result: Response = try await client.functions.invoke(
+                functionName,
+                options: .init(body: body),
+                decoder: decoder
+            )
+            print("[Supabase] '\(functionName)' succeeded")
+            return result
+        } catch let err as FunctionsError {
+            switch err {
+            case .httpError(let code, let data):
+                let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+                print("[Supabase] '\(functionName)' HTTP \(code): \(body)")
+            case .relayError:
+                print("[Supabase] '\(functionName)' relay error")
+            }
+            throw err
+        }
     }
 
     private func betaEnsureUserURL() throws -> URL {
@@ -431,6 +438,24 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func updateEventCoverImageUrl(eventId: UUID, coverImageUrl: String) async throws {
+        let updates: [String: AnyJSON] = ["cover_image_url": .string(coverImageUrl)]
+        try await client
+            .from("events")
+            .update(updates)
+            .eq("id", value: eventId.uuidString)
+            .execute()
+    }
+
+    func clearEventCoverImageUrl(eventId: UUID) async throws {
+        let updates: [String: AnyJSON] = ["cover_image_url": .null]
+        try await client
+            .from("events")
+            .update(updates)
+            .eq("id", value: eventId.uuidString)
+            .execute()
+    }
+
     func softDeleteEvent(id: UUID) async throws {
         let updates: [String: AnyJSON] = [
             "deleted_at": .string(ISO8601DateFormatter().string(from: Date())),
@@ -573,55 +598,97 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return invites
     }
 
-    func respondToInvite(inviteId: UUID, status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async throws {
-        // selected_time_option_ids stores 'yes' votes for backward compat
-        let yesIds = timeVotes.filter { $0.voteType == .yes }.map { $0.timeOptionId }
-
-        let updates: [String: AnyJSON] = [
-            "status": .string(status.rawValue),
-            "responded_at": .string(ISO8601DateFormatter().string(from: Date())),
-            "selected_time_option_ids": .array(yesIds.map { .string($0.uuidString) })
-        ]
-
-        try await client
+    func fetchInvite(id: UUID) async throws -> Invite {
+        let invite: Invite = try await client
             .from("invites")
-            .update(updates)
-            .eq("id", value: inviteId.uuidString)
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
             .execute()
+            .value
+        return invite
+    }
 
-        // Delete existing votes for this invite, then insert new ones
-        try await client
-            .from("time_option_votes")
-            .delete()
-            .eq("invite_id", value: inviteId.uuidString)
+    func fetchUserById(_ userId: UUID) async throws -> User {
+        let user: User = try await client
+            .from("users")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .single()
             .execute()
+            .value
+        return user
+    }
 
-        if !timeVotes.isEmpty {
-            struct VoteInsert: Encodable {
-                let timeOptionId: UUID
-                let inviteId: UUID
-                let voteType: String
-                enum CodingKeys: String, CodingKey {
-                    case timeOptionId = "time_option_id"
-                    case inviteId = "invite_id"
-                    case voteType = "vote_type"
-                }
+    func respondToInvite(inviteId: UUID, status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async throws {
+        struct VoteParam: Encodable {
+            let timeOptionId: String
+            let voteType: String
+            enum CodingKeys: String, CodingKey {
+                case timeOptionId = "time_option_id"
+                case voteType = "vote_type"
             }
-            let voteInserts = timeVotes.map { vote in
-                VoteInsert(timeOptionId: vote.timeOptionId, inviteId: inviteId, voteType: vote.voteType.rawValue)
+        }
+        struct SuggestedTimeParam: Encodable {
+            let date: String
+            let startTime: String
+            let endTime: String?
+            let label: String?
+            enum CodingKeys: String, CodingKey {
+                case date, label
+                case startTime = "start_time"
+                case endTime = "end_time"
             }
-            try await client
-                .from("time_option_votes")
-                .insert(voteInserts)
-                .execute()
+        }
+        struct RespondParams: Encodable {
+            let pInviteId: String
+            let pStatus: String
+            let pVotes: [VoteParam]
+            let pSuggestedTimes: [SuggestedTimeParam]
+            enum CodingKeys: String, CodingKey {
+                case pInviteId = "p_invite_id"
+                case pStatus = "p_status"
+                case pVotes = "p_votes"
+                case pSuggestedTimes = "p_suggested_times"
+            }
         }
 
-        // Insert suggested times if any
-        if let suggestedTimes, !suggestedTimes.isEmpty {
-            try await client
-                .from("time_options")
-                .insert(suggestedTimes)
-                .execute()
+        let iso = ISO8601DateFormatter()
+        let votes = timeVotes.map { VoteParam(timeOptionId: $0.timeOptionId.uuidString, voteType: $0.voteType.rawValue) }
+        let suggested = (suggestedTimes ?? []).map { t in
+            SuggestedTimeParam(
+                date: iso.string(from: t.date),
+                startTime: iso.string(from: t.startTime),
+                endTime: t.endTime.map { iso.string(from: $0) },
+                label: t.label
+            )
+        }
+
+        // Use the respond_to_invite RPC which correctly sets event_participant_id on votes
+        try await client
+            .rpc("respond_to_invite", params: RespondParams(
+                pInviteId: inviteId.uuidString,
+                pStatus: status.rawValue,
+                pVotes: votes,
+                pSuggestedTimes: suggested
+            ))
+            .execute()
+
+        // Auto-save the host as a contact (fire-and-forget) — fetch the invite to get hostUserId
+        Task {
+            if let invite = try? await fetchInvite(id: inviteId),
+               let hostId = invite.hostUserId {
+                if let hostUser = try? await fetchUserById(hostId) {
+                    let contact = UserContact(
+                        id: UUID(),
+                        name: hostUser.displayName,
+                        phoneNumber: hostUser.phoneNumber,
+                        avatarUrl: hostUser.avatarUrl,
+                        isAppUser: true
+                    )
+                    try? await saveContacts([contact])
+                }
+            }
         }
 
         // Trigger tiered invite processing on decline
@@ -631,6 +698,32 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 body: ["invite_id": inviteId.uuidString]
             )
         }
+    }
+
+    func fetchMyPollVotes(inviteId: UUID) async throws -> [UUID: TimeOptionVoteType] {
+        struct VoteRow: Decodable {
+            let timeOptionId: UUID
+            let voteType: String
+            enum CodingKeys: String, CodingKey {
+                case timeOptionId = "time_option_id"
+                case voteType = "vote_type"
+            }
+        }
+
+        let rows: [VoteRow] = try await client
+            .from("time_option_votes")
+            .select("time_option_id, vote_type")
+            .eq("invite_id", value: inviteId.uuidString)
+            .execute()
+            .value
+
+        var result: [UUID: TimeOptionVoteType] = [:]
+        for row in rows {
+            if let voteType = TimeOptionVoteType(rawValue: row.voteType) {
+                result[row.timeOptionId] = voteType
+            }
+        }
+        return result
     }
 
     func createInvites(_ invites: [Invite]) async throws {
@@ -645,6 +738,20 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .from("invites")
             .insert(normalizedInvites)
             .execute()
+
+        // Auto-save invitees as contacts (fire-and-forget)
+        Task {
+            let contacts = normalizedInvites.map { invite in
+                UserContact(
+                    id: UUID(),
+                    name: invite.displayName ?? invite.phoneNumber,
+                    phoneNumber: invite.phoneNumber,
+                    avatarUrl: nil,
+                    isAppUser: invite.userId != nil
+                )
+            }
+            try? await saveContacts(contacts)
+        }
 
         // Trigger SMS sending for active invites
         let activeInvites = normalizedInvites.filter { $0.isActive }
@@ -757,6 +864,24 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .from("games")
             .update(game)
             .eq("id", value: game.id.uuidString)
+            .execute()
+    }
+
+    func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws {
+        let updates: [String: AnyJSON] = ["image_url": .string(imageUrl)]
+        try await client
+            .from("games")
+            .update(updates)
+            .eq("id", value: gameId.uuidString)
+            .execute()
+    }
+
+    func clearGameImageUrl(gameId: UUID) async throws {
+        let updates: [String: AnyJSON] = ["image_url": .null]
+        try await client
+            .from("games")
+            .update(updates)
+            .eq("id", value: gameId.uuidString)
             .execute()
     }
 
@@ -1050,6 +1175,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return saved
     }
 
+    func autoSaveInviteContact(name: String, phoneNumber: String, isAppUser: Bool) async {
+        let contact = UserContact(id: UUID(), name: name, phoneNumber: phoneNumber, avatarUrl: nil, isAppUser: isAppUser)
+        try? await saveContacts([contact])
+    }
+
     func deleteSavedContact(id: UUID) async throws {
         try await client
             .from("saved_contacts")
@@ -1220,14 +1350,95 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
-    func confirmGame(eventId: UUID, gameId: UUID) async throws {
+    // MARK: - Poll Voter Details
+
+    func fetchTimeOptionVoters(eventId: UUID) async throws -> [TimeOptionVoter] {
+        let voters: [TimeOptionVoter] = try await client
+            .rpc("fetch_time_poll_voters", params: ["p_event_id": eventId.uuidString])
+            .execute()
+            .value
+        return voters
+    }
+
+    private struct GameVoterRow: Decodable {
+        let gameId: UUID
+        let voteType: String
+        let userId: UUID
+        let displayName: String
+        let avatarUrl: String?
+
+        enum CodingKeys: String, CodingKey {
+            case gameId = "game_id"
+            case voteType = "vote_type"
+            case userId = "user_id"
+            case displayName = "display_name"
+            case avatarUrl = "avatar_url"
+        }
+    }
+
+    func fetchGameVoterDetails(eventId: UUID) async throws -> [GameVoterInfo] {
+        let rows: [GameVoterRow] = try await client
+            .rpc("fetch_game_poll_voters", params: ["p_event_id": eventId.uuidString])
+            .execute()
+            .value
+        return rows.compactMap { row in
+            guard let voteType = GameVoteType(rawValue: row.voteType) else { return nil }
+            return GameVoterInfo(
+                gameId: row.gameId,
+                userId: row.userId,
+                displayName: row.displayName,
+                avatarUrl: row.avatarUrl,
+                voteType: voteType
+            )
+        }
+    }
+
+    func confirmTimeOption(eventId: UUID, timeOptionId: UUID) async throws {
+        try await client
+            .rpc("confirm_time_option", params: [
+                "p_event_id": eventId.uuidString,
+                "p_time_option_id": timeOptionId.uuidString
+            ])
+            .execute()
+    }
+
+    func confirmGame(eventId: UUID, gameId: UUID, gameName: String) async throws {
+        // Set confirmed game and end game voting
         let updates: [String: AnyJSON] = [
-            "confirmed_game_id": .string(gameId.uuidString)
+            "confirmed_game_id": .string(gameId.uuidString),
+            "allow_game_voting": .bool(false)
         ]
         try await client
             .from("events")
             .update(updates)
             .eq("id", value: eventId.uuidString)
+            .execute()
+
+        // Set confirmed game as primary, unset others
+        try await client
+            .from("event_games")
+            .update(["is_primary": AnyJSON.bool(false)])
+            .eq("event_id", value: eventId.uuidString)
+            .execute()
+
+        try await client
+            .from("event_games")
+            .update(["is_primary": AnyJSON.bool(true)])
+            .eq("event_id", value: eventId.uuidString)
+            .eq("game_id", value: gameId.uuidString)
+            .execute()
+
+        // Post game_confirmed announcement to activity feed
+        let session = try await client.auth.session
+        let announcement: [String: AnyJSON] = [
+            "event_id": .string(eventId.uuidString),
+            "user_id": .string(session.user.id.uuidString),
+            "type": .string("game_confirmed"),
+            "content": .string(gameName)
+        ]
+        try await client
+            .from("activity_feed")
+            .insert(announcement)
             .execute()
     }
 

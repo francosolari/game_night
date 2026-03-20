@@ -9,6 +9,7 @@ final class GameLibraryViewModel: ObservableObject {
     @Published var searchQuery = ""
     @Published var isLoading = true
     @Published var error: String?
+    @Published var toast: ToastItem?
 
     // BGG Search
     @Published var bggSearchQuery = ""
@@ -112,6 +113,7 @@ final class GameLibraryViewModel: ObservableObject {
             selectedGameParseResult = nil
             selectedGameDetail = nil
             await loadLibrary()
+            toast = ToastItem(style: .success, message: "Added \(game.name) to library")
         } catch {
             self.error = error.localizedDescription
         }
@@ -160,6 +162,7 @@ final class GameLibraryViewModel: ObservableObject {
             }
 
             await loadLibrary()
+            toast = ToastItem(style: .success, message: "Imported \(parseResults.count) game\(parseResults.count == 1 ? "" : "s")!")
         } catch {
             self.error = error.localizedDescription
         }

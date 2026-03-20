@@ -102,12 +102,12 @@ CREATE TRIGGER trg_game_vote_count
     AFTER INSERT OR UPDATE OR DELETE ON game_votes
     FOR EACH ROW EXECUTE FUNCTION update_game_vote_count();
 
--- 6. Auto-post RSVP updates to activity feed
+-- 6. Auto-post RSVP updates to activity feed (only accepted and maybe, not declined)
 CREATE OR REPLACE FUNCTION auto_post_rsvp_update()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status IS DISTINCT FROM OLD.status
-       AND NEW.status IN ('accepted', 'maybe', 'declined')
+       AND NEW.status IN ('accepted', 'maybe')
        AND NEW.user_id IS NOT NULL THEN
         INSERT INTO activity_feed (event_id, user_id, type, content)
         VALUES (NEW.event_id, NEW.user_id, 'rsvp_update', NEW.status);
