@@ -114,6 +114,7 @@
 		D64C5C08692476E0E5786CB9 /* Secrets.swift.example in Resources */ = {isa = PBXBuildFile; fileRef = BFCE44DB7F63902750892756 /* Secrets.swift.example */; };
 		D7358196973474782DD6ABDD /* GroupPlayHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DF51217739522D1F3F21F6 /* GroupPlayHistoryView.swift */; };
 		D8BA6CA0E91A2ABEAEF147C0 /* GameEventDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F38EB39579296EB1CC1BD9F /* GameEventDecodingTests.swift */; };
+		D94640388C537F8DD69FD0B5 /* GroupInviteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9980167E08A72DABE640CA43 /* GroupInviteCard.swift */; };
 		DB246FC621832F6F20E2BB51 /* GenerativeEventCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3D86B22BD75AA9FD76C86A /* GenerativeEventCover.swift */; };
 		DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */; };
 		DBACF5C6B7903F393DBE6F73 /* CreateEventDetailsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = C851C421B2D167D35FFF7787 /* CreateEventDetailsStep.swift */; };
@@ -248,6 +249,7 @@
 		91F7FE54EBEFBB78137AB34A /* AddToCalendarButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCalendarButton.swift; sourceTree = "<group>"; };
 		95B0C917F3210D3DEE57EA0F /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
+		9980167E08A72DABE640CA43 /* GroupInviteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupInviteCard.swift; sourceTree = "<group>"; };
 		9AB1A89107DC5915629A148C /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTestHelpers.swift; sourceTree = "<group>"; };
 		AC348B1DF846B0EA1FED19F6 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
@@ -432,6 +434,7 @@
 				7FFF8F8644B3D6C09B3D23E5 /* GameCard.swift */,
 				DC3D86B22BD75AA9FD76C86A /* GenerativeEventCover.swift */,
 				D468AF0B1FB54A10EF29F05F /* GroupedGuestSection.swift */,
+				9980167E08A72DABE640CA43 /* GroupInviteCard.swift */,
 				D72031D7106E225252F4D3BC /* ListEventCard.swift */,
 				82822A1740DFB720E14F4CCC /* LocationPickerSheet.swift */,
 				2D0EA42EA853AC67A97206DA /* PlayerCountIndicator.swift */,
@@ -826,6 +829,7 @@
 				ED27EDD6F53C7ADF49FEFAC0 /* GroupChatView.swift in Sources */,
 				02D64A6EE197BE2D6FDE5156 /* GroupDetailView.swift in Sources */,
 				08A6E2DEB261C7D78480D0D1 /* GroupDetailViewModel.swift in Sources */,
+				D94640388C537F8DD69FD0B5 /* GroupInviteCard.swift in Sources */,
 				801F62917586BF780DFD31E7 /* GroupMessage.swift in Sources */,
 				DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */,
 				D7358196973474782DD6ABDD /* GroupPlayHistoryView.swift in Sources */,

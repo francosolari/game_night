@@ -92,20 +92,22 @@ actor ContactPickerService {
     /// Checks which of the SELECTED contacts (not all) are already app users.
     /// Only the phone numbers the user chose to invite are sent to the server.
     func checkAppUsers(for selectedContacts: [UserContact]) async -> [UserContact] {
-        // Only send the phones the user explicitly picked
-        let phones = selectedContacts.map(\.phoneNumber)
-        guard !phones.isEmpty else { return selectedContacts }
+        guard !selectedContacts.isEmpty else { return selectedContacts }
+
+        // DB stores phones as digits-only (e.g. "19546080345"), iOS normalizes to E.164 ("+19546080345").
+        // Strip non-digits for the query so both sides match.
+        let digitsOnly = selectedContacts.map { $0.phoneNumber.filter(\.isNumber) }
+        guard !digitsOnly.isEmpty else { return selectedContacts }
 
         do {
             struct PhoneCheck: Decodable {
                 let phone_number: String
-                let id: UUID
             }
 
             let results: [PhoneCheck] = try await SupabaseService.shared.client
                 .from("users")
-                .select("phone_number, id")
-                .in("phone_number", values: phones)
+                .select("phone_number")
+                .in("phone_number", values: digitsOnly)
                 .execute()
                 .value
 
@@ -113,12 +115,27 @@ actor ContactPickerService {
 
             return selectedContacts.map { contact in
                 var updated = contact
-                updated.isAppUser = appUserPhones.contains(contact.phoneNumber)
+                updated.isAppUser = appUserPhones.contains(contact.phoneNumber.filter(\.isNumber))
                 return updated
             }
         } catch {
             return selectedContacts
         }
+    }
+
+    /// Builds a phone→name map from all device contacts (digits-only phone key).
+    /// Used to resolve how the current user sees other people (contact name > display_name).
+    func buildContactNameMap() async -> [String: String] {
+        guard (try? await requestAccess()) == true else { return [:] }
+        let contacts = (try? await fetchLocalContacts()) ?? []
+        var map: [String: String] = [:]
+        for contact in contacts {
+            let key = contact.phoneNumber.filter(\.isNumber)
+            if !key.isEmpty {
+                map[key] = contact.name
+            }
+        }
+        return map
     }
 
     // MARK: - Phone normalization

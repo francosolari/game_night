@@ -105,6 +105,42 @@ final class GroupDetailViewModel: ObservableObject {
         }
     }
 
+    func addMembers(contacts: [UserContact]) async {
+        let existingPhones = Set(group.members.map(\.phoneNumber))
+        let currentUserId = try? await supabase.client.auth.session.user.id
+        for contact in contacts {
+            let normalized = ContactPickerService.normalizePhone(contact.phoneNumber)
+            guard !existingPhones.contains(normalized) else { continue }
+            let member = GroupMember(
+                id: UUID(),
+                groupId: group.id,
+                userId: nil,
+                phoneNumber: normalized,
+                displayName: contact.name,
+                tier: 1,
+                sortOrder: group.members.count,
+                addedAt: Date(),
+                status: .pending,
+                invitedBy: currentUserId
+            )
+            do {
+                try await supabase.addGroupMember(member)
+                group.members.append(member)
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    func removeMember(id: UUID) async {
+        do {
+            try await supabase.removeGroupMember(id: id)
+            group.members.removeAll { $0.id == id }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     func deletePlay(id: UUID) async {
         do {
             try await supabase.deletePlay(id: id)

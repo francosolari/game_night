@@ -1139,6 +1139,47 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    /// Fetches pending group invites for the current user — groups they've been invited to but haven't responded.
+    func fetchMyPendingGroupInvites() async throws -> [(group: GameGroup, member: GroupMember)] {
+        let session = try await client.auth.session
+
+        // Step 1: fetch pending group_member rows for the current user
+        let pendingMembers: [GroupMember] = try await client
+            .from("group_members")
+            .select()
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("status", value: "pending")
+            .execute()
+            .value
+
+        guard !pendingMembers.isEmpty else { return [] }
+
+        // Step 2: fetch the corresponding groups (accepted members only for preview)
+        let groupIds = pendingMembers.map(\.groupId.uuidString)
+        let groups: [GameGroup] = try await client
+            .from("groups")
+            .select("*, members:group_members(*)")
+            .in("id", values: groupIds)
+            .execute()
+            .value
+
+        let groupMap = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+
+        return pendingMembers.compactMap { member in
+            guard let group = groupMap[member.groupId] else { return nil }
+            return (group: group, member: member)
+        }
+    }
+
+    func respondToGroupInvite(memberId: UUID, accept: Bool) async throws {
+        let newStatus = accept ? "accepted" : "declined"
+        try await client
+            .from("group_members")
+            .update(["status": newStatus])
+            .eq("id", value: memberId.uuidString)
+            .execute()
+    }
+
     // MARK: - Saved Contacts
 
     func fetchSavedContacts() async throws -> [SavedContact] {
@@ -1150,11 +1191,47 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .order("name")
             .execute()
             .value
-        return contacts
+
+        guard !contacts.isEmpty else { return contacts }
+
+        // Cross-reference with users table to determine who is on the app.
+        // saved_contacts stores E.164 ("+19546080345"), users stores digits-only ("19546080345").
+        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }
+
+        struct PhoneCheck: Decodable { let phone_number: String }
+        let results: [PhoneCheck] = try await client
+            .from("users")
+            .select("phone_number")
+            .in("phone_number", values: digitsOnly)
+            .execute()
+            .value
+
+        let appUserPhones = Set(results.map(\.phone_number))
+
+        return contacts.map { contact in
+            var updated = contact
+            updated.isAppUser = appUserPhones.contains(contact.phoneNumber.filter(\.isNumber))
+            return updated
+        }
     }
 
     func saveContacts(_ contacts: [UserContact]) async throws -> [SavedContact] {
         let session = try await client.auth.session
+
+        // Check which contacts are app users before saving
+        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
+        var appUserPhones = Set<String>()
+        if !digitsOnly.isEmpty {
+            struct PhoneCheck: Decodable { let phone_number: String }
+            let results: [PhoneCheck] = try await client
+                .from("users")
+                .select("phone_number")
+                .in("phone_number", values: digitsOnly)
+                .execute()
+                .value
+            appUserPhones = Set(results.map(\.phone_number))
+        }
+
         let toSave = contacts.map { contact in
             SavedContact(
                 id: UUID(),
@@ -1162,7 +1239,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 name: contact.name,
                 phoneNumber: contact.phoneNumber,
                 avatarUrl: contact.avatarUrl,
-                isAppUser: contact.isAppUser,
+                isAppUser: appUserPhones.contains(contact.phoneNumber.filter(\.isNumber)),
                 createdAt: nil
             )
         }

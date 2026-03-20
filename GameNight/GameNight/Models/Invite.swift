@@ -200,6 +200,7 @@ struct InviteSummary {
     struct InviteUser: Identifiable {
         let id: UUID
         var name: String
+        var phoneNumber: String?
         var avatarUrl: String?
         var status: InviteStatus
         var tier: Int

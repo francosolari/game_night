@@ -193,6 +193,7 @@ private struct GuestTabPill: View {
 // MARK: - Tab Content (list of guests)
 
 private struct GuestTabContent: View {
+    @EnvironmentObject var appState: AppState
     let users: [InviteSummary.InviteUser]
     let accentColor: Color
     var maxVisible: Int = 4
@@ -212,7 +213,7 @@ private struct GuestTabContent: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     StatusDot(color: accentColor, size: 6)
                     AvatarView(url: user.avatarUrl, size: 32)
-                    Text(user.name)
+                    Text(appState.resolveDisplayName(phone: user.phoneNumber, fallback: user.name))
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
                     Spacer()

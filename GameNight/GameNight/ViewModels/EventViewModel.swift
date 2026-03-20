@@ -123,7 +123,7 @@ final class EventViewModel: ObservableObject {
         let waitlisted = nonHostInvites.filter { $0.status == .waitlisted }
 
         func mapUsers(_ list: [Invite]) -> [InviteSummary.InviteUser] {
-            list.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", avatarUrl: nil, status: $0.status, tier: $0.tier) }
+            list.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", phoneNumber: $0.phoneNumber, avatarUrl: nil, status: $0.status, tier: $0.tier) }
         }
 
         let hostUser: InviteSummary.InviteUser? = {

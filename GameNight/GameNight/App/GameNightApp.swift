@@ -17,6 +17,7 @@ struct GameNightApp: App {
                     OnboardingView()
                 }
             }
+            .animation(.easeInOut(duration: 0.25), value: themeManager.mode)
             .task {
                 await appState.checkAuthState()
             }
@@ -25,9 +26,6 @@ struct GameNightApp: App {
             .environmentObject(themeManager)
             .preferredColorScheme(themeManager.preferredColorScheme)
             .tint(Theme.Colors.primary)
-            .onChange(of: themeManager.mode) { _, _ in
-                // Force tint update when theme changes
-            }
         }
     }
 }

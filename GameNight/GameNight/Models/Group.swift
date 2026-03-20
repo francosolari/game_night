@@ -34,7 +34,7 @@ struct GameGroup: Identifiable, Codable {
         // Intentionally skip: members — it's a joined relation via group_members, not a column
     }
 
-    var memberCount: Int { members.count }
+    var memberCount: Int { members.filter(\.isAccepted).count }
 
     static let preview = GameGroup(
         id: UUID(),
@@ -53,6 +53,12 @@ struct GameGroup: Identifiable, Codable {
     )
 }
 
+enum GroupMemberStatus: String, Codable {
+    case pending
+    case accepted
+    case declined
+}
+
 struct GroupMember: Identifiable, Codable, Hashable {
     let id: UUID
     var groupId: UUID
@@ -62,6 +68,11 @@ struct GroupMember: Identifiable, Codable, Hashable {
     var tier: Int           // Default invite tier for this group
     var sortOrder: Int
     var addedAt: Date
+    var status: GroupMemberStatus
+    var invitedBy: UUID?
+
+    var isAccepted: Bool { status == .accepted }
+    var isPending: Bool { status == .pending }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -72,6 +83,23 @@ struct GroupMember: Identifiable, Codable, Hashable {
         case tier
         case sortOrder = "sort_order"
         case addedAt = "added_at"
+        case status
+        case invitedBy = "invited_by"
+    }
+
+    init(id: UUID, groupId: UUID, userId: UUID? = nil, phoneNumber: String, displayName: String? = nil,
+         tier: Int = 1, sortOrder: Int = 0, addedAt: Date = Date(),
+         status: GroupMemberStatus = .pending, invitedBy: UUID? = nil) {
+        self.id = id
+        self.groupId = groupId
+        self.userId = userId
+        self.phoneNumber = phoneNumber
+        self.displayName = displayName
+        self.tier = tier
+        self.sortOrder = sortOrder
+        self.addedAt = addedAt
+        self.status = status
+        self.invitedBy = invitedBy
     }
 
     static let preview = GroupMember(

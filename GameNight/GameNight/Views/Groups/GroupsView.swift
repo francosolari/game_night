@@ -449,15 +449,15 @@ struct CreateGroupSheet: View {
 // MARK: - Member Row
 struct MemberRow: View {
     let member: GroupMember
-    let groupId: UUID
-    @ObservedObject var viewModel: GroupsViewModel
+    var resolvedName: String? = nil
+    let onRemove: () async -> Void
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
             AvatarView(url: nil, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(member.displayName ?? "Unknown")
+                Text(resolvedName ?? member.displayName ?? "Unknown")
                     .font(Theme.Typography.bodyMedium)
                     .foregroundColor(Theme.Colors.textPrimary)
                 Text(member.phoneNumber)
@@ -469,7 +469,7 @@ struct MemberRow: View {
 
             Menu {
                 Button("Remove", role: .destructive) {
-                    Task { await viewModel.removeMember(id: member.id, from: groupId) }
+                    Task { await onRemove() }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")

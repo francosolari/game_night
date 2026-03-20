@@ -7,6 +7,7 @@ final class HomeViewModel: ObservableObject {
     @Published var myInvites: [Invite] = []
     @Published var drafts: [GameEvent] = []
     @Published var awaitingResponseEvents: [(event: GameEvent, invite: Invite)] = []
+    @Published var pendingGroupInvites: [(group: GameGroup, member: GroupMember)] = []
     @Published var isLoading = true
     @Published var error: String?
 
@@ -118,6 +119,20 @@ final class HomeViewModel: ObservableObject {
 
         if isInitialLoad {
             isLoading = false
+        }
+
+        // Load pending group invites (non-blocking — runs after main content is shown)
+        if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
+            self.pendingGroupInvites = groupInvites
+        }
+    }
+
+    func respondToGroupInvite(memberId: UUID, accept: Bool) async {
+        do {
+            try await SupabaseService.shared.respondToGroupInvite(memberId: memberId, accept: accept)
+            pendingGroupInvites.removeAll { $0.member.id == memberId }
+        } catch {
+            print("🏠 [HomeViewModel] Group invite response failed: \(error)")
         }
     }
 

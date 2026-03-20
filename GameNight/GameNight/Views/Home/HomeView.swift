@@ -175,13 +175,30 @@ struct HomeView: View {
                         .frame(minHeight: 400)
                     } else {
                         let awaitingResponseItems = viewModel.awaitingResponseEvents
-                        if !awaitingResponseItems.isEmpty {
+                        let pendingGroupInvites = viewModel.pendingGroupInvites
+                        if !awaitingResponseItems.isEmpty || !pendingGroupInvites.isEmpty {
                             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                                 SectionHeader(title: "Awaiting Response")
                                     .padding(.horizontal, Theme.Spacing.xl)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
+                                        // Group invites (shown first — more time-sensitive)
+                                        ForEach(pendingGroupInvites, id: \.member.id) { entry in
+                                            GroupInviteCard(
+                                                group: entry.group,
+                                                member: entry.member,
+                                                onAccept: {
+                                                    Task { await viewModel.respondToGroupInvite(memberId: entry.member.id, accept: true) }
+                                                },
+                                                onDecline: {
+                                                    Task { await viewModel.respondToGroupInvite(memberId: entry.member.id, accept: false) }
+                                                }
+                                            )
+                                            .frame(width: carouselCardWidth)
+                                        }
+
+                                        // Event invites
                                         ForEach(awaitingResponseItems, id: \.event.id) { entry in
                                             VerticalEventCard(
                                                 event: entry.event,
