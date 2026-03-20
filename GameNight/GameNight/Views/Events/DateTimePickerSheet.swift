@@ -356,14 +356,16 @@ struct DateTimeSummaryBar: View {
 struct CalendarGridView: View {
     @Binding var selectedDate: Date
     @Binding var hasSelection: Bool
+    var allowsPastDates: Bool = false
     var onDateSelected: (() -> Void)? = nil
 
     @State private var displayedMonth: Date
     @State private var showMonthYearPicker = false
 
-    init(selectedDate: Binding<Date>, hasSelection: Binding<Bool>, onDateSelected: (() -> Void)? = nil) {
+    init(selectedDate: Binding<Date>, hasSelection: Binding<Bool>, allowsPastDates: Bool = false, onDateSelected: (() -> Void)? = nil) {
         _selectedDate = selectedDate
         _hasSelection = hasSelection
+        self.allowsPastDates = allowsPastDates
         self.onDateSelected = onDateSelected
         _displayedMonth = State(initialValue: selectedDate.wrappedValue)
     }
@@ -418,6 +420,7 @@ struct CalendarGridView: View {
             if showMonthYearPicker {
                 MonthYearPickerView(
                     displayedMonth: $displayedMonth,
+                    allowsPastDates: allowsPastDates,
                     onDismiss: {
                         withAnimation(Theme.Animation.snappy) {
                             showMonthYearPicker = false
@@ -444,7 +447,7 @@ struct CalendarGridView: View {
                         if index < days.count, let day = days[index] {
                             let isSelected = hasSelection && Calendar.current.isDate(day, inSameDayAs: selectedDate)
                             let isToday = Calendar.current.isDateInToday(day)
-                            let isPast = day < Calendar.current.startOfDay(for: Date()) && !isToday
+                            let isPast = !allowsPastDates && day < Calendar.current.startOfDay(for: Date()) && !isToday
 
                             Button {
                                 withAnimation(Theme.Animation.snappy) {
@@ -518,6 +521,7 @@ struct CalendarGridView: View {
 
 struct MonthYearPickerView: View {
     @Binding var displayedMonth: Date
+    var allowsPastDates: Bool = false
 
     let onDismiss: () -> Void
 
@@ -526,8 +530,9 @@ struct MonthYearPickerView: View {
 
     @State private var displayedYear: Int
 
-    init(displayedMonth: Binding<Date>, onDismiss: @escaping () -> Void) {
+    init(displayedMonth: Binding<Date>, allowsPastDates: Bool = false, onDismiss: @escaping () -> Void) {
         _displayedMonth = displayedMonth
+        self.allowsPastDates = allowsPastDates
         self.onDismiss = onDismiss
         _displayedYear = State(initialValue: Calendar.current.component(.year, from: displayedMonth.wrappedValue))
     }
@@ -601,6 +606,7 @@ struct MonthYearPickerView: View {
     }
 
     private func isPast(year: Int, month: Int) -> Bool {
+        if allowsPastDates { return false }
         let now = Date()
         let cal = Calendar.current
         let currentYear = cal.component(.year, from: now)

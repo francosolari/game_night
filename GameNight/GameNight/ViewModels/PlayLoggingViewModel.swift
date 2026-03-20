@@ -20,6 +20,8 @@ final class PlayLoggingViewModel: ObservableObject {
     @Published var notesByGame: [UUID: String] = [:]
     @Published var isCooperativeByGame: [UUID: Bool] = [:]
     @Published var cooperativeResultByGame: [UUID: Play.CooperativeResult] = [:]
+    @Published var playedAt: Date = Date()
+    @Published var durationMinutes: Int? = nil
     @Published var existingPlays: [Play] = []
     @Published var isSaving = false
     @Published var error: String?
@@ -126,6 +128,18 @@ final class PlayLoggingViewModel: ObservableObject {
         isCooperativeByGame[game.id] = false
     }
 
+    func addGuestParticipant(name: String, gameId: UUID) {
+        let guest = PlayParticipantDraft(
+            id: UUID(),
+            userId: nil,
+            phoneNumber: nil,
+            displayName: name,
+            isPlaying: true,
+            isWinner: false
+        )
+        participantsByGame[gameId, default: []].append(guest)
+    }
+
     func checkExistingPlays() async {
         guard let eventId else { return }
         do {
@@ -155,7 +169,8 @@ final class PlayLoggingViewModel: ObservableObject {
                     groupId: groupId,
                     gameId: gameId,
                     loggedBy: userId,
-                    playedAt: Date(),
+                    playedAt: playedAt,
+                    durationMinutes: durationMinutes,
                     notes: notesByGame[gameId]?.isEmpty == true ? nil : notesByGame[gameId],
                     isCooperative: isCooperativeByGame[gameId] ?? false,
                     cooperativeResult: cooperativeResultByGame[gameId]
