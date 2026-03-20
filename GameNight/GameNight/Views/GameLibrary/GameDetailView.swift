@@ -1,5 +1,4 @@
 import SwiftUI
-import PhotosUI
 
 struct GameDetailView: View {
     @StateObject private var viewModel: GameDetailViewModel
@@ -8,7 +7,7 @@ struct GameDetailView: View {
     @State private var isEditingManualGame = false
     @State private var manualDraftGame: Game?
     @State private var isSavingManualGame = false
-    @State private var selectedImageItem: PhotosPickerItem?
+    @State private var showImageCropPicker = false
     @State private var isUploadingImage = false
     @State private var imageUploadError: String?
 
@@ -59,13 +58,15 @@ struct GameDetailView: View {
                     }
 
                     if isEditingManualGame {
-                        PhotosPicker(selection: $selectedImageItem, matching: .images) {
+                        // Full-frame tap area for upload/change
+                        Button {
+                            showImageCropPicker = true
+                        } label: {
                             ZStack {
                                 Color.black.opacity(0.35)
                                 VStack(spacing: 6) {
                                     if isUploadingImage {
-                                        ProgressView()
-                                            .tint(.white)
+                                        ProgressView().tint(.white)
                                     } else {
                                         Image(systemName: displayedGame.imageUrl == nil ? "photo.badge.plus" : "camera.fill")
                                             .font(.system(size: 24, weight: .semibold))
@@ -93,12 +94,29 @@ struct GameDetailView: View {
                         }
                     }
                 }
+                // Remove photo button — top-trailing when editing and image exists
+                .overlay(alignment: .topTrailing) {
+                    if isEditingManualGame, displayedGame.imageUrl != nil, !isUploadingImage {
+                        Button {
+                            Task { await removeGameImage() }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white)
+                                .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(Theme.Spacing.sm)
+                    }
+                }
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.lg)
                 .padding(.bottom, -Theme.Spacing.xl)
-                .onChange(of: selectedImageItem) { _, item in
-                    guard let item else { return }
-                    Task { await uploadGameImage(item) }
+                .fullScreenCover(isPresented: $showImageCropPicker) {
+                    ImageCropPicker(isPresented: $showImageCropPicker) { image in
+                        Task { await uploadGameImage(image) }
+                    }
+                    .ignoresSafeArea()
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
@@ -333,20 +351,17 @@ struct GameDetailView: View {
         manualDraftGame = nil
         isEditingManualGame = false
         isSavingManualGame = false
-        selectedImageItem = nil
         imageUploadError = nil
     }
 
-    private func uploadGameImage(_ item: PhotosPickerItem) async {
+    private func uploadGameImage(_ image: UIImage) async {
         isUploadingImage = true
         imageUploadError = nil
-        defer { isUploadingImage = false; selectedImageItem = nil }
+        defer { isUploadingImage = false }
 
         do {
-            guard let data = try await item.loadTransferable(type: Data.self),
-                  let uiImage = UIImage(data: data),
-                  let jpeg = uiImage.jpegData(compressionQuality: 0.85) else {
-                imageUploadError = "Could not load image"
+            guard let jpeg = image.jpegData(compressionQuality: 0.85) else {
+                imageUploadError = "Could not process image"
                 return
             }
 
@@ -357,7 +372,17 @@ struct GameDetailView: View {
             manualDraftGame?.imageUrl = publicUrl
             viewModel.game.imageUrl = publicUrl
         } catch {
-            imageUploadError = "Upload failed. Please try again."
+            imageUploadError = "Upload failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func removeGameImage() async {
+        do {
+            try await SupabaseService.shared.clearGameImageUrl(gameId: viewModel.game.id)
+            manualDraftGame?.imageUrl = nil
+            viewModel.game.imageUrl = nil
+        } catch {
+            imageUploadError = "Could not remove photo"
         }
     }
 

@@ -1,9 +1,8 @@
 import SwiftUI
-import PhotosUI
 
 struct CreateEventReviewStep: View {
     @ObservedObject var viewModel: CreateEventViewModel
-    @State private var selectedCoverItem: PhotosPickerItem?
+    @State private var showCoverCropPicker = false
     @State private var isUploadingCover = false
     @State private var coverUploadError: String?
 
@@ -179,7 +178,9 @@ struct CreateEventReviewStep: View {
                     .buttonStyle(.plain)
                 } else {
                     HStack(spacing: 8) {
-                        PhotosPicker(selection: $selectedCoverItem, matching: .images) {
+                        Button {
+                            showCoverCropPicker = true
+                        } label: {
                             HStack(spacing: 4) {
                                 if isUploadingCover {
                                     ProgressView().scaleEffect(0.7)
@@ -245,22 +246,22 @@ struct CreateEventReviewStep: View {
                     .foregroundColor(Theme.Colors.error)
             }
         }
-        .onChange(of: selectedCoverItem) { _, item in
-            guard let item else { return }
-            Task { await uploadCoverPhoto(item) }
+        .fullScreenCover(isPresented: $showCoverCropPicker) {
+            ImageCropPicker(isPresented: $showCoverCropPicker) { image in
+                Task { await uploadCoverPhoto(image) }
+            }
+            .ignoresSafeArea()
         }
     }
 
-    private func uploadCoverPhoto(_ item: PhotosPickerItem) async {
+    private func uploadCoverPhoto(_ image: UIImage) async {
         isUploadingCover = true
         coverUploadError = nil
-        defer { isUploadingCover = false; selectedCoverItem = nil }
+        defer { isUploadingCover = false }
 
         do {
-            guard let data = try await item.loadTransferable(type: Data.self),
-                  let image = UIImage(data: data),
-                  let jpeg = image.jpegData(compressionQuality: 0.85) else {
-                coverUploadError = "Could not load image"
+            guard let jpeg = image.jpegData(compressionQuality: 0.85) else {
+                coverUploadError = "Could not process image"
                 return
             }
 
@@ -276,7 +277,7 @@ struct CreateEventReviewStep: View {
                 viewModel.pendingCoverImageUrl = publicUrl
             }
         } catch {
-            coverUploadError = "Upload failed. Please try again."
+            coverUploadError = "Upload failed: \(error.localizedDescription)"
         }
     }
 }

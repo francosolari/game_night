@@ -862,6 +862,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func clearGameImageUrl(gameId: UUID) async throws {
+        let updates: [String: AnyJSON] = ["image_url": .null]
+        try await client
+            .from("games")
+            .update(updates)
+            .eq("id", value: gameId.uuidString)
+            .execute()
+    }
+
     // MARK: - Game Relations
 
     func fetchExpansions(gameId: UUID) async throws -> [Game] {
