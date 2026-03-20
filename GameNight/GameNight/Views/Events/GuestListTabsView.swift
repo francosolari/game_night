@@ -3,6 +3,7 @@ import SwiftUI
 enum GuestListVisibilityMode: Equatable {
     case fullList
     case countsOnly(message: String)
+    case countsWithBlocker(message: String)
 }
 
 struct GuestListTabsView: View {
@@ -86,6 +87,46 @@ struct GuestListTabsView: View {
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .frame(height: guestTabContentHeight)
                     .animation(Theme.Animation.snappy, value: selectedTab)
+                }
+
+            case .countsWithBlocker(let message):
+                if !tabs.isEmpty {
+                    // Pill tab bar (non-clickable)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                                HStack(spacing: 4) {
+                                    StatusDot(color: tab.color, size: 6)
+                                    Text("\(tab.title) · \(tab.users.count)")
+                                        .font(Theme.Typography.caption.weight(.medium))
+                                }
+                                .foregroundColor(Theme.Colors.textTertiary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Theme.Colors.fieldBackground)
+                                )
+                            }
+                        }
+                    }
+
+                    Divider()
+                        .background(Theme.Colors.divider)
+
+                    // Blocker message
+                    VStack(spacing: Theme.Spacing.sm) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Theme.Colors.textTertiary)
+
+                        Text(message)
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(Theme.Spacing.xl)
                 }
 
             case .countsOnly(let message):
@@ -298,6 +339,46 @@ struct GuestListFullPageView: View {
                             }
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))
+                    }
+
+                case .countsWithBlocker(let message):
+                    if !tabs.isEmpty {
+                        // Pill tabs (non-clickable)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Theme.Spacing.sm) {
+                                ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
+                                    let filtered = filteredUsers(tab.users)
+                                    HStack(spacing: 4) {
+                                        StatusDot(color: tab.color, size: 6)
+                                        Text("\(tab.title) · \(filtered.count)")
+                                            .font(Theme.Typography.caption.weight(.medium))
+                                    }
+                                    .foregroundColor(Theme.Colors.textTertiary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule()
+                                            .fill(Theme.Colors.fieldBackground)
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, Theme.Spacing.xl)
+                        }
+                        .padding(.top, Theme.Spacing.md)
+
+                        // Blocker message
+                        VStack(spacing: Theme.Spacing.sm) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textTertiary)
+
+                            Text(message)
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(Theme.Spacing.xxl)
                     }
 
                 case .countsOnly(let message):

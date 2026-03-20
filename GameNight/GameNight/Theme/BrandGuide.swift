@@ -5,7 +5,7 @@ import SwiftUI
 /// Reference this file for cross-platform consistency (iOS, web, marketing).
 ///
 /// Warm palette inspired by cardboard meeple logo + Claude brand guide.
-/// Dark palette preserves the original Linear/Raycast-inspired design.
+/// Dark palette
 struct BrandGuide {
 
     // MARK: - Warm Palette (Light Mode)

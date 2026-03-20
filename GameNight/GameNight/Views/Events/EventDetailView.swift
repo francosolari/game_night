@@ -312,12 +312,12 @@ struct EventDetailView: View {
 
     private var guestListVisibilityMode: GuestListVisibilityMode {
         guard viewModel.accessPolicy?.canViewGuestList ?? true else {
-            return .countsOnly(message: "RSVP to see who's going.")
+            return .countsWithBlocker(message: "RSVP to see who's going.")
         }
         if viewModel.isOwner || viewModel.hasRSVPd {
             return .fullList
         }
-        return .countsOnly(message: "RSVP to see who's going.")
+        return .countsWithBlocker(message: "RSVP to see who's going.")
     }
 
     private func locationPresentation(for event: GameEvent) -> EventLocationPresentation? {
