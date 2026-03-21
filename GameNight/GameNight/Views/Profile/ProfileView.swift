@@ -3,103 +3,39 @@ import SwiftUI
 struct ProfileView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var themeManager: ThemeManager
+    @StateObject private var viewModel = ProfileViewModel()
     @State private var showEditProfile = false
     @State private var showBGGLink = false
     @State private var showPrivacy = false
+    @State private var showContacts = false
+    @State private var showEventHistory = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: Theme.Spacing.xxl) {
-                    // Profile header
-                    VStack(spacing: Theme.Spacing.lg) {
-                        AvatarView(url: appState.currentUser?.avatarUrl, size: 80)
+                VStack(spacing: Theme.Spacing.xl) {
+                    // MARK: - Profile Header Card
+                    profileHeaderCard
 
-                        VStack(spacing: Theme.Spacing.xs) {
-                            Text(appState.currentUser?.displayName ?? "Player")
-                                .font(Theme.Typography.displaySmall)
-                                .foregroundColor(Theme.Colors.textPrimary)
+                    // MARK: - Stats Grid
+                    statsGrid
 
-                            // Show masked phone by default (privacy-first)
-                            Text(appState.currentUser?.maskedPhone ?? "")
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textSecondary)
+                    // MARK: - Badges
+                    badgesSection
 
-                            if let bio = appState.currentUser?.bio {
-                                Text(bio)
-                                    .font(Theme.Typography.body)
-                                    .foregroundColor(Theme.Colors.textSecondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
+                    // MARK: - Event History
+                    eventHistorySection
 
-                        Button("Edit Profile") {
-                            showEditProfile = true
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .frame(width: 160)
-                    }
-                    .padding(.top, Theme.Spacing.xl)
+                    // MARK: - My Contacts
+                    contactsRow
 
-                    // Settings sections
-                    VStack(spacing: Theme.Spacing.md) {
-                        // Privacy & Safety (prominent position)
-                        SettingsRow(
-                            icon: "lock.shield.fill",
-                            title: "Privacy & Safety",
-                            subtitle: "Phone visibility, blocking, your data",
-                            color: Theme.Colors.accentWarm
-                        ) {
-                            showPrivacy = true
-                        }
+                    // MARK: - Settings
+                    settingsSection
 
-                        // BGG Integration
-                        SettingsRow(
-                            icon: "dice.fill",
-                            title: "BoardGameGeek",
-                            subtitle: appState.currentUser?.bggUsername ?? "Link your account",
-                            color: Theme.Colors.textSecondary
-                        ) {
-                            showBGGLink = true
-                        }
-
-                        // Notifications
-                        SettingsRow(
-                            icon: "bell.fill",
-                            title: "Notifications",
-                            subtitle: "Push & SMS preferences",
-                            color: Theme.Colors.primaryAction
-                        ) {
-                            // TODO: Notification settings
-                        }
-
-                        // Appearance — theme toggle
-                        ThemeToggleRow()
-                    }
-                    .padding(.horizontal, Theme.Spacing.xl)
-
-                    // Sign out
-                    VStack(spacing: Theme.Spacing.md) {
-                        Button {
-                            Task { await appState.signOut() }
-                        } label: {
-                            HStack {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                Text("Sign Out")
-                            }
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.error)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background(
-                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                                    .fill(Theme.Colors.error.opacity(0.1))
-                            )
-                        }
-                    }
-                    .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.top, Theme.Spacing.xl)
+                    // MARK: - Sign Out
+                    signOutButton
                 }
+                .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.bottom, 100)
             }
             .background(Theme.Colors.background.ignoresSafeArea())
@@ -112,7 +48,429 @@ struct ProfileView: View {
             .navigationDestination(isPresented: $showPrivacy) {
                 PrivacySettingsView()
             }
+            .navigationDestination(isPresented: $showContacts) {
+                MyContactsView()
+            }
+            .navigationDestination(isPresented: $showEventHistory) {
+                ProfileEventHistoryView()
+            }
+            .navigationDestination(for: GameEvent.self) { event in
+                EventDetailView(eventId: event.id)
+            }
+            .onAppear {
+                viewModel.loadIfNeeded()
+            }
         }
+    }
+
+    // MARK: - Profile Header Card
+
+    private var profileHeaderCard: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            AvatarView(url: appState.currentUser?.avatarUrl, size: 80)
+
+            VStack(spacing: Theme.Spacing.xs) {
+                Text(appState.currentUser?.displayName ?? "Player")
+                    .font(Theme.Typography.displaySmall)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                HStack(spacing: 6) {
+                    Text(appState.currentUser?.maskedPhone ?? "")
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textSecondary)
+
+                    if !viewModel.joinedDateString.isEmpty {
+                        Text("·")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        Text(viewModel.joinedDateString)
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                }
+
+                if let bio = appState.currentUser?.bio, !bio.isEmpty {
+                    Text(bio)
+                        .font(Theme.Typography.body)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            Button {
+                showEditProfile = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                    Text("Edit Profile")
+                }
+                .font(Theme.Typography.bodySemibold)
+                .foregroundColor(Theme.Colors.primary)
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.vertical, Theme.Spacing.sm)
+                .background(
+                    Capsule()
+                        .stroke(Theme.Colors.primary, lineWidth: 1.5)
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Theme.Spacing.xl)
+        .padding(.bottom, Theme.Spacing.lg)
+        .cardStyle()
+    }
+
+    // MARK: - Stats Grid
+
+    private var statsGrid: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            StatCard(icon: "bolt.fill", value: viewModel.hostedCount, label: "HOSTED", color: Theme.Colors.dateAccent)
+            StatCard(icon: "calendar.badge.checkmark", value: viewModel.attendedCount, label: "ATTENDED", color: Theme.Colors.primaryAction)
+            StatCard(icon: "dice.fill", value: viewModel.gameLibraryCount, label: "GAMES", color: Theme.Colors.accentWarm)
+            StatCard(icon: "person.2.fill", value: viewModel.groupCount, label: "GROUPS", color: Theme.Colors.textSecondary)
+        }
+    }
+
+    // MARK: - Badges Section
+
+    private var badgesSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "trophy.fill")
+                    .foregroundColor(Theme.Colors.dateAccent)
+                Text("Badges")
+                    .font(Theme.Typography.headlineMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+            }
+
+            // Badge chips - flow layout
+            let badges = ProfileBadge.allBadges(
+                hostedCount: viewModel.hostedCount,
+                attendedCount: viewModel.attendedCount,
+                gameCount: viewModel.gameLibraryCount,
+                groupCount: viewModel.groupCount
+            )
+
+            FlowLayout(spacing: Theme.Spacing.sm) {
+                ForEach(badges) { badge in
+                    BadgeChip(badge: badge)
+                }
+            }
+
+            Text("More badges coming soon!")
+                .font(Theme.Typography.caption)
+                .foregroundColor(Theme.Colors.primaryAction)
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Event History
+
+    private var eventHistorySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            HStack {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "calendar")
+                        .foregroundColor(Theme.Colors.dateAccent)
+                    Text("Event History")
+                        .font(Theme.Typography.headlineMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                }
+
+                Spacer()
+
+                Button("View All") {
+                    showEventHistory = true
+                }
+                .font(Theme.Typography.bodySemibold)
+                .foregroundColor(Theme.Colors.primaryAction)
+            }
+
+            if viewModel.recentEvents.isEmpty && !viewModel.isLoading {
+                Text("No past events yet")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, Theme.Spacing.lg)
+            } else {
+                ForEach(viewModel.recentEvents) { event in
+                    NavigationLink(value: event) {
+                        ProfileEventRow(
+                            event: event,
+                            invite: viewModel.recentEventInvites[event.id],
+                            confirmedCount: viewModel.recentEventCounts[event.id] ?? 0
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Contacts Row
+
+    private var contactsRow: some View {
+        Button {
+            showContacts = true
+        } label: {
+            HStack(spacing: Theme.Spacing.lg) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.primaryAction.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "person.crop.rectangle.stack.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(Theme.Colors.primaryAction)
+                }
+
+                Text("My Contacts")
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Text("(\(viewModel.savedContactsCount))")
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14))
+                    .foregroundColor(Theme.Colors.textSecondary)
+            }
+            .cardStyle()
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Settings Section
+
+    private var settingsSection: some View {
+        VStack(spacing: 0) {
+            SettingsRow(
+                icon: "lock.shield.fill",
+                title: "Privacy & Safety",
+                subtitle: "Phone visibility, blocking, your data",
+                color: Theme.Colors.accentWarm
+            ) {
+                showPrivacy = true
+            }
+            .padding(.bottom, 1)
+
+            Divider()
+                .padding(.horizontal, Theme.Spacing.lg)
+
+            SettingsRow(
+                icon: "dice.fill",
+                title: "BoardGameGeek",
+                subtitle: appState.currentUser?.bggUsername ?? "Link your account",
+                color: Theme.Colors.textSecondary
+            ) {
+                showBGGLink = true
+            }
+            .padding(.vertical, 1)
+
+            Divider()
+                .padding(.horizontal, Theme.Spacing.lg)
+
+            SettingsRow(
+                icon: "bell.fill",
+                title: "Notifications",
+                subtitle: "Push & SMS preferences",
+                color: Theme.Colors.primaryAction
+            ) {
+                // TODO: Notification settings
+            }
+            .padding(.vertical, 1)
+
+            Divider()
+                .padding(.horizontal, Theme.Spacing.lg)
+
+            ThemeToggleRow()
+        }
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                .fill(Theme.Colors.cardBackground)
+                .shadow(color: Color.black.opacity(ThemeManager.shared.isDark ? 0.3 : 0.06), radius: 8, x: 0, y: 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                        .stroke(Theme.Colors.divider, lineWidth: 1)
+                )
+        )
+    }
+
+    // MARK: - Sign Out
+
+    private var signOutButton: some View {
+        Button {
+            Task { await appState.signOut() }
+        } label: {
+            HStack {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                Text("Sign Out")
+            }
+            .font(Theme.Typography.bodyMedium)
+            .foregroundColor(Theme.Colors.error)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .stroke(Theme.Colors.error.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .padding(.top, Theme.Spacing.sm)
+    }
+}
+
+// MARK: - Stat Card
+
+private struct StatCard: View {
+    let icon: String
+    let value: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(color)
+            }
+
+            Text("\(value)")
+                .font(Theme.Typography.displaySmall)
+                .foregroundColor(Theme.Colors.textPrimary)
+
+            Text(label)
+                .font(Theme.Typography.caption2)
+                .foregroundColor(Theme.Colors.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                .fill(Theme.Colors.cardBackground)
+                .shadow(color: Color.black.opacity(ThemeManager.shared.isDark ? 0.3 : 0.06), radius: 4, x: 0, y: 2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
+                        .stroke(Theme.Colors.divider, lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Profile Event Row
+
+private struct ProfileEventRow: View {
+    let event: GameEvent
+    var invite: Invite?
+    var confirmedCount: Int
+
+    private var coverImageUrl: String? {
+        event.coverImageUrl ?? event.games.first(where: { $0.isPrimary })?.game?.imageUrl ?? event.games.first?.game?.imageUrl
+    }
+
+    private var isCurrentUserHost: Bool {
+        event.hostId == SupabaseService.shared.client.auth.currentSession?.user.id
+    }
+
+    private var hostName: String {
+        if isCurrentUserHost { return "You" }
+        return event.host?.displayName ?? "Unknown"
+    }
+
+    private var eventDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: event.effectiveStartDate)
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            // Cover image
+            Group {
+                if let urlString = coverImageUrl, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
+                    }
+                } else {
+                    GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
+                }
+            }
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+
+            // Info
+            VStack(alignment: .leading, spacing: 3) {
+                Text(event.title)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                Text("\(eventDate) · Hosted by \(hostName)")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(Theme.Colors.textTertiary)
+        }
+        .padding(.vertical, Theme.Spacing.xs)
+    }
+}
+
+// MARK: - Badge Model & Chip
+
+struct ProfileBadge: Identifiable {
+    let id: String
+    let icon: String
+    let name: String
+    let isUnlocked: Bool
+
+    static func allBadges(hostedCount: Int, attendedCount: Int, gameCount: Int, groupCount: Int) -> [ProfileBadge] {
+        [
+            ProfileBadge(id: "first_game_night", icon: "calendar.badge.checkmark", name: "First Game Night", isUnlocked: attendedCount >= 1 || hostedCount >= 1),
+            ProfileBadge(id: "host_hero", icon: "crown.fill", name: "Host Hero", isUnlocked: hostedCount >= 3),
+            ProfileBadge(id: "regular", icon: "flame.fill", name: "Regular", isUnlocked: attendedCount >= 5),
+            ProfileBadge(id: "collector", icon: "dice.fill", name: "Collector", isUnlocked: gameCount >= 10),
+            ProfileBadge(id: "social_butterfly", icon: "person.3.fill", name: "Social Butterfly", isUnlocked: groupCount >= 3),
+            ProfileBadge(id: "champion", icon: "trophy.fill", name: "Champion", isUnlocked: attendedCount >= 20),
+        ]
+    }
+}
+
+private struct BadgeChip: View {
+    let badge: ProfileBadge
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: badge.isUnlocked ? badge.icon : "lock.fill")
+                .font(.system(size: 12))
+            Text(badge.name)
+                .font(Theme.Typography.caption)
+        }
+        .foregroundColor(badge.isUnlocked ? Theme.Colors.primaryAction : Theme.Colors.textTertiary)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(
+            Capsule()
+                .fill(badge.isUnlocked ? Theme.Colors.primaryAction.opacity(0.12) : Theme.Colors.backgroundElevated)
+                .overlay(
+                    Capsule()
+                        .stroke(badge.isUnlocked ? Theme.Colors.primaryAction.opacity(0.3) : Theme.Colors.divider, lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -151,7 +509,7 @@ struct SettingsRow: View {
                     .font(.system(size: 14))
                     .foregroundColor(Theme.Colors.textSecondary)
             }
-            .cardStyle()
+            .padding(Theme.Spacing.lg)
         }
         .buttonStyle(.plain)
     }
@@ -275,7 +633,7 @@ struct ThemeToggleRow: View {
             .sageSegmented()
             .id(themeManager.isDark)
         }
-        .cardStyle()
+        .padding(Theme.Spacing.lg)
     }
 }
 

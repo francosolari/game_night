@@ -1270,6 +1270,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func updateSavedContactName(id: UUID, name: String) async throws {
+        try await client
+            .from("saved_contacts")
+            .update(["name": name])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     func fetchFrequentContacts(limit: Int = 20) async throws -> [FrequentContact] {
         let session = try await client.auth.session
         let contacts: [FrequentContact] = try await client
