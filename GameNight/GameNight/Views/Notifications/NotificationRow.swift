@@ -24,11 +24,18 @@ struct NotificationRow: View {
     let notification: AppNotification
 
     var body: some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.md) {
-            iconCircle
-            contentStack
-            Spacer(minLength: 0)
-            trailingIndicator
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                iconCircle
+                contentStack
+                Spacer(minLength: 0)
+                trailingIndicator
+            }
+
+            if notification.type == .inviteReceived, let event = notification.event {
+                CompactEventPreview(event: event)
+                    .padding(.leading, 40 + Theme.Spacing.md)
+            }
         }
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.vertical, Theme.Spacing.md)
@@ -92,5 +99,62 @@ struct NotificationRow: View {
         notification.isRead
             ? Color.clear
             : Theme.Colors.accent.opacity(0.04)
+    }
+}
+
+// MARK: - Compact Event Preview
+
+private struct CompactEventPreview: View {
+    let event: GameEvent
+
+    private var coverImageUrl: String? {
+        event.coverImageUrl ?? event.games.first(where: { $0.isPrimary })?.game?.imageUrl ?? event.games.first?.game?.imageUrl
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+            // Cover image
+            coverImage
+                .frame(width: 56, height: 68)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+
+            // Info
+            VStack(alignment: .leading, spacing: 4) {
+                EventDateLabel(event: event, size: .compact)
+
+                Text(event.title)
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                if !event.games.isEmpty {
+                    GameInfoCompact(games: event.games, size: .compact)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.backgroundElevated)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .stroke(Theme.Colors.border.opacity(0.4), lineWidth: 0.5)
+        )
+    }
+
+    @ViewBuilder
+    private var coverImage: some View {
+        if let urlString = coverImageUrl, let url = URL(string: urlString) {
+            AsyncImage(url: url) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
+            }
+        } else {
+            GenerativeEventCover(title: event.title, eventId: event.id, variant: event.coverVariant)
+        }
     }
 }

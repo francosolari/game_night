@@ -524,4 +524,5 @@ struct CalendarDestination: Hashable {}
 enum HomeDestination: Hashable {
     case notifications
     case inbox
+    case eventDetail(UUID)
 }

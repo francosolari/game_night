@@ -469,6 +469,10 @@ struct EventHeroHeader: View {
         event.timeOptions.first
     }
 
+    private var isEventPast: Bool {
+        event.status == .completed || (event.timeOptions.first?.date ?? Date()) < Date()
+    }
+
     private var relativeTimeLabel: String {
         guard let timeOption = firstTimeOption else { return "" }
         return timeOption.relativeTimeDisplay
@@ -565,8 +569,8 @@ struct EventHeroHeader: View {
                             .padding(.top, 2)
 
                         HStack(spacing: Theme.Spacing.md) {
-                            if let myInvite, let onRSVPTap {
-                                heroRSVPRow(invite: myInvite, onTap: onRSVPTap)
+                            if let myInvite {
+                                heroRSVPRow(invite: myInvite, onTap: isEventPast ? nil : onRSVPTap)
                             }
 
                             Spacer()
@@ -590,46 +594,61 @@ struct EventHeroHeader: View {
 
     // MARK: - RSVP Row
     @ViewBuilder
-    private func heroRSVPRow(invite: Invite, onTap: @escaping () -> Void) -> some View {
-        let isPending = invite.status == .pending
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    if isPending {
-                        Image(systemName: "envelope.open.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Theme.Colors.primary)
-                        Text(hasPollsActive ? "RSVP & Vote" : "RSVP")
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.primary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+    private func heroRSVPRow(invite: Invite, onTap: (() -> Void)?) -> some View {
+        if let onTap {
+            // Future event — tappable RSVP button
+            let isPending = invite.status == .pending
+            Button(action: onTap) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        if isPending {
+                            Image(systemName: "envelope.open.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Theme.Colors.primary)
+                            Text(hasPollsActive ? "RSVP & Vote" : "RSVP")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.primary)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        } else {
+                            Image(systemName: invite.status.icon)
+                                .font(.system(size: 14))
+                                .foregroundColor(invite.status.color)
+                            Text(invite.status.rsvpDisplayLabel)
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+
+                    if let rsvpDeadline {
+                        Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
+                            .font(.system(size: 10, weight: .heavy))
                             .foregroundColor(Theme.Colors.textTertiary)
-                    } else {
-                        Image(systemName: invite.status.icon)
-                            .font(.system(size: 14))
-                            .foregroundColor(invite.status.color)
-                        Text(invite.status.rsvpDisplayLabel)
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        Image(systemName: "pencil")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(Theme.Colors.textTertiary)
+                    } else if !isPending && hasPollsActive {
+                        Text("View Polls")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(Theme.Colors.primary)
                     }
                 }
-
-                if let rsvpDeadline {
-                    Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(Theme.Colors.textTertiary)
-                } else if !isPending && hasPollsActive {
-                    Text("View Polls")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(Theme.Colors.primary)
-                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Past event — static display, no edit affordance
+            let wentIcon = invite.status == .accepted ? "checkmark.seal.fill" : invite.status.icon
+            let wentLabel = invite.status == .accepted ? "Went" : invite.status.rsvpDisplayLabel
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: wentIcon)
+                    .font(.system(size: 14))
+                    .foregroundColor(invite.status.color)
+                Text(wentLabel)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
             }
         }
-        .buttonStyle(.plain)
     }
 
     /// Renders "TODAY · 7:00 PM", "TOMORROW · 7:00 PM", or "Thursday, Mar 19 · 7:00 PM"

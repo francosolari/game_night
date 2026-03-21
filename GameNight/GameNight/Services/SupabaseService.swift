@@ -1766,7 +1766,8 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchNotifications(limit: Int = 50, offset: Int = 0) async throws -> [AppNotification] {
         try await client
             .from("notifications")
-            .select("*")
+            .select("*, event:events(*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*))")
+            .neq("type", value: "dm_received")
             .order("created_at", ascending: false)
             .range(from: offset, to: offset + limit - 1)
             .execute()
@@ -1777,6 +1778,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let response = try await client
             .from("notifications")
             .select("id", head: true, count: .exact)
+            .neq("type", value: "dm_received")
             .is("read_at", value: nil)
             .execute()
 

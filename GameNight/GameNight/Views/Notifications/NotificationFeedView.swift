@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NotificationFeedView: View {
+    @Binding var navigationPath: NavigationPath
     @StateObject private var viewModel = NotificationViewModel()
     @ObservedObject private var themeManager = ThemeManager.shared
 
@@ -41,6 +42,9 @@ struct NotificationFeedView: View {
                 ForEach(viewModel.notifications) { notification in
                     Button {
                         Task { await viewModel.markAsRead(notification) }
+                        if let eventId = notification.eventId {
+                            navigationPath.append(HomeDestination.eventDetail(eventId))
+                        }
                     } label: {
                         NotificationRow(notification: notification)
                     }
