@@ -48,7 +48,7 @@ actor ContactPickerService {
             contacts.append(UserContact(
                 id: UUID(),
                 name: name,
-                phoneNumber: Self.normalizePhone(phone),
+                phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
                 avatarUrl: nil,
                 isAppUser: false
             ))
@@ -82,7 +82,7 @@ actor ContactPickerService {
             return UserContact(
                 id: UUID(),
                 name: name,
-                phoneNumber: Self.normalizePhone(phone),
+                phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
                 avatarUrl: nil,
                 isAppUser: false
             )
@@ -131,7 +131,7 @@ actor ContactPickerService {
         let contacts = (try? await fetchLocalContacts()) ?? []
         var map: [String: String] = [:]
         for contact in contacts {
-            let key = contact.phoneNumber.filter(\.isNumber)
+            let key = PhoneNumberFormatter.normalizedForComparison(contact.phoneNumber)
             if !key.isEmpty {
                 map[key] = contact.name
             }
@@ -141,17 +141,9 @@ actor ContactPickerService {
 
     // MARK: - Phone normalization
 
+    /// Normalizes phone numbers to E.164 format (with +).
+    /// Delegates to PhoneNumberFormatter for consistency.
     static func normalizePhone(_ raw: String) -> String {
-        let digits = raw.filter(\.isNumber)
-        if digits.count == 10 {
-            return "+1\(digits)"  // Default US
-        }
-        if digits.hasPrefix("1") && digits.count == 11 {
-            return "+\(digits)"
-        }
-        if raw.hasPrefix("+") {
-            return "+\(digits)"
-        }
-        return "+\(digits)"
+        PhoneNumberFormatter.normalizeToE164(raw)
     }
 }

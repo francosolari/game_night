@@ -19,9 +19,12 @@ struct ContactListSheet: View {
     let onSelect: ([UserContact]) -> Void
 
     private var allContacts: [UserContact] {
-        var seen = excludedPhones
+        // Normalize excluded phones for consistent comparison
+        let normalizedExcluded = excludedPhones.map { PhoneNumberFormatter.normalizedForComparison($0) }
+        var seen = Set(normalizedExcluded)
+
         if let currentUserPhone {
-            seen.insert(currentUserPhone)
+            seen.insert(PhoneNumberFormatter.normalizedForComparison(currentUserPhone))
         }
         var result: [UserContact] = []
 
@@ -29,8 +32,9 @@ struct ContactListSheet: View {
             if let currentUserId, fc.contactUserId == currentUserId {
                 continue
             }
-            guard !seen.contains(fc.contactPhone) else { continue }
-            seen.insert(fc.contactPhone)
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(fc.contactPhone)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
             result.append(UserContact(
                 id: UUID(),
                 name: fc.contactName,
@@ -41,14 +45,16 @@ struct ContactListSheet: View {
         }
 
         for sc in savedContacts {
-            guard !seen.contains(sc.phoneNumber) else { continue }
-            seen.insert(sc.phoneNumber)
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(sc.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
             result.append(sc.asUserContact)
         }
 
         for ic in importedContacts {
-            guard !seen.contains(ic.phoneNumber) else { continue }
-            seen.insert(ic.phoneNumber)
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(ic.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
             result.append(ic)
         }
 
@@ -107,7 +113,7 @@ struct ContactListSheet: View {
                             }
 
                             if !appUserContacts.isEmpty {
-                                sectionHeader("On Game Night")
+                                sectionHeader("on cardboardwithme")
                                 ForEach(appUserContacts) { contact in
                                     ContactRow(
                                         contact: contact,

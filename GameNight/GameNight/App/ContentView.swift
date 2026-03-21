@@ -72,6 +72,12 @@ struct MainTabView: View {
             }
             previousTab = newTab
         }
+        .onChange(of: appState.showCreateEvent) { _, newValue in
+            if newValue {
+                showCreateEvent = true
+                appState.showCreateEvent = false
+            }
+        }
     }
 }
 

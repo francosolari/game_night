@@ -35,7 +35,7 @@ struct ContactRow: View {
                     Text(contact.name)
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
-                    Text(contact.phoneNumber)
+                    Text(PhoneNumberFormatter.formatForDisplay(contact.phoneNumber))
                         .font(Theme.Typography.caption)
                         .foregroundColor(Theme.Colors.textTertiary)
                 }
@@ -291,7 +291,7 @@ private struct NativeContactPicker: UIViewControllerRepresentable {
                 return UserContact(
                     id: UUID(),
                     name: name,
-                    phoneNumber: ContactPickerService.normalizePhone(phone),
+                    phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
                     avatarUrl: nil,
                     isAppUser: false
                 )

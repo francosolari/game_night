@@ -30,12 +30,13 @@ final class PlayLoggingViewModel: ObservableObject {
     var groupId: UUID?
 
     /// Phone numbers already in the participant list — used to exclude from contact picker
+    /// Stores normalized (digits-only) format for consistent comparison
     var existingPhoneNumbers: Set<String> {
         var phones = Set<String>()
         for drafts in participantsByGame.values {
             for d in drafts {
                 if let phone = d.phoneNumber {
-                    phones.insert(phone)
+                    phones.insert(PhoneNumberFormatter.normalizedForComparison(phone))
                 }
             }
         }
@@ -169,10 +170,13 @@ final class PlayLoggingViewModel: ObservableObject {
                 isWinner: false
             )
             // Add to all selected games
+            let normalizedContactPhone = PhoneNumberFormatter.normalizedForComparison(contact.phoneNumber)
             for gameId in selectedGameIds {
-                // Skip if already present (match by phone)
+                // Skip if already present (match by normalized phone)
                 let existing = participantsByGame[gameId] ?? []
-                if existing.contains(where: { $0.phoneNumber == contact.phoneNumber }) { continue }
+                if existing.contains(where: { PhoneNumberFormatter.normalizedForComparison($0.phoneNumber ?? "") == normalizedContactPhone }) {
+                    continue
+                }
                 participantsByGame[gameId, default: []].append(draft)
             }
         }

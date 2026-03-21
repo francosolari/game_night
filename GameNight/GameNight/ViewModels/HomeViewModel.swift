@@ -38,6 +38,9 @@ final class HomeViewModel: ObservableObject {
         }
         error = nil
 
+        // Mark past events as completed before fetching
+        await SupabaseService.shared.completePastEvents()
+
         let snapshot = await HomeDataLoader.load(
             fetchUpcomingEvents: { [supabase] in
                 try await supabase.fetchUpcomingEvents()

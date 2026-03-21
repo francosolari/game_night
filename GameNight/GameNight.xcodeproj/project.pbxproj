@@ -115,6 +115,7 @@
 		D7358196973474782DD6ABDD /* GroupPlayHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DF51217739522D1F3F21F6 /* GroupPlayHistoryView.swift */; };
 		D8BA6CA0E91A2ABEAEF147C0 /* GameEventDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F38EB39579296EB1CC1BD9F /* GameEventDecodingTests.swift */; };
 		D94640388C537F8DD69FD0B5 /* GroupInviteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9980167E08A72DABE640CA43 /* GroupInviteCard.swift */; };
+		D9C1645B40A95FFB5E700395 /* PhoneNumberFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA929ACDD2447D825A52AFCF /* PhoneNumberFormatter.swift */; };
 		DB246FC621832F6F20E2BB51 /* GenerativeEventCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3D86B22BD75AA9FD76C86A /* GenerativeEventCover.swift */; };
 		DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DF23C59FBCF877EDC97BAD /* GroupPickerSheet.swift */; };
 		DBACF5C6B7903F393DBE6F73 /* CreateEventDetailsStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = C851C421B2D167D35FFF7787 /* CreateEventDetailsStep.swift */; };
@@ -257,6 +258,7 @@
 		AFCD7292A0C4E019CD712C73 /* CreateEventViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventViewModelTests.swift; sourceTree = "<group>"; };
 		B28400BD598D5C4BB6D33C6F /* GroupDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupDetailView.swift; sourceTree = "<group>"; };
 		B5A15F336918E8627CD57784 /* SortOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortOption.swift; sourceTree = "<group>"; };
+		BA929ACDD2447D825A52AFCF /* PhoneNumberFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberFormatter.swift; sourceTree = "<group>"; };
 		BF42D07B22BEA961ACC27216 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		BFCE44DB7F63902750892756 /* Secrets.swift.example */ = {isa = PBXFileReference; path = Secrets.swift.example; sourceTree = "<group>"; };
 		C545563F575388D3D5C55CE1 /* GroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsView.swift; sourceTree = "<group>"; };
@@ -374,6 +376,14 @@
 			path = Loaders;
 			sourceTree = "<group>";
 		};
+		2E1C06A90EA5877EB445122C /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				BA929ACDD2447D825A52AFCF /* PhoneNumberFormatter.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
 		2E8326EECFF2BE195EA309C5 /* GameLibrary */ = {
 			isa = PBXGroup;
 			children = (
@@ -474,6 +484,7 @@
 				5B0B4A1EBFEC5861C00CA29E /* Models */,
 				476382826CCB8A7F9C5BC61F /* Services */,
 				ADD85AC6B93155A12EA0D94A /* Theme */,
+				2E1C06A90EA5877EB445122C /* Utilities */,
 				406E7A27D654D0E51AF7305C /* ViewModels */,
 				0C1179022F1DD863DD4F1970 /* Views */,
 			);
@@ -851,6 +862,7 @@
 				7124447E48FB168EA905F827 /* LocationPickerSheet.swift in Sources */,
 				88286AB6BCD7CFB53E204C68 /* LocationService.swift in Sources */,
 				8EBFE0CD5C9F9E0FADEB8B66 /* OnboardingView.swift in Sources */,
+				D9C1645B40A95FFB5E700395 /* PhoneNumberFormatter.swift in Sources */,
 				222C8545BDCB2BF28EC20D1F /* PhotoPickerButton.swift in Sources */,
 				48FB09F253EA3D13A22D5D3B /* Play.swift in Sources */,
 				F17E659EF6BA2319DA0B7B65 /* PlayCard.swift in Sources */,

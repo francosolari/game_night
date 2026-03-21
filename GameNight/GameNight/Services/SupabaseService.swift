@@ -456,6 +456,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    /// Marks past events as completed server-side. Call on app launch / home load.
+    func completePastEvents() async {
+        _ = try? await client.rpc("complete_past_events").execute()
+    }
+
     func softDeleteEvent(id: UUID) async throws {
         let updates: [String: AnyJSON] = [
             "deleted_at": .string(ISO8601DateFormatter().string(from: Date())),
