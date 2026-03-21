@@ -90,12 +90,14 @@ serve(async (req) => {
 
     const promotedInvite = waitlisted[0];
 
-    // Promote: update status and mark as active
+    // Promote: update status, mark as active, track promotion
     await supabase
       .from("invites")
       .update({
         status: "pending",
         is_active: true,
+        promoted_at: new Date().toISOString(),
+        promoted_from_tier: promotedInvite.tier,
       })
       .eq("id", promotedInvite.id);
 
