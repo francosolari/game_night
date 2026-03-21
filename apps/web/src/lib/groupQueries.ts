@@ -15,13 +15,38 @@ async function currentUserId(): Promise<string> {
 
 export async function fetchGroups(): Promise<GameGroup[]> {
   const userId = await currentUserId();
-  const { data, error } = await supabase
+
+  // Fetch groups the user owns
+  const { data: ownedData, error: ownedError } = await supabase
     .from("groups")
     .select("*, members:group_members(*)")
     .eq("owner_id", userId)
     .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as unknown as GameGroup[];
+  if (ownedError) throw ownedError;
+
+  // Fetch groups the user is a member of (via group_members.user_id)
+  const { data: memberRows, error: memberError } = await supabase
+    .from("group_members")
+    .select("group_id")
+    .eq("user_id", userId);
+  if (memberError) throw memberError;
+
+  const memberGroupIds = (memberRows ?? [])
+    .map(r => r.group_id)
+    .filter(id => !(ownedData ?? []).some(g => g.id === id));
+
+  let memberGroups: GameGroup[] = [];
+  if (memberGroupIds.length > 0) {
+    const { data: mData, error: mError } = await supabase
+      .from("groups")
+      .select("*, members:group_members(*)")
+      .in("id", memberGroupIds)
+      .order("created_at", { ascending: false });
+    if (mError) throw mError;
+    memberGroups = (mData ?? []) as unknown as GameGroup[];
+  }
+
+  return [...(ownedData ?? []) as unknown as GameGroup[], ...memberGroups];
 }
 
 export async function createGroup(name: string, emoji?: string, description?: string): Promise<GameGroup> {
