@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Night - RSVP</title>
+    <meta name="apple-itunes-app" content="app-id=APPSTOREID, app-argument=gamenight://invite/">
     <style>
         :root {
             /* Linear/Raycast inspired palette */
@@ -365,7 +366,9 @@
         <!-- App download badge -->
         <div class="app-badge">
             <p>Get the full experience</p>
-            <a href="#">Download Game Night App</a>
+            <a id="open-in-app" href="#" style="display:inline-block;padding:12px 24px;background:var(--primary);color:white;border-radius:8px;text-decoration:none;font-weight:600;margin-bottom:12px;">Open in App</a>
+            <br>
+            <a href="#" id="download-link" style="font-size:13px;">Don't have the app? Download it</a>
         </div>
     </div>
 
@@ -581,6 +584,12 @@
                     <div class="host">${msg}</div>
                 </div>
             `;
+        }
+
+        // Deep link into app
+        const openInAppBtn = document.getElementById('open-in-app');
+        if (openInAppBtn) {
+            openInAppBtn.href = `gamenight://invite/${inviteToken}`;
         }
 
         // Initialize
