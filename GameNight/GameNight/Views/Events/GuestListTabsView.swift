@@ -217,6 +217,11 @@ private struct GuestTabContent: View {
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
                     Spacer()
+                    if user.promotedAt != nil {
+                        Label("Promoted", systemImage: "arrow.up.circle.fill")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.primary)
+                    }
                     if user.tier > 1 {
                         Text("Tier \(user.tier)")
                             .font(Theme.Typography.caption)
@@ -224,6 +229,15 @@ private struct GuestTabContent: View {
                     }
                 }
                 .padding(.vertical, 6)
+                .contextMenu {
+                    if let token = user.inviteToken, !token.isEmpty {
+                        Button {
+                            UIPasteboard.general.string = "https://cardboardwithme.com/invite/\(token)"
+                        } label: {
+                            Label("Copy Invite Link", systemImage: "link")
+                        }
+                    }
+                }
 
                 if index < displayUsers.count - 1 {
                     Divider()

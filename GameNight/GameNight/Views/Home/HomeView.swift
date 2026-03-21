@@ -20,17 +20,19 @@ struct HomeView: View {
         ScrollView {
             VStack(spacing: Theme.Spacing.xxl) {
                     // Header
-                    HStack {
+                    HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+                            HStack(alignment: .center, spacing: 6) {
                                 Text("CardboardWithMe")
                                     .font(Theme.Typography.displayLarge)
                                     .foregroundColor(Theme.Colors.textPrimary)
+                                    .minimumScaleFactor(0.75)
+                                    .lineLimit(1)
 
                                 Image("MeepleLogo")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(width: 24, height: 24)
+                                    .frame(width: 20, height: 20)
                                     .opacity(0.6)
                             }
 
@@ -39,15 +41,48 @@ struct HomeView: View {
                                 .foregroundColor(Theme.Colors.textSecondary)
                         }
 
-                        Spacer()
+                        Spacer(minLength: 8)
 
-                        Button {
-                            appState.showCreateEvent = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(Theme.Gradients.primary)
+                        HStack(spacing: 8) {
+                            // Notifications
+                            Button {
+                                navigationPath.append(HomeDestination.notifications)
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "bell.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Theme.Colors.textSecondary)
+
+                                    if appState.unreadNotificationCount > 0 {
+                                        Circle()
+                                            .fill(Theme.Colors.error)
+                                            .frame(width: 6, height: 6)
+                                            .offset(x: 2, y: -1)
+                                    }
+                                }
+                                .frame(width: 24, height: 24)
+                            }
+
+                            // Messages
+                            Button {
+                                navigationPath.append(HomeDestination.inbox)
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "bubble.left.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Theme.Colors.textSecondary)
+
+                                    if appState.unreadMessageCount > 0 {
+                                        Circle()
+                                            .fill(Theme.Colors.error)
+                                            .frame(width: 6, height: 6)
+                                            .offset(x: 2, y: -1)
+                                    }
+                                }
+                                .frame(width: 24, height: 24)
+                            }
                         }
+                        .padding(.top, 6)
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.lg)
@@ -484,3 +519,9 @@ extension GameEvent: Hashable {
 
 // MARK: - Calendar Navigation Destination
 struct CalendarDestination: Hashable {}
+
+// MARK: - Home Navigation Destinations
+enum HomeDestination: Hashable {
+    case notifications
+    case inbox
+}

@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var showPrivacy = false
     @State private var showContacts = false
     @State private var showEventHistory = false
+    @State private var showNotificationSettings = false
 
     var body: some View {
         NavigationStack {
@@ -53,6 +54,9 @@ struct ProfileView: View {
             }
             .navigationDestination(isPresented: $showEventHistory) {
                 ProfileEventHistoryView()
+            }
+            .navigationDestination(isPresented: $showNotificationSettings) {
+                NotificationSettingsView()
             }
             .navigationDestination(for: GameEvent.self) { event in
                 EventDetailView(eventId: event.id)
@@ -280,7 +284,7 @@ struct ProfileView: View {
                 subtitle: "Push & SMS preferences",
                 color: Theme.Colors.primaryAction
             ) {
-                // TODO: Notification settings
+                showNotificationSettings = true
             }
             .padding(.vertical, 1)
 

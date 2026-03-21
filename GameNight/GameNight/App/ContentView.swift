@@ -31,6 +31,25 @@ struct MainTabView: View {
                         .navigationDestination(for: GameFamilyDestination.self) { destination in
                             GameFamilyDetailView(destination: destination)
                         }
+                        .navigationDestination(for: HomeDestination.self) { destination in
+                            switch destination {
+                            case .notifications:
+                                NotificationFeedView()
+                            case .inbox:
+                                InboxView(navigationPath: $homeNavigationPath)
+                            }
+                        }
+                        .navigationDestination(for: DMNavDestination.self) { dest in
+                            let conversationVM = ConversationViewModel(
+                                conversationId: dest.conversationId,
+                                otherUser: ConversationViewModel.ConversationOtherUser(
+                                    id: dest.otherUserId,
+                                    displayName: dest.otherDisplayName,
+                                    avatarUrl: dest.otherAvatarUrl
+                                )
+                            )
+                            ConversationView(viewModel: conversationVM)
+                        }
                 }
                 .tag(AppState.Tab.home)
 

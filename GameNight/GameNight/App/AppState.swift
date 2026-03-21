@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Supabase
 
 @MainActor
 final class AppState: ObservableObject {
@@ -10,6 +11,9 @@ final class AppState: ObservableObject {
     @Published var showCreateEvent = false
     @Published var scheduleNightGroup: GameGroup?
     @Published var deepLinkEventId: String?
+    @Published var deepLinkInviteToken: String?
+    @Published var unreadNotificationCount: Int = 0
+    @Published var unreadMessageCount: Int = 0
     /// Maps digits-only phone number → the current user's contact name for that person.
     /// Used to show contact names instead of app display names for people in your address book.
     var contactNameMap: [String: String] = [:]
@@ -23,6 +27,7 @@ final class AppState: ObservableObject {
     }
 
     private var cancellables = Set<AnyCancellable>()
+    private var notificationChannel: RealtimeChannelV2?
 
     init() {}
 
@@ -45,6 +50,8 @@ final class AppState: ObservableObject {
                 }
             }
             refreshContactNames()
+            startNotificationSubscription()
+            refreshUnreadCounts()
         } else {
             self.isAuthenticated = false
             if !isFirstLaunch {
@@ -87,9 +94,47 @@ final class AppState: ObservableObject {
     }
 
     func signOut() async {
+        await PushNotificationManager.shared.unregisterCurrentToken()
+        stopNotificationSubscription()
         try? await SupabaseService.shared.client.auth.signOut()
         isAuthenticated = false
         currentUser = nil
         contactNameMap = [:]
+        unreadNotificationCount = 0
+        unreadMessageCount = 0
+    }
+
+    // MARK: - Unread Counts
+
+    func refreshUnreadCounts() {
+        Task {
+            do {
+                let notifCount = try await SupabaseService.shared.fetchUnreadNotificationCount()
+                let msgCount = try await SupabaseService.shared.fetchUnreadMessageCount()
+                await MainActor.run {
+                    self.unreadNotificationCount = notifCount
+                    self.unreadMessageCount = msgCount
+                }
+            } catch {
+                print("Failed to refresh unread counts: \(error)")
+            }
+        }
+    }
+
+    func startNotificationSubscription() {
+        notificationChannel = SupabaseService.shared.subscribeToNotifications { [weak self] in
+            Task { @MainActor in
+                self?.refreshUnreadCounts()
+            }
+        }
+    }
+
+    func stopNotificationSubscription() {
+        if let channel = notificationChannel {
+            Task {
+                await channel.unsubscribe()
+            }
+        }
+        notificationChannel = nil
     }
 }
