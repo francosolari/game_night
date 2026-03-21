@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { ArrowLeft, MoreHorizontal, Pencil, Trash2, Users, Loader2 } from "lucide-react";
 import { PlayerCountIndicator } from "@/components/PlayerCountIndicator";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ const EventDetail = () => {
     event,
     isLoading,
     isOwner,
+    isCompleted,
     hasRSVPd,
     myInvite,
     accessPolicy,
@@ -68,6 +70,38 @@ const EventDetail = () => {
     togglePin,
     deleteEvent,
   } = detail;
+
+  // Auto-apply pending RSVP from invite flow (stored in localStorage)
+  const appliedPendingRef = useRef(false);
+  useEffect(() => {
+    if (appliedPendingRef.current || isLoading || !myInvite || !event || isSending) return;
+    const raw = localStorage.getItem("pendingRSVP");
+    if (!raw) return;
+    try {
+      const pending = JSON.parse(raw) as { eventId?: string; status?: string; selectedTimeId?: string | null };
+      if (pending.eventId !== id) return;
+      // Only apply if invite is still pending
+      if (myInvite.status !== "pending") {
+        localStorage.removeItem("pendingRSVP");
+        return;
+      }
+      appliedPendingRef.current = true;
+      localStorage.removeItem("pendingRSVP");
+      const votes: { time_option_id: string; vote_type: string }[] = [];
+      if (pending.selectedTimeId) {
+        votes.push({ time_option_id: pending.selectedTimeId, vote_type: "available" });
+      }
+      const status = pending.status || "accepted";
+      respondToInvite(status, votes).then(() => {
+        const label = status === "accepted" ? "Going" : status === "maybe" ? "Maybe" : "Can't Go";
+        toast({ title: `RSVP: ${label}`, description: "Your response has been saved." });
+      }).catch(() => {
+        toast({ title: "RSVP failed", description: "Please try again.", variant: "destructive" });
+      });
+    } catch {
+      localStorage.removeItem("pendingRSVP");
+    }
+  }, [isLoading, myInvite, event, id, isSending, respondToInvite, toast]);
 
   const handleDelete = async () => {
     const ok = await deleteEvent();
@@ -168,7 +202,8 @@ const EventDetail = () => {
         myInvite={myInvite}
         confirmedCount={inviteSummary.accepted}
         hasPollsActive={hasPollsActive}
-        onRSVPTap={() => setShowRSVP(true)}
+        accessPolicy={accessPolicy}
+        onRSVPTap={isCompleted ? undefined : () => setShowRSVP(true)}
       />
 
       {/* Content sections */}
@@ -268,7 +303,8 @@ const EventDetail = () => {
                 myInvite={myInvite}
                 confirmedCount={inviteSummary.accepted}
                 hasPollsActive={hasPollsActive}
-                onRSVPTap={() => setShowRSVP(true)}
+                accessPolicy={accessPolicy}
+                onRSVPTap={isCompleted ? undefined : () => setShowRSVP(true)}
               />
             </div>
 
@@ -309,14 +345,16 @@ const EventDetail = () => {
               <div className="rounded-xl bg-card border border-border p-4 space-y-3">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Your RSVP</h3>
                 <div className="flex items-center gap-2">
-                  <StatusDot status={myInvite.status} />
+                  <StatusDot status={isCompleted && myInvite.status === "accepted" ? "went" : myInvite.status} />
                   <span className="text-sm font-semibold text-foreground capitalize">
-                    {myInvite.status === "accepted" ? "Going" : myInvite.status === "declined" ? "Can't Go" : myInvite.status}
+                    {isCompleted && myInvite.status === "accepted" ? "Went" : myInvite.status === "accepted" ? "Going" : myInvite.status === "declined" ? "Can't Go" : myInvite.status}
                   </span>
                 </div>
-                <Button onClick={() => setShowRSVP(true)} variant="outline" size="sm" className="w-full">
-                  {myInvite.status === "pending" ? (hasPollsActive ? "RSVP & Vote" : "RSVP Now") : "Update RSVP"}
-                </Button>
+                {!isCompleted && (
+                  <Button onClick={() => setShowRSVP(true)} variant="outline" size="sm" className="w-full">
+                    {myInvite.status === "pending" ? (hasPollsActive ? "RSVP & Vote" : "RSVP Now") : "Update RSVP"}
+                  </Button>
+                )}
               </div>
             )}
 
@@ -371,7 +409,7 @@ const EventDetail = () => {
       {desktopView}
 
       {/* RSVP Dialog */}
-      {event && myInvite && (
+      {event && myInvite && !isCompleted && (
         <RSVPDialog
           open={showRSVP}
           onOpenChange={setShowRSVP}

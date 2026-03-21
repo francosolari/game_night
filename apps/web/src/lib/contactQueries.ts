@@ -9,6 +9,18 @@ export interface SavedContact {
   source?: "saved" | "co-guest" | "group";
 }
 
+/**
+ * Normalize a phone number to a canonical +1XXXXXXXXXX form for US numbers.
+ * Strips all non-digit chars, handles leading 1 / +1 / no prefix.
+ */
+export function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  // Already has country code or international
+  return `+${digits}`;
+}
+
 async function currentUserId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
@@ -65,16 +77,19 @@ async function fetchCoGuests(userId: string, myPhone: string | null): Promise<Sa
     .neq("user_id", userId)
     .limit(500);
 
-  // Dedupe by phone
+  // Dedupe by normalized phone
+  const myNorm = myPhone ? normalizePhone(myPhone) : null;
   const seen = new Map<string, SavedContact>();
   for (const inv of (coInvites ?? [])) {
     const phone = inv.phone_number;
-    if (!phone || phone === myPhone) continue;
-    if (seen.has(phone)) continue;
-    seen.set(phone, {
-      id: `co-${phone}`,
+    if (!phone) continue;
+    const norm = normalizePhone(phone);
+    if (norm === myNorm) continue;
+    if (seen.has(norm)) continue;
+    seen.set(norm, {
+      id: `co-${norm}`,
       name: inv.display_name ?? phone,
-      phone_number: phone,
+      phone_number: norm,
       is_app_user: !!inv.user_id,
       source: "co-guest",
     });
@@ -109,17 +124,19 @@ async function fetchGroupContacts(userId: string, myPhone: string | null): Promi
     .in("group_id", Array.from(groupIds))
     .limit(500);
 
+  const myNorm = myPhone ? normalizePhone(myPhone) : null;
   const seen = new Map<string, SavedContact>();
   for (const m of (members ?? [])) {
     const phone = m.phone_number;
-    if (!phone || phone === myPhone) continue;
-    // Skip self by user_id too
+    if (!phone) continue;
+    const norm = normalizePhone(phone);
+    if (norm === myNorm) continue;
     if (m.user_id === userId) continue;
-    if (seen.has(phone)) continue;
-    seen.set(phone, {
-      id: `grp-${phone}`,
+    if (seen.has(norm)) continue;
+    seen.set(norm, {
+      id: `grp-${norm}`,
       name: m.display_name ?? phone,
-      phone_number: phone,
+      phone_number: norm,
       is_app_user: !!m.user_id,
       source: "group",
     });
@@ -142,23 +159,25 @@ export async function fetchAllContacts(): Promise<SavedContact[]> {
     fetchGroupContacts(userId, myPhone),
   ]);
 
-  // Merge: saved wins over co-guest wins over group
+  // Merge: saved wins over co-guest wins over group, keyed by normalized phone
   const byPhone = new Map<string, SavedContact>();
 
   // Add in reverse priority order so saved overwrites
   for (const c of groupMembers) {
-    if (!byPhone.has(c.phone_number)) byPhone.set(c.phone_number, c);
+    const norm = normalizePhone(c.phone_number);
+    if (!byPhone.has(norm)) byPhone.set(norm, { ...c, phone_number: norm });
   }
   for (const c of coGuests) {
-    if (!byPhone.has(c.phone_number)) byPhone.set(c.phone_number, c);
+    const norm = normalizePhone(c.phone_number);
+    if (!byPhone.has(norm)) byPhone.set(norm, { ...c, phone_number: norm });
     else {
-      // Upgrade is_app_user if co-guest has it
-      const existing = byPhone.get(c.phone_number)!;
+      const existing = byPhone.get(norm)!;
       if (c.is_app_user && !existing.is_app_user) existing.is_app_user = true;
     }
   }
   for (const c of saved) {
-    byPhone.set(c.phone_number, c); // saved always wins
+    const norm = normalizePhone(c.phone_number);
+    byPhone.set(norm, { ...c, phone_number: norm }); // saved always wins
   }
 
   return Array.from(byPhone.values()).sort((a, b) =>

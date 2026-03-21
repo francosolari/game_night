@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -31,6 +31,9 @@ const Login = () => {
 
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
+  const inviteToken = searchParams.get("inviteToken");
 
   const fullPhone = normalizePhone(countryCode, phoneNumber);
   const phoneDigits = phoneNumber.replace(/\D/g, "");
@@ -123,7 +126,7 @@ const Login = () => {
         .maybeSingle();
 
       if (profile) {
-        navigate("/dashboard");
+        navigate(returnTo ?? "/dashboard");
       } else {
         setStep("display-name");
       }
@@ -160,7 +163,7 @@ const Login = () => {
       if (insertError) throw insertError;
 
       toast({ title: "Welcome!", description: "Your account is ready." });
-      navigate("/dashboard");
+      navigate(returnTo ?? "/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
     }

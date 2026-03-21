@@ -54,6 +54,11 @@ export function useEventDetail(eventId: string | undefined) {
     return event.host_id === user.id;
   }, [event, user]);
 
+  const isCompleted = useMemo(() => {
+    if (!event) return false;
+    return event.status === "completed" || event.status === "cancelled";
+  }, [event]);
+
   const hasRSVPd = useMemo(() => {
     if (!myInvite) return false;
     return myInvite.status === "accepted" || myInvite.status === "maybe";
@@ -359,6 +364,7 @@ export function useEventDetail(eventId: string | undefined) {
     isPostingComment,
     error,
     isOwner,
+    isCompleted,
     hasRSVPd,
     viewerRole,
     accessPolicy,
