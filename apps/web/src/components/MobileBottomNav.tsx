@@ -6,8 +6,8 @@ export function MobileBottomNav() {
   const navigate = useNavigate();
   const path = location.pathname;
 
-  // Don't show on login page
-  if (path === "/login") return null;
+  // Don't show on login or invite preview pages
+  if (path === "/login" || path.startsWith("/invite")) return null;
 
   return (
     <nav

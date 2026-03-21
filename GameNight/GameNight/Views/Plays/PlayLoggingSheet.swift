@@ -5,6 +5,9 @@ struct PlayLoggingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var toast: ToastItem?
     @State private var showGamePicker = false
+    @State private var showDatePicker = false
+    @State private var showContactPicker = false
+    @State private var durationText = ""
 
     let event: GameEvent?
     let group: GameGroup?
@@ -25,6 +28,9 @@ struct PlayLoggingSheet: View {
                         existingPlaysSection
                     }
 
+                    // Date selection
+                    dateSelectionSection
+
                     // Game selection
                     gameSelectionSection
 
@@ -32,6 +38,9 @@ struct PlayLoggingSheet: View {
                     ForEach(viewModel.selectedGames) { game in
                         gameResultSection(game)
                     }
+
+                    // Duration
+                    durationSection
 
                     // Confirm
                     if !viewModel.selectedGameIds.isEmpty {
@@ -208,16 +217,19 @@ struct PlayLoggingSheet: View {
             }
 
             // Participants
-            if let participants = viewModel.participantsByGame[game.id], !participants.isEmpty {
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    Text("Players")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.textSecondary)
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Players")
+                    .font(Theme.Typography.label)
+                    .foregroundColor(Theme.Colors.textSecondary)
 
+                if let participants = viewModel.participantsByGame[game.id], !participants.isEmpty {
                     ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
                         participantRow(gameId: game.id, index: index, participant: participant, isCoop: isCoop.wrappedValue)
                     }
                 }
+
+                // Add from contacts
+                addPlayerButton
             }
 
             // Notes
@@ -294,6 +306,112 @@ struct PlayLoggingSheet: View {
             }
         }
         .padding(.vertical, Theme.Spacing.xs)
+    }
+
+    // MARK: - Date Selection
+
+    private var dateSelectionSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            SectionHeader(title: "When was it played?")
+
+            Button {
+                withAnimation(Theme.Animation.snappy) {
+                    showDatePicker.toggle()
+                }
+            } label: {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.Colors.primary)
+                    Text(playedAtDisplay)
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                    Spacer()
+                    Image(systemName: showDatePicker ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+                .padding(Theme.Spacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.cardBackground)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if showDatePicker {
+                CalendarGridView(
+                    selectedDate: $viewModel.playedAt,
+                    hasSelection: .constant(true),
+                    allowsPastDates: true,
+                    onDateSelected: {
+                        withAnimation(Theme.Animation.snappy) {
+                            showDatePicker = false
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    private var playedAtDisplay: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d, yyyy"
+        return formatter.string(from: viewModel.playedAt)
+    }
+
+    // MARK: - Duration
+
+    private var durationSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            SectionHeader(title: "Duration (optional)")
+
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "clock")
+                    .font(.system(size: 16))
+                    .foregroundColor(Theme.Colors.textTertiary)
+                TextField("Minutes", text: $durationText)
+                    .font(Theme.Typography.bodyMedium)
+                    .keyboardType(.numberPad)
+                    .onChange(of: durationText) { _, newValue in
+                        viewModel.durationMinutes = Int(newValue)
+                    }
+                if !durationText.isEmpty {
+                    Text("min")
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+            }
+            .padding(Theme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(Theme.Colors.fieldBackground)
+            )
+        }
+    }
+
+    // MARK: - Add Player
+
+    private var addPlayerButton: some View {
+        Button {
+            showContactPicker = true
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "person.badge.plus")
+                    .font(.system(size: 14))
+                Text("Add a player...")
+                    .font(Theme.Typography.callout)
+            }
+            .foregroundColor(Theme.Colors.primary)
+        }
+        .padding(.vertical, Theme.Spacing.xs)
+        .sheet(isPresented: $showContactPicker) {
+            ContactListSheet(
+                excludedPhones: viewModel.existingPhoneNumbers
+            ) { contacts in
+                viewModel.addParticipantsFromContacts(contacts)
+            }
+        }
     }
 
     // MARK: - Confirm

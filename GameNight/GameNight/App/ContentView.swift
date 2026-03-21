@@ -31,6 +31,27 @@ struct MainTabView: View {
                         .navigationDestination(for: GameFamilyDestination.self) { destination in
                             GameFamilyDetailView(destination: destination)
                         }
+                        .navigationDestination(for: HomeDestination.self) { destination in
+                            switch destination {
+                            case .notifications:
+                                NotificationFeedView(navigationPath: $homeNavigationPath)
+                            case .inbox:
+                                InboxView(navigationPath: $homeNavigationPath)
+                            case .eventDetail(let id):
+                                EventDetailView(eventId: id)
+                            }
+                        }
+                        .navigationDestination(for: DMNavDestination.self) { dest in
+                            let conversationVM = ConversationViewModel(
+                                conversationId: dest.conversationId,
+                                otherUser: ConversationViewModel.ConversationOtherUser(
+                                    id: dest.otherUserId,
+                                    displayName: dest.otherDisplayName,
+                                    avatarUrl: dest.otherAvatarUrl
+                                )
+                            )
+                            ConversationView(viewModel: conversationVM)
+                        }
                 }
                 .tag(AppState.Tab.home)
 
@@ -71,6 +92,28 @@ struct MainTabView: View {
                 homeNavigationPath = NavigationPath()
             }
             previousTab = newTab
+        }
+        .onChange(of: appState.showCreateEvent) { _, newValue in
+            if newValue {
+                showCreateEvent = true
+                appState.showCreateEvent = false
+            }
+        }
+        .onChange(of: appState.deepLinkEventId) { _, newValue in
+            guard let idString = newValue, let uuid = UUID(uuidString: idString) else { return }
+            appState.deepLinkEventId = nil
+            appState.selectedTab = .home
+            homeNavigationPath.append(HomeDestination.eventDetail(uuid))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pushNotificationTapped)) { note in
+            if let eventId = note.userInfo?["event_id"] as? String,
+               let uuid = UUID(uuidString: eventId) {
+                appState.selectedTab = .home
+                homeNavigationPath.append(HomeDestination.eventDetail(uuid))
+            } else if note.userInfo?["conversation_id"] != nil {
+                appState.selectedTab = .home
+                homeNavigationPath.append(HomeDestination.inbox)
+            }
         }
     }
 }

@@ -132,7 +132,7 @@ final class GroupsViewModel: ObservableObject {
 
         let now = Date()
         upcomingEvents = allEvents
-            .filter { $0.effectiveStartDate >= now && $0.status == .published }
+            .filter { $0.effectiveEndDate >= now && $0.status == .published }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
 
         // Fetch invite counts for upcoming events

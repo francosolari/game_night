@@ -524,13 +524,13 @@ final class CreateEventViewModel: ObservableObject {
     func addContact(_ contact: UserContact) {
         guard !isCurrentUser(phoneNumber: contact.phoneNumber, userId: nil) else { return }
         guard !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber }) else { return }
-        addInvitee(name: contact.name, phoneNumber: contact.phoneNumber, tier: 1)
+        addInvitee(name: contact.name, phoneNumber: contact.phoneNumber, tier: 1, userId: contact.appUserId, source: contact.source)
     }
 
     func addFrequentContact(_ contact: FrequentContact) {
         guard !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId) else { return }
         guard !invitees.contains(where: { $0.phoneNumber == contact.contactPhone }) else { return }
-        addInvitee(name: contact.contactName, phoneNumber: contact.contactPhone, tier: 1)
+        addInvitee(name: contact.contactName, phoneNumber: contact.contactPhone, tier: 1, userId: contact.contactUserId, source: .appConnection)
     }
 
     var tier1Invitees: [InviteeEntry] {
@@ -580,15 +580,16 @@ final class CreateEventViewModel: ObservableObject {
         }
     }
 
-    func addInvitee(name: String, phoneNumber: String, tier: Int = 1) {
+    func addInvitee(name: String, phoneNumber: String, tier: Int = 1, userId: UUID? = nil, source: ContactSource = .phonebook) {
         let normalizedPhone = ContactPickerService.normalizePhone(phoneNumber)
         guard !isCurrentUser(phoneNumber: normalizedPhone, userId: nil) else { return }
         let entry = InviteeEntry(
             id: UUID(),
             name: name,
             phoneNumber: normalizedPhone,
-            userId: nil,
-            tier: tier
+            userId: userId,
+            tier: tier,
+            source: source
         )
         invitees.append(entry)
     }
@@ -769,6 +770,8 @@ final class CreateEventViewModel: ObservableObject {
 
         let invites: [Invite] = sortedInvitees.enumerated().map { index, invitee in
             let isFirstTier = inviteStrategy.type == .allAtOnce || index < firstTierSize
+            // App connections with known userId get push only (no SMS — host doesn't own their number)
+            let deliveryMethod: DeliveryMethod = (invitee.source == .appConnection && invitee.userId != nil) ? .push : .both
             return Invite(
                 id: invitee.id,
                 eventId: eventId,
@@ -783,7 +786,7 @@ final class CreateEventViewModel: ObservableObject {
                 respondedAt: nil,
                 selectedTimeOptionIds: [],
                 suggestedTimes: nil,
-                sentVia: .both,
+                sentVia: deliveryMethod,
                 smsDeliveryStatus: nil,
                 createdAt: Date()
             )
@@ -984,6 +987,7 @@ final class CreateEventViewModel: ObservableObject {
             return existingInvite
         }
 
+        let deliveryMethod: DeliveryMethod = (entry.source == .appConnection && entry.userId != nil) ? .push : .both
         return Invite(
             id: entry.id,
             eventId: eventId,
@@ -998,7 +1002,7 @@ final class CreateEventViewModel: ObservableObject {
             respondedAt: nil,
             selectedTimeOptionIds: [],
             suggestedTimes: nil,
-            sentVia: .both,
+            sentVia: deliveryMethod,
             smsDeliveryStatus: nil,
             createdAt: Date()
         )
@@ -1033,4 +1037,5 @@ struct InviteeEntry: Identifiable {
     var groupId: UUID?
     var groupEmoji: String?
     var groupName: String?
+    var source: ContactSource = .phonebook
 }

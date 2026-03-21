@@ -20,17 +20,19 @@ struct HomeView: View {
         ScrollView {
             VStack(spacing: Theme.Spacing.xxl) {
                     // Header
-                    HStack {
+                    HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+                            HStack(alignment: .center, spacing: 6) {
                                 Text("CardboardWithMe")
                                     .font(Theme.Typography.displayLarge)
                                     .foregroundColor(Theme.Colors.textPrimary)
+                                    .minimumScaleFactor(0.75)
+                                    .lineLimit(1)
 
                                 Image("MeepleLogo")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(width: 24, height: 24)
+                                    .frame(width: 20, height: 20)
                                     .opacity(0.6)
                             }
 
@@ -39,15 +41,48 @@ struct HomeView: View {
                                 .foregroundColor(Theme.Colors.textSecondary)
                         }
 
-                        Spacer()
+                        Spacer(minLength: 8)
 
-                        Button {
-                            appState.showCreateEvent = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(Theme.Gradients.primary)
+                        HStack(spacing: 8) {
+                            // Notifications
+                            Button {
+                                navigationPath.append(HomeDestination.notifications)
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "bell.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Theme.Colors.textSecondary)
+
+                                    if appState.unreadNotificationCount > 0 {
+                                        Circle()
+                                            .fill(Theme.Colors.error)
+                                            .frame(width: 6, height: 6)
+                                            .offset(x: 2, y: -1)
+                                    }
+                                }
+                                .frame(width: 24, height: 24)
+                            }
+
+                            // Messages
+                            Button {
+                                navigationPath.append(HomeDestination.inbox)
+                            } label: {
+                                ZStack(alignment: .topTrailing) {
+                                    Image(systemName: "bubble.left.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(Theme.Colors.textSecondary)
+
+                                    if appState.unreadMessageCount > 0 {
+                                        Circle()
+                                            .fill(Theme.Colors.error)
+                                            .frame(width: 6, height: 6)
+                                            .offset(x: 2, y: -1)
+                                    }
+                                }
+                                .frame(width: 24, height: 24)
+                            }
                         }
+                        .padding(.top, 6)
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.lg)
@@ -152,6 +187,18 @@ struct HomeView: View {
                         }
                     }
 
+                    // Compute future events once for empty state check and display
+                    let startOfToday = Calendar.current.startOfDay(for: Date())
+                    let futureEvents = viewModel.upcomingEvents.filter { event in
+                        event.effectiveStartDate >= startOfToday
+                    }
+                    let awaitingResponseItems = viewModel.awaitingResponseEvents
+                    let pendingGroupInvites = viewModel.pendingGroupInvites
+                    let hasVisibleContent = !futureEvents.isEmpty
+                        || !awaitingResponseItems.isEmpty
+                        || !pendingGroupInvites.isEmpty
+                        || !viewModel.drafts.isEmpty
+
                     if viewModel.isLoading {
                         // Skeleton loading
                         VStack(spacing: Theme.Spacing.lg) {
@@ -163,25 +210,61 @@ struct HomeView: View {
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
-                    } else if viewModel.awaitingResponseEvents.isEmpty && viewModel.upcomingEvents.isEmpty && viewModel.drafts.isEmpty {
-                        EmptyStateView(
-                            icon: "dice.fill",
-                            title: "No Game Nights Yet",
-                            message: "Create your first game night and invite friends to play!",
-                            actionLabel: "Create Game Night"
-                        ) {
-                            appState.showCreateEvent = true
+                    } else if !hasVisibleContent {
+                        VStack(spacing: Theme.Spacing.xxl) {
+                            Spacer()
+                                .frame(height: 60)
+
+                            Image(systemName: "dice.fill")
+                                .font(.system(size: 52))
+                                .foregroundStyle(Theme.Gradients.primary)
+
+                            VStack(spacing: Theme.Spacing.sm) {
+                                Text("No Game Nights Yet")
+                                    .font(Theme.Typography.headlineLarge)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+
+                                Text("Get the crew together — pick a game,\nset the date, and send out invites.")
+                                    .font(Theme.Typography.body)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .multilineTextAlignment(.center)
+                            }
+
+                            Button {
+                                appState.showCreateEvent = true
+                            } label: {
+                                Text("Plan a Game Night")
+                                    .font(Theme.Typography.bodySemibold)
+                            }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .padding(.horizontal, Theme.Spacing.jumbo)
                         }
-                        .frame(minHeight: 400)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, Theme.Spacing.xl)
                     } else {
-                        let awaitingResponseItems = viewModel.awaitingResponseEvents
-                        if !awaitingResponseItems.isEmpty {
+                        if !awaitingResponseItems.isEmpty || !pendingGroupInvites.isEmpty {
                             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                                 SectionHeader(title: "Awaiting Response")
                                     .padding(.horizontal, Theme.Spacing.xl)
 
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: Theme.Spacing.md) {
+                                        // Group invites (shown first — more time-sensitive)
+                                        ForEach(pendingGroupInvites, id: \.member.id) { entry in
+                                            GroupInviteCard(
+                                                group: entry.group,
+                                                member: entry.member,
+                                                onAccept: {
+                                                    Task { await viewModel.respondToGroupInvite(memberId: entry.member.id, accept: true) }
+                                                },
+                                                onDecline: {
+                                                    Task { await viewModel.respondToGroupInvite(memberId: entry.member.id, accept: false) }
+                                                }
+                                            )
+                                            .frame(width: carouselCardWidth)
+                                        }
+
+                                        // Event invites
                                         ForEach(awaitingResponseItems, id: \.event.id) { entry in
                                             VerticalEventCard(
                                                 event: entry.event,
@@ -199,14 +282,6 @@ struct HomeView: View {
                                 }
                                 .scrollTargetBehavior(.viewAligned)
                             }
-                        }
-
-                        // Next Up — horizontal carousel (future/today events only)
-                        let startOfToday = Calendar.current.startOfDay(for: Date())
-                        let futureEvents = viewModel.upcomingEvents.filter { event in
-                            // Include events starting today (even if already started) and future events.
-                            // An event that started today at noon still shows at 3pm.
-                            event.effectiveStartDate >= startOfToday
                         }
 
                         if !futureEvents.isEmpty {
@@ -444,3 +519,10 @@ extension GameEvent: Hashable {
 
 // MARK: - Calendar Navigation Destination
 struct CalendarDestination: Hashable {}
+
+// MARK: - Home Navigation Destinations
+enum HomeDestination: Hashable {
+    case notifications
+    case inbox
+    case eventDetail(UUID)
+}

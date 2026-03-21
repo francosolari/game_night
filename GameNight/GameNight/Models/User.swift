@@ -93,6 +93,14 @@ struct BlockedUser: Identifiable, Codable {
     }
 }
 
+// MARK: - Contact Source
+/// Tracks how a contact was discovered — controls phone number visibility in the UI.
+enum ContactSource: String, Hashable {
+    case phonebook      // From device address book (synced or picked)
+    case appConnection  // Discovered only through mutual events (FrequentContact RPC)
+    case manual         // Typed in manually by the host
+}
+
 // MARK: - User Contact (for invite picker — never bulk uploaded)
 struct UserContact: Identifiable, Hashable {
     let id: UUID
@@ -100,13 +108,29 @@ struct UserContact: Identifiable, Hashable {
     var phoneNumber: String
     var avatarUrl: String?
     var isAppUser: Bool
+    /// The contact's Supabase auth user ID (only set for app users).
+    /// Use this for DMs/RPC calls — `id` may be a saved_contacts row PK.
+    var appUserId: UUID?
+    /// How this contact was discovered — determines whether phone is visible in UI.
+    var source: ContactSource
+
+    init(id: UUID, name: String, phoneNumber: String, avatarUrl: String? = nil, isAppUser: Bool, appUserId: UUID? = nil, source: ContactSource = .phonebook) {
+        self.id = id
+        self.name = name
+        self.phoneNumber = phoneNumber
+        self.avatarUrl = avatarUrl
+        self.isAppUser = isAppUser
+        self.appUserId = appUserId
+        self.source = source
+    }
 
     static let preview = UserContact(
         id: UUID(),
         name: "Alex Chen",
         phoneNumber: "+1234567890",
         avatarUrl: nil,
-        isAppUser: true
+        isAppUser: true,
+        appUserId: UUID()
     )
 }
 
@@ -119,6 +143,8 @@ struct SavedContact: Identifiable, Codable, Hashable {
     var avatarUrl: String?
     var isAppUser: Bool
     var createdAt: Date?
+    /// The contact's Supabase auth user ID (resolved from phone match). Not stored in DB.
+    var appUserId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -128,10 +154,19 @@ struct SavedContact: Identifiable, Codable, Hashable {
         case avatarUrl = "avatar_url"
         case isAppUser = "is_app_user"
         case createdAt = "created_at"
+        // appUserId is not in CodingKeys — set manually after fetch
     }
 
     var asUserContact: UserContact {
-        UserContact(id: id, name: name, phoneNumber: phoneNumber, avatarUrl: avatarUrl, isAppUser: isAppUser)
+        UserContact(
+            id: appUserId ?? id,
+            name: name,
+            phoneNumber: phoneNumber,
+            avatarUrl: avatarUrl,
+            isAppUser: isAppUser,
+            appUserId: appUserId,
+            source: .phonebook
+        )
     }
 }
 

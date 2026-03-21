@@ -8,6 +8,9 @@ struct PlayDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var toast: ToastItem?
+    @State private var linkedEvent: GameEvent?
+    @State private var linkedEventPlays: [Play] = []
+    @State private var linkedEventInvites: [Invite] = []
 
     private var isLogger: Bool {
         currentUserId == play.loggedBy
@@ -141,6 +144,11 @@ struct PlayDetailView: View {
                     .cardStyle()
                 }
 
+                // Linked event info
+                if let event = linkedEvent {
+                    linkedEventSection(event: event)
+                }
+
                 // Logged by
                 HStack(spacing: Theme.Spacing.sm) {
                     Text("Logged by")
@@ -175,6 +183,73 @@ struct PlayDetailView: View {
             Button("Cancel", role: .cancel) {}
         }
         .toast($toast)
+        .task {
+            if let eventId = play.eventId {
+                linkedEvent = try? await SupabaseService.shared.fetchEvent(id: eventId)
+                linkedEventPlays = (try? await SupabaseService.shared.fetchPlaysForEvent(eventId: eventId))?.filter { $0.id != play.id } ?? []
+                linkedEventInvites = (try? await SupabaseService.shared.fetchInvites(eventId: eventId)) ?? []
+            }
+        }
+    }
+
+    // MARK: - Linked Event
+
+    private func linkedEventSection(event: GameEvent) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            SectionHeader(title: "Game Night")
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "party.popper.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(Theme.Colors.primary)
+                    Text(event.title)
+                        .font(Theme.Typography.headlineMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                }
+
+                HStack(spacing: Theme.Spacing.xs) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 11))
+                    Text(eventDateDisplay(event.effectiveStartDate))
+                        .font(Theme.Typography.caption)
+                }
+                .foregroundColor(Theme.Colors.textSecondary)
+
+                // Attendees
+                let accepted = linkedEventInvites.filter { $0.status == .accepted }
+                if !accepted.isEmpty {
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 11))
+                        Text(accepted.compactMap(\.displayName).joined(separator: ", "))
+                            .font(Theme.Typography.caption)
+                            .lineLimit(2)
+                    }
+                    .foregroundColor(Theme.Colors.textTertiary)
+                }
+            }
+
+            // Also played
+            if !linkedEventPlays.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("Also played")
+                        .font(Theme.Typography.label)
+                        .foregroundColor(Theme.Colors.textSecondary)
+
+                    ForEach(linkedEventPlays) { otherPlay in
+                        PlayCard(play: otherPlay)
+                    }
+                }
+            }
+        }
+        .cardStyle()
+    }
+
+    private func eventDateDisplay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d, yyyy"
+        return formatter.string(from: date)
     }
 
     private var playDateDisplay: String {

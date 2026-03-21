@@ -1,8 +1,9 @@
-import { useMemo } from "react";
-import { CalendarDays, MapPin, ChevronRight, Pencil, Mail } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarDays, MapPin, ChevronRight, Pencil, Mail, ExternalLink } from "lucide-react";
 import { GenerativeEventCover } from "@/components/GenerativeEventCover";
 import { PlayerCountIndicator } from "@/components/PlayerCountIndicator";
-import type { GameEvent, Invite } from "@/lib/types";
+import { buildLocationPresentation, type LocationPresentation } from "@/lib/locationPresentation";
+import type { GameEvent, Invite, EventAccessPolicy } from "@/lib/types";
 import { getPreferredCoverImage } from "@/lib/types";
 
 interface Props {
@@ -10,7 +11,8 @@ interface Props {
   myInvite: Invite | null;
   confirmedCount: number;
   hasPollsActive: boolean;
-  onRSVPTap: () => void;
+  accessPolicy?: EventAccessPolicy | null;
+  onRSVPTap?: () => void;
 }
 
 function getRelativeDay(dateStr: string): string {
@@ -32,7 +34,7 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
-export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActive, onRSVPTap }: Props) {
+export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActive, accessPolicy, onRSVPTap }: Props) {
   const coverImage = getPreferredCoverImage(event);
   const firstTimeOption = event.time_options[0];
   const confirmedOption = event.confirmed_time_option_id
@@ -43,8 +45,26 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
   const relativeDay = displayOption ? getRelativeDay(displayOption.start_time) : "";
   const isUrgent = relativeDay === "Today" || relativeDay === "Tomorrow";
 
+  const isCompleted = event.status === "completed" || event.status === "cancelled";
+
+  const [showMapMenu, setShowMapMenu] = useState(false);
+
+  const locationPres = useMemo<LocationPresentation | null>(() => {
+    return buildLocationPresentation(
+      event.location,
+      event.location_address,
+      accessPolicy?.canViewFullAddress ?? false
+    );
+  }, [event.location, event.location_address, accessPolicy?.canViewFullAddress]);
+
   const rsvpStatusConfig = useMemo(() => {
     if (!myInvite) return null;
+    if (isCompleted) {
+      if (myInvite.status === "accepted") return { label: "Went", color: "text-green-500", icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-green-500">✓</span>, isPending: false };
+      if (myInvite.status === "maybe") return { label: "Maybe", color: "text-amber-500", icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-amber-500">?</span>, isPending: false };
+      if (myInvite.status === "declined") return { label: "Didn't Go", color: "text-red-500", icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-red-500">✕</span>, isPending: false };
+      return { label: "Missed", color: "text-muted-foreground", icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-muted-foreground">—</span>, isPending: false };
+    }
     switch (myInvite.status) {
       case "pending": return { label: hasPollsActive ? "RSVP & Vote" : "RSVP", color: "text-primary", icon: <Mail className="w-3.5 h-3.5" />, isPending: true };
       case "accepted": return { label: "Going", color: "text-green-500", icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-green-500">✓</span>, isPending: false };
@@ -52,7 +72,7 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
       case "declined": return { label: "Can't Go", color: "text-red-500", icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center text-red-500">✕</span>, isPending: false };
       default: return null;
     }
-  }, [myInvite, hasPollsActive]);
+  }, [myInvite, hasPollsActive, isCompleted]);
 
   return (
     <div className="relative w-full h-[330px] md:h-[280px] md:rounded-xl md:overflow-hidden">
@@ -97,11 +117,82 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
           </div>
         )}
 
-        {/* Location */}
-        {(event.location || event.location_address) && (
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3 h-3 text-muted-foreground" />
-            <span className="text-sm font-medium text-white/90 truncate">{event.location || event.location_address}</span>
+        {/* Location — clickable when map link available */}
+        {locationPres && (
+          <div className="relative">
+            {locationPres.googleMapsURL ? (
+              <button
+                onClick={() => setShowMapMenu(prev => !prev)}
+                className="flex items-center gap-1.5 group text-left"
+              >
+                <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-white/90 truncate block group-hover:text-primary transition-colors">
+                    {locationPres.title}
+                  </span>
+                  {locationPres.subtitle && (
+                    <span className="text-[11px] text-white/60 truncate block">
+                      {locationPres.subtitle}
+                    </span>
+                  )}
+                </div>
+                <ExternalLink className="w-2.5 h-2.5 text-white/40 flex-shrink-0" />
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-white/90 truncate block">
+                    {locationPres.title}
+                  </span>
+                  {locationPres.subtitle && (
+                    <span className="text-[11px] text-white/60 truncate block">
+                      {locationPres.subtitle}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Map picker dropdown */}
+            {showMapMenu && locationPres.googleMapsURL && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMapMenu(false)} />
+                <div className="absolute bottom-full left-0 mb-2 bg-card border border-border rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
+                  {locationPres.appleMapsURL && (
+                    <a
+                      href={locationPres.appleMapsURL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setShowMapMenu(false)}
+                    >
+                      Apple Maps
+                    </a>
+                  )}
+                  <a
+                    href={locationPres.googleMapsURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                    onClick={() => setShowMapMenu(false)}
+                  >
+                    Google Maps
+                  </a>
+                  {locationPres.wazeURL && (
+                    <a
+                      href={locationPres.wazeURL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                      onClick={() => setShowMapMenu(false)}
+                    >
+                      Waze
+                    </a>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -124,16 +215,16 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
           <>
             <div className="border-t border-white/20 pt-2 mt-1 flex items-center justify-between">
               {rsvpStatusConfig && (
-                <button onClick={onRSVPTap} className="flex items-center gap-2 active:scale-95 transition-transform">
+                <button onClick={onRSVPTap} disabled={!onRSVPTap} className="flex items-center gap-2 active:scale-95 transition-transform disabled:opacity-100">
                   <span className={rsvpStatusConfig.color}>{rsvpStatusConfig.icon}</span>
                   <span className={`text-sm font-semibold ${rsvpStatusConfig.isPending ? "text-primary" : "text-white"}`}>
                     {rsvpStatusConfig.label}
                   </span>
-                  {rsvpStatusConfig.isPending ? (
+                  {!isCompleted && (rsvpStatusConfig.isPending ? (
                     <ChevronRight className="w-3 h-3 text-muted-foreground" />
                   ) : (
                     <Pencil className="w-3 h-3 text-muted-foreground" />
-                  )}
+                  ))}
                 </button>
               )}
 
@@ -149,7 +240,7 @@ export function EventHeroHeader({ event, myInvite, confirmedCount, hasPollsActiv
               )}
             </div>
 
-            {event.rsvp_deadline && (
+            {event.rsvp_deadline && !isCompleted && new Date(event.rsvp_deadline) > new Date() && (
               <p className="text-[10px] font-extrabold text-muted-foreground tracking-wide">
                 RSVP BY {new Date(event.rsvp_deadline).toLocaleDateString("en-US", { weekday: "long" }).toUpperCase()}
               </p>

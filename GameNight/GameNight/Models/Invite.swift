@@ -16,6 +16,9 @@ struct Invite: Identifiable, Codable {
     var selectedTimeOptionIds: [UUID]
     var suggestedTimes: [TimeOption]?
     var sentVia: DeliveryMethod
+    var inviteToken: String?
+    var promotedAt: Date?
+    var promotedFromTier: Int?
     var smsDeliveryStatus: SMSStatus?
     var createdAt: Date
 
@@ -33,6 +36,9 @@ struct Invite: Identifiable, Codable {
         case respondedAt = "responded_at"
         case selectedTimeOptionIds = "selected_time_option_ids"
         case suggestedTimes = "suggested_times"
+        case inviteToken = "invite_token"
+        case promotedAt = "promoted_at"
+        case promotedFromTier = "promoted_from_tier"
         case sentVia = "sent_via"
         case smsDeliveryStatus = "sms_delivery_status"
         case createdAt = "created_at"
@@ -53,6 +59,9 @@ struct Invite: Identifiable, Codable {
         respondedAt = try container.decodeIfPresent(Date.self, forKey: .respondedAt)
         selectedTimeOptionIds = (try? container.decodeIfPresent([UUID].self, forKey: .selectedTimeOptionIds)) ?? []
         suggestedTimes = try container.decodeIfPresent([TimeOption].self, forKey: .suggestedTimes)
+        inviteToken = try container.decodeIfPresent(String.self, forKey: .inviteToken)
+        promotedAt = try container.decodeIfPresent(Date.self, forKey: .promotedAt)
+        promotedFromTier = try container.decodeIfPresent(Int.self, forKey: .promotedFromTier)
         sentVia = try container.decodeIfPresent(DeliveryMethod.self, forKey: .sentVia) ?? .sms
         smsDeliveryStatus = try container.decodeIfPresent(SMSStatus.self, forKey: .smsDeliveryStatus)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
@@ -72,6 +81,9 @@ struct Invite: Identifiable, Codable {
         respondedAt: Date? = nil,
         selectedTimeOptionIds: [UUID],
         suggestedTimes: [TimeOption]? = nil,
+        inviteToken: String? = nil,
+        promotedAt: Date? = nil,
+        promotedFromTier: Int? = nil,
         sentVia: DeliveryMethod,
         smsDeliveryStatus: SMSStatus? = nil,
         createdAt: Date
@@ -89,6 +101,9 @@ struct Invite: Identifiable, Codable {
         self.respondedAt = respondedAt
         self.selectedTimeOptionIds = selectedTimeOptionIds
         self.suggestedTimes = suggestedTimes
+        self.inviteToken = inviteToken
+        self.promotedAt = promotedAt
+        self.promotedFromTier = promotedFromTier
         self.sentVia = sentVia
         self.smsDeliveryStatus = smsDeliveryStatus
         self.createdAt = createdAt
@@ -109,6 +124,9 @@ struct Invite: Identifiable, Codable {
         try container.encodeIfPresent(respondedAt, forKey: .respondedAt)
         try container.encode(selectedTimeOptionIds, forKey: .selectedTimeOptionIds)
         try container.encodeIfPresent(suggestedTimes, forKey: .suggestedTimes)
+        try container.encodeIfPresent(inviteToken, forKey: .inviteToken)
+        try container.encodeIfPresent(promotedAt, forKey: .promotedAt)
+        try container.encodeIfPresent(promotedFromTier, forKey: .promotedFromTier)
         try container.encode(sentVia, forKey: .sentVia)
         try container.encodeIfPresent(smsDeliveryStatus, forKey: .smsDeliveryStatus)
         try container.encode(createdAt, forKey: .createdAt)
@@ -200,9 +218,12 @@ struct InviteSummary {
     struct InviteUser: Identifiable {
         let id: UUID
         var name: String
+        var phoneNumber: String?
         var avatarUrl: String?
         var status: InviteStatus
         var tier: Int
+        var inviteToken: String?
+        var promotedAt: Date?
     }
 }
 
@@ -222,6 +243,7 @@ extension Invite {
         respondedAt: nil,
         selectedTimeOptionIds: [],
         suggestedTimes: nil,
+        inviteToken: "abc123def456",
         sentVia: .both,
         smsDeliveryStatus: .delivered,
         createdAt: Date()

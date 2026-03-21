@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext.tsx";
 import { MobileBottomNav } from "@/components/MobileBottomNav.tsx";
 import { DesktopShell } from "@/components/DesktopShell.tsx";
 import Index from "./pages/Index.tsx";
+import InvitePreview from "./pages/InvitePreview.tsx";
 import Login from "./pages/Login.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import CreateEvent from "./pages/CreateEvent.tsx";
@@ -23,16 +24,18 @@ import NotFound from "./pages/NotFound.tsx";
 const queryClient = new QueryClient();
 
 /** Pages that should NOT get the desktop sidebar */
-const NO_SHELL_ROUTES = ["/", "/login"];
+const NO_SHELL_ROUTES = ["/", "/login", "/invite"];
 
 function AppRoutes() {
   const location = useLocation();
-  const showShell = !NO_SHELL_ROUTES.includes(location.pathname);
+  const showShell = !NO_SHELL_ROUTES.some(r => location.pathname === r || location.pathname.startsWith(r + "/"))
+    || location.pathname === "/dashboard";
 
   const routes = (
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/invite/:token" element={<InvitePreview />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/events/new" element={<CreateEvent />} />
       <Route path="/events/:id" element={<EventDetail />} />

@@ -20,12 +20,28 @@ final class PlayLoggingViewModel: ObservableObject {
     @Published var notesByGame: [UUID: String] = [:]
     @Published var isCooperativeByGame: [UUID: Bool] = [:]
     @Published var cooperativeResultByGame: [UUID: Play.CooperativeResult] = [:]
+    @Published var playedAt: Date = Date()
+    @Published var durationMinutes: Int? = nil
     @Published var existingPlays: [Play] = []
     @Published var isSaving = false
     @Published var error: String?
 
     var eventId: UUID?
     var groupId: UUID?
+
+    /// Phone numbers already in the participant list — used to exclude from contact picker
+    /// Stores normalized (digits-only) format for consistent comparison
+    var existingPhoneNumbers: Set<String> {
+        var phones = Set<String>()
+        for drafts in participantsByGame.values {
+            for d in drafts {
+                if let phone = d.phoneNumber {
+                    phones.insert(PhoneNumberFormatter.normalizedForComparison(phone))
+                }
+            }
+        }
+        return phones
+    }
 
     private let supabase = SupabaseService.shared
 
@@ -81,6 +97,7 @@ final class PlayLoggingViewModel: ObservableObject {
     func prefillFromGroup(_ group: GameGroup) {
         groupId = group.id
 
+        // Show all group members but none pre-selected — user picks who played
         var drafts: [PlayParticipantDraft] = []
         for member in group.members {
             drafts.append(PlayParticipantDraft(
@@ -88,12 +105,14 @@ final class PlayLoggingViewModel: ObservableObject {
                 userId: member.userId,
                 phoneNumber: member.phoneNumber,
                 displayName: member.displayName ?? "Player",
-                isPlaying: true,
+                isPlaying: false,
                 isWinner: false
             ))
         }
 
         // No games preselected — user picks from library
+        // Store drafts so they're available when games are added
+        groupMemberDrafts = drafts
         for gameId in selectedGameIds {
             participantsByGame[gameId] = drafts
             notesByGame[gameId] = ""
@@ -101,15 +120,29 @@ final class PlayLoggingViewModel: ObservableObject {
         }
     }
 
+    /// Cached group member drafts so new games get the same member list
+    var groupMemberDrafts: [PlayParticipantDraft] = []
+
     func addGame(_ game: Game) {
         guard !availableGames.contains(where: { $0.id == game.id }) else { return }
         availableGames.append(game)
         selectedGameIds.insert(game.id)
 
-        // Copy participants from first game if available
+        // Copy participants from first game if available, else use group member drafts
         if let firstGameId = participantsByGame.keys.first,
            let existingParticipants = participantsByGame[firstGameId] {
             participantsByGame[game.id] = existingParticipants.map { p in
+                PlayParticipantDraft(
+                    id: UUID(),
+                    userId: p.userId,
+                    phoneNumber: p.phoneNumber,
+                    displayName: p.displayName,
+                    isPlaying: p.isPlaying,
+                    isWinner: false
+                )
+            }
+        } else if !groupMemberDrafts.isEmpty {
+            participantsByGame[game.id] = groupMemberDrafts.map { p in
                 PlayParticipantDraft(
                     id: UUID(),
                     userId: p.userId,
@@ -124,6 +157,29 @@ final class PlayLoggingViewModel: ObservableObject {
         }
         notesByGame[game.id] = ""
         isCooperativeByGame[game.id] = false
+    }
+
+    func addParticipantsFromContacts(_ contacts: [UserContact]) {
+        for contact in contacts {
+            let draft = PlayParticipantDraft(
+                id: UUID(),
+                userId: nil,
+                phoneNumber: contact.phoneNumber,
+                displayName: contact.name,
+                isPlaying: true,
+                isWinner: false
+            )
+            // Add to all selected games
+            let normalizedContactPhone = PhoneNumberFormatter.normalizedForComparison(contact.phoneNumber)
+            for gameId in selectedGameIds {
+                // Skip if already present (match by normalized phone)
+                let existing = participantsByGame[gameId] ?? []
+                if existing.contains(where: { PhoneNumberFormatter.normalizedForComparison($0.phoneNumber ?? "") == normalizedContactPhone }) {
+                    continue
+                }
+                participantsByGame[gameId, default: []].append(draft)
+            }
+        }
     }
 
     func checkExistingPlays() async {
@@ -155,7 +211,8 @@ final class PlayLoggingViewModel: ObservableObject {
                     groupId: groupId,
                     gameId: gameId,
                     loggedBy: userId,
-                    playedAt: Date(),
+                    playedAt: playedAt,
+                    durationMinutes: durationMinutes,
                     notes: notesByGame[gameId]?.isEmpty == true ? nil : notesByGame[gameId],
                     isCooperative: isCooperativeByGame[gameId] ?? false,
                     cooperativeResult: cooperativeResultByGame[gameId]

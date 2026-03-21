@@ -419,6 +419,19 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return event
     }
 
+    func fetchEventId(byShareToken shareToken: String) async throws -> UUID {
+        struct EventIdRow: Decodable { let id: UUID }
+        let row: EventIdRow = try await client
+            .from("events")
+            .select("id")
+            .eq("share_token", value: shareToken)
+            .is("deleted_at", value: nil)
+            .single()
+            .execute()
+            .value
+        return row.id
+    }
+
     func createEvent(_ event: GameEvent) async throws -> GameEvent {
         let created: GameEvent = try await client
             .from("events")
@@ -454,6 +467,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .update(updates)
             .eq("id", value: eventId.uuidString)
             .execute()
+    }
+
+    /// Marks past events as completed server-side. Call on app launch / home load.
+    func completePastEvents() async {
+        _ = try? await client.rpc("complete_past_events").execute()
     }
 
     func softDeleteEvent(id: UUID) async throws {
@@ -1139,6 +1157,47 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    /// Fetches pending group invites for the current user — groups they've been invited to but haven't responded.
+    func fetchMyPendingGroupInvites() async throws -> [(group: GameGroup, member: GroupMember)] {
+        let session = try await client.auth.session
+
+        // Step 1: fetch pending group_member rows for the current user
+        let pendingMembers: [GroupMember] = try await client
+            .from("group_members")
+            .select()
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("status", value: "pending")
+            .execute()
+            .value
+
+        guard !pendingMembers.isEmpty else { return [] }
+
+        // Step 2: fetch the corresponding groups (accepted members only for preview)
+        let groupIds = pendingMembers.map(\.groupId.uuidString)
+        let groups: [GameGroup] = try await client
+            .from("groups")
+            .select("*, members:group_members(*)")
+            .in("id", values: groupIds)
+            .execute()
+            .value
+
+        let groupMap = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+
+        return pendingMembers.compactMap { member in
+            guard let group = groupMap[member.groupId] else { return nil }
+            return (group: group, member: member)
+        }
+    }
+
+    func respondToGroupInvite(memberId: UUID, accept: Bool) async throws {
+        let newStatus = accept ? "accepted" : "declined"
+        try await client
+            .from("group_members")
+            .update(["status": newStatus])
+            .eq("id", value: memberId.uuidString)
+            .execute()
+    }
+
     // MARK: - Saved Contacts
 
     func fetchSavedContacts() async throws -> [SavedContact] {
@@ -1150,11 +1209,57 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .order("name")
             .execute()
             .value
-        return contacts
+
+        guard !contacts.isEmpty else { return contacts }
+
+        // Cross-reference with users table to determine who is on the app
+        // and resolve their Supabase user ID for DMs.
+        // saved_contacts stores E.164 ("+19546080345"), users stores digits-only ("19546080345").
+        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }
+
+        struct PhoneCheck: Decodable { let id: UUID; let phone_number: String }
+        let results: [PhoneCheck] = try await client
+            .from("users")
+            .select("id,phone_number")
+            .in("phone_number", values: digitsOnly)
+            .execute()
+            .value
+
+        let appUsersByPhone = Dictionary(
+            results.map { ($0.phone_number, $0.id) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        return contacts.map { contact in
+            var updated = contact
+            let digits = contact.phoneNumber.filter(\.isNumber)
+            if let userId = appUsersByPhone[digits] {
+                updated.isAppUser = true
+                updated.appUserId = userId
+            } else {
+                updated.isAppUser = false
+            }
+            return updated
+        }
     }
 
     func saveContacts(_ contacts: [UserContact]) async throws -> [SavedContact] {
         let session = try await client.auth.session
+
+        // Check which contacts are app users before saving
+        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
+        var appUserPhones = Set<String>()
+        if !digitsOnly.isEmpty {
+            struct PhoneCheck: Decodable { let phone_number: String }
+            let results: [PhoneCheck] = try await client
+                .from("users")
+                .select("phone_number")
+                .in("phone_number", values: digitsOnly)
+                .execute()
+                .value
+            appUserPhones = Set(results.map(\.phone_number))
+        }
+
         let toSave = contacts.map { contact in
             SavedContact(
                 id: UUID(),
@@ -1162,7 +1267,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 name: contact.name,
                 phoneNumber: contact.phoneNumber,
                 avatarUrl: contact.avatarUrl,
-                isAppUser: contact.isAppUser,
+                isAppUser: appUserPhones.contains(contact.phoneNumber.filter(\.isNumber)),
                 createdAt: nil
             )
         }
@@ -1184,6 +1289,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         try await client
             .from("saved_contacts")
             .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func updateSavedContactName(id: UUID, name: String) async throws {
+        try await client
+            .from("saved_contacts")
+            .update(["name": name])
             .eq("id", value: id.uuidString)
             .execute()
     }
@@ -1659,6 +1772,234 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    // MARK: - Notifications
+
+    func fetchNotifications(limit: Int = 50, offset: Int = 0) async throws -> [AppNotification] {
+        try await client
+            .from("notifications")
+            .select("*, event:events(*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*))")
+            .neq("type", value: "dm_received")
+            .order("created_at", ascending: false)
+            .range(from: offset, to: offset + limit - 1)
+            .execute()
+            .value
+    }
+
+    func fetchUnreadNotificationCount() async throws -> Int {
+        let response = try await client
+            .from("notifications")
+            .select("id", head: true, count: .exact)
+            .neq("type", value: "dm_received")
+            .is("read_at", value: nil)
+            .execute()
+
+        return response.count ?? 0
+    }
+
+    func markNotificationRead(id: UUID) async throws {
+        try await client
+            .from("notifications")
+            .update(["read_at": Date().ISO8601Format()])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func markAllNotificationsRead() async throws {
+        try await client
+            .from("notifications")
+            .update(["read_at": Date().ISO8601Format()])
+            .is("read_at", value: nil)
+            .execute()
+    }
+
+    func subscribeToNotifications(onUpdate: @escaping () -> Void) -> RealtimeChannelV2? {
+        // Subscribe to all notification changes; filter is handled by RLS
+        // Use a unique channel name to avoid conflicts when multiple subscribers exist
+        let channel = client.realtimeV2.channel("notifications-\(UUID().uuidString.prefix(8))")
+
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "notifications"
+        )
+
+        Task {
+            try? await channel.subscribeWithError()
+            for await _ in changes {
+                onUpdate()
+            }
+        }
+
+        return channel
+    }
+
+    func fetchNotificationPreferences() async throws -> NotificationPreferences? {
+        let results: [NotificationPreferences] = try await client
+            .from("notification_preferences")
+            .select("*")
+            .execute()
+            .value
+
+        return results.first
+    }
+
+    func upsertNotificationPreferences(_ prefs: NotificationPreferences) async throws {
+        try await client
+            .from("notification_preferences")
+            .upsert(prefs)
+            .execute()
+    }
+
+    // MARK: - Push Tokens
+
+    func registerPushToken(_ token: String) async throws {
+        let userId = try await currentUserId()
+        struct PushTokenEntry: Encodable {
+            let user_id: String
+            let device_token: String
+            let platform: String
+            let updated_at: String
+        }
+        let entry = PushTokenEntry(
+            user_id: userId.uuidString,
+            device_token: token,
+            platform: "ios",
+            updated_at: Date().ISO8601Format()
+        )
+        try await client
+            .from("push_tokens")
+            .upsert(entry)
+            .execute()
+    }
+
+    func unregisterPushToken(_ token: String) async throws {
+        try await client
+            .from("push_tokens")
+            .delete()
+            .eq("device_token", value: token)
+            .execute()
+    }
+
+    // MARK: - Direct Messages
+
+    func fetchConversations() async throws -> [ConversationSummary] {
+        try await client
+            .rpc("fetch_conversations_for_user")
+            .execute()
+            .value
+    }
+
+    func fetchMessages(conversationId: UUID, limit: Int = 50, before: Date? = nil) async throws -> [DirectMessage] {
+        var query = client
+            .from("direct_messages")
+            .select("*, sender:users!sender_id(*)")
+            .eq("conversation_id", value: conversationId.uuidString)
+
+        if let before = before {
+            query = query.lt("created_at", value: before.ISO8601Format())
+        }
+
+        return try await query
+            .order("created_at", ascending: true)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
+    func sendDirectMessage(conversationId: UUID, content: String, type: DirectMessage.MessageType = .text, metadata: MessageMetadata? = nil) async throws {
+        let userId = try await currentUserId()
+        struct DMEntry: Encodable {
+            let conversation_id: String
+            let sender_id: String
+            let content: String
+            let message_type: String
+            let metadata: MessageMetadata?
+        }
+        let entry = DMEntry(
+            conversation_id: conversationId.uuidString,
+            sender_id: userId.uuidString,
+            content: content,
+            message_type: type.rawValue,
+            metadata: metadata
+        )
+        try await client
+            .from("direct_messages")
+            .insert(entry)
+            .execute()
+    }
+
+    func getOrCreateDM(otherUserId: UUID) async throws -> UUID {
+        print("[DM] getOrCreateDM called with otherUserId: \(otherUserId)")
+        do {
+            let response = try await client
+                .rpc("get_or_create_dm", params: ["p_other_user_id": otherUserId.uuidString])
+                .execute()
+
+            let rawBody = String(data: response.data, encoding: .utf8) ?? "<non-utf8>"
+            print("[DM] Raw response body: \(rawBody)")
+            print("[DM] Response status: \(response.status)")
+
+            // Try decoding as a plain string first (scalar return)
+            if let uuidString = try? JSONDecoder().decode(String.self, from: response.data),
+               let uuid = UUID(uuidString: uuidString) {
+                print("[DM] Decoded as scalar string UUID: \(uuid)")
+                return uuid
+            }
+
+            // Try decoding as a single-element array of strings
+            if let array = try? JSONDecoder().decode([String].self, from: response.data),
+               let first = array.first,
+               let uuid = UUID(uuidString: first) {
+                print("[DM] Decoded as array[0] UUID: \(uuid)")
+                return uuid
+            }
+
+            // Try raw string trimming quotes
+            let trimmed = rawBody.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            if let uuid = UUID(uuidString: trimmed) {
+                print("[DM] Decoded from trimmed raw string UUID: \(uuid)")
+                return uuid
+            }
+
+            print("[DM] ERROR: Could not parse UUID from response")
+            throw NSError(domain: "GameNight", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid conversation ID: \(rawBody)"])
+        } catch {
+            print("[DM] ERROR: \(error)")
+            throw error
+        }
+    }
+
+    func markConversationRead(conversationId: UUID) async throws {
+        try await client
+            .rpc("mark_conversation_read", params: ["p_conversation_id": conversationId.uuidString])
+            .execute()
+    }
+
+    func fetchUnreadMessageCount() async throws -> Int {
+        let conversations: [ConversationSummary] = try await fetchConversations()
+        return conversations.reduce(0) { $0 + $1.unreadCount }
+    }
+
+    func subscribeToDirectMessages(conversationId: UUID, onUpdate: @escaping () -> Void) -> RealtimeChannelV2 {
+        let channel = client.realtimeV2.channel("dm-\(conversationId.uuidString)")
+
+        let changes = channel.postgresChange(
+            AnyAction.self,
+            schema: "public",
+            table: "direct_messages",
+            filter: .eq("conversation_id", value: conversationId)
+        )
+
+        Task {
+            try? await channel.subscribeWithError()
+            for await _ in changes {
+                onUpdate()
+            }
+        }
+
+        return channel
     }
 
     func subscribeToGroupMessages(groupId: UUID, onUpdate: @escaping () -> Void) -> RealtimeChannelV2 {

@@ -193,6 +193,7 @@ private struct GuestTabPill: View {
 // MARK: - Tab Content (list of guests)
 
 private struct GuestTabContent: View {
+    @EnvironmentObject var appState: AppState
     let users: [InviteSummary.InviteUser]
     let accentColor: Color
     var maxVisible: Int = 4
@@ -212,10 +213,15 @@ private struct GuestTabContent: View {
                 HStack(spacing: Theme.Spacing.sm) {
                     StatusDot(color: accentColor, size: 6)
                     AvatarView(url: user.avatarUrl, size: 32)
-                    Text(user.name)
+                    Text(appState.resolveDisplayName(phone: user.phoneNumber, fallback: user.name))
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
                     Spacer()
+                    if user.promotedAt != nil {
+                        Label("Promoted", systemImage: "arrow.up.circle.fill")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.primary)
+                    }
                     if user.tier > 1 {
                         Text("Tier \(user.tier)")
                             .font(Theme.Typography.caption)
@@ -223,6 +229,15 @@ private struct GuestTabContent: View {
                     }
                 }
                 .padding(.vertical, 6)
+                .contextMenu {
+                    if let token = user.inviteToken, !token.isEmpty {
+                        Button {
+                            UIPasteboard.general.string = "https://cardboardwithme.com/invite/\(token)"
+                        } label: {
+                            Label("Copy Invite Link", systemImage: "link")
+                        }
+                    }
+                }
 
                 if index < displayUsers.count - 1 {
                     Divider()

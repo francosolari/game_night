@@ -16,6 +16,8 @@ struct EventDetailView: View {
     @State private var editSavePresentation = EventEditSavePresentation()
     @State private var heroStretchOffset: CGFloat = 0
     @State private var showRSVPSheet = false
+    @State private var showInviteLinkSheet = false
+    @State private var pendingLinkInvites: [Invite] = []
     @State private var showPlayLogging = false
     @State private var eventPlays: [Play] = []
     @State private var selectedPlay: Play?
@@ -136,6 +138,21 @@ struct EventDetailView: View {
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Share button — visible when user has invite permissions
+            if let shareToken = viewModel.event?.shareToken,
+               viewModel.isOwner || viewModel.canInviteGuests {
+                ToolbarItem(placement: .topBarLeading) {
+                    ShareLink(
+                        item: URL(string: "https://cardboardwithme.com/event/\(shareToken)")!,
+                        message: Text("Join me for \(viewModel.event?.title ?? "Game Night")!")
+                    ) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16))
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                }
+            }
+
             if viewModel.isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: Theme.Spacing.sm) {
@@ -178,12 +195,12 @@ struct EventDetailView: View {
             ContactListSheet(
                 excludedPhones: Set(viewModel.invites.map(\.phoneNumber)),
                 onSelect: { contacts in
-                    Task {
-                        await viewModel.inviteContacts(contacts)
-                        viewModel.toast = ToastItem(style: .success, message: "\(contacts.count) invite\(contacts.count == 1 ? "" : "s") sent!")
-                    }
+                    Task { await handleInviteContacts(contacts) }
                 }
             )
+        }
+        .sheet(isPresented: $showInviteLinkSheet) {
+            InviteLinkSheet(invites: pendingLinkInvites)
         }
         .sheet(isPresented: $showEditSheet) {
             if let event = viewModel.event {
@@ -414,6 +431,24 @@ struct EventDetailView: View {
         return nil
     }
 
+    private func handleInviteContacts(_ contacts: [UserContact]) async {
+        await viewModel.inviteContacts(contacts)
+        // Check if any app-connection contacts were invited — show their links
+        let appConnectionContacts = contacts.filter { $0.source == .appConnection && $0.isAppUser }
+        if !appConnectionContacts.isEmpty {
+            let appConnectionPhones = Set(appConnectionContacts.map { PhoneNumberFormatter.normalizedForComparison($0.phoneNumber) })
+            pendingLinkInvites = viewModel.invites.filter { invite in
+                let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(invite.phoneNumber)
+                return appConnectionPhones.contains(normalizedPhone) && invite.inviteToken != nil
+            }
+            if !pendingLinkInvites.isEmpty {
+                showInviteLinkSheet = true
+            }
+        }
+        let count = contacts.count
+        viewModel.toast = ToastItem(style: .success, message: "\(count) invite\(count == 1 ? "" : "s") sent!")
+    }
+
 }
 
 // MARK: - Supporting Types
@@ -467,6 +502,10 @@ struct EventHeroHeader: View {
 
     private var firstTimeOption: TimeOption? {
         event.timeOptions.first
+    }
+
+    private var isEventPast: Bool {
+        event.status == .completed || (event.timeOptions.first?.date ?? Date()) < Date()
     }
 
     private var relativeTimeLabel: String {
@@ -565,8 +604,8 @@ struct EventHeroHeader: View {
                             .padding(.top, 2)
 
                         HStack(spacing: Theme.Spacing.md) {
-                            if let myInvite, let onRSVPTap {
-                                heroRSVPRow(invite: myInvite, onTap: onRSVPTap)
+                            if let myInvite {
+                                heroRSVPRow(invite: myInvite, onTap: isEventPast ? nil : onRSVPTap)
                             }
 
                             Spacer()
@@ -590,46 +629,61 @@ struct EventHeroHeader: View {
 
     // MARK: - RSVP Row
     @ViewBuilder
-    private func heroRSVPRow(invite: Invite, onTap: @escaping () -> Void) -> some View {
-        let isPending = invite.status == .pending
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: Theme.Spacing.sm) {
-                    if isPending {
-                        Image(systemName: "envelope.open.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Theme.Colors.primary)
-                        Text(hasPollsActive ? "RSVP & Vote" : "RSVP")
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.primary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+    private func heroRSVPRow(invite: Invite, onTap: (() -> Void)?) -> some View {
+        if let onTap {
+            // Future event — tappable RSVP button
+            let isPending = invite.status == .pending
+            Button(action: onTap) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        if isPending {
+                            Image(systemName: "envelope.open.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(Theme.Colors.primary)
+                            Text(hasPollsActive ? "RSVP & Vote" : "RSVP")
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.primary)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        } else {
+                            Image(systemName: invite.status.icon)
+                                .font(.system(size: 14))
+                                .foregroundColor(invite.status.color)
+                            Text(invite.status.rsvpDisplayLabel)
+                                .font(Theme.Typography.bodyMedium)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+
+                    if let rsvpDeadline {
+                        Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
+                            .font(.system(size: 10, weight: .heavy))
                             .foregroundColor(Theme.Colors.textTertiary)
-                    } else {
-                        Image(systemName: invite.status.icon)
-                            .font(.system(size: 14))
-                            .foregroundColor(invite.status.color)
-                        Text(invite.status.rsvpDisplayLabel)
-                            .font(Theme.Typography.bodyMedium)
-                            .foregroundColor(Theme.Colors.textPrimary)
-                        Image(systemName: "pencil")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(Theme.Colors.textTertiary)
+                    } else if !isPending && hasPollsActive {
+                        Text("View Polls")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(Theme.Colors.primary)
                     }
                 }
-
-                if let rsvpDeadline {
-                    Text(RSVPDeadlineDisplay.label(for: rsvpDeadline))
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(Theme.Colors.textTertiary)
-                } else if !isPending && hasPollsActive {
-                    Text("View Polls")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(Theme.Colors.primary)
-                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Past event — static display, no edit affordance
+            let wentIcon = invite.status == .accepted ? "checkmark.seal.fill" : invite.status.icon
+            let wentLabel = invite.status == .accepted ? "Went" : invite.status.rsvpDisplayLabel
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: wentIcon)
+                    .font(.system(size: 14))
+                    .foregroundColor(invite.status.color)
+                Text(wentLabel)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
             }
         }
-        .buttonStyle(.plain)
     }
 
     /// Renders "TODAY · 7:00 PM", "TOMORROW · 7:00 PM", or "Thursday, Mar 19 · 7:00 PM"

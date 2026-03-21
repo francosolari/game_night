@@ -2,7 +2,6 @@ import SwiftUI
 
 struct GroupDetailView: View {
     @StateObject private var viewModel: GroupDetailViewModel
-    @StateObject private var groupsViewModel = GroupsViewModel()
     @EnvironmentObject var appState: AppState
     @State private var showAddMembers = false
     @State private var showPlayLogging = false
@@ -113,7 +112,7 @@ struct GroupDetailView: View {
                 excludedPhones: Set(viewModel.group.members.map(\.phoneNumber)),
                 onSelect: { contacts in
                     Task {
-                        await groupsViewModel.addMembers(to: viewModel.group.id, contacts: contacts)
+                        await viewModel.addMembers(contacts: contacts)
                         toast = ToastItem(style: .success, message: "Added \(contacts.count) member\(contacts.count == 1 ? "" : "s")")
                     }
                 }
@@ -159,8 +158,38 @@ struct GroupDetailView: View {
                 )
             }
 
-            ForEach(viewModel.group.members) { member in
-                MemberRow(member: member, groupId: viewModel.group.id, viewModel: groupsViewModel)
+            // Confirmed members
+            let confirmedMembers = viewModel.group.members.filter(\.isAccepted)
+            if !confirmedMembers.isEmpty {
+                ForEach(confirmedMembers) { member in
+                    MemberRow(
+                        member: member,
+                        resolvedName: appState.resolveDisplayName(phone: member.phoneNumber, fallback: member.displayName)
+                    ) {
+                        await viewModel.removeMember(id: member.id)
+                    }
+                }
+            }
+
+            // Pending invites
+            let pendingMembers = viewModel.group.members.filter(\.isPending)
+            if !pendingMembers.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("Invited — Awaiting Response")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .padding(.top, Theme.Spacing.xs)
+
+                    ForEach(pendingMembers) { member in
+                        MemberRow(
+                            member: member,
+                            resolvedName: appState.resolveDisplayName(phone: member.phoneNumber, fallback: member.displayName)
+                        ) {
+                            await viewModel.removeMember(id: member.id)
+                        }
+                        .opacity(0.65)
+                    }
+                }
             }
 
             // Linked events section

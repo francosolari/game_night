@@ -48,7 +48,7 @@ actor ContactPickerService {
             contacts.append(UserContact(
                 id: UUID(),
                 name: name,
-                phoneNumber: Self.normalizePhone(phone),
+                phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
                 avatarUrl: nil,
                 isAppUser: false
             ))
@@ -82,7 +82,7 @@ actor ContactPickerService {
             return UserContact(
                 id: UUID(),
                 name: name,
-                phoneNumber: Self.normalizePhone(phone),
+                phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
                 avatarUrl: nil,
                 isAppUser: false
             )
@@ -92,20 +92,22 @@ actor ContactPickerService {
     /// Checks which of the SELECTED contacts (not all) are already app users.
     /// Only the phone numbers the user chose to invite are sent to the server.
     func checkAppUsers(for selectedContacts: [UserContact]) async -> [UserContact] {
-        // Only send the phones the user explicitly picked
-        let phones = selectedContacts.map(\.phoneNumber)
-        guard !phones.isEmpty else { return selectedContacts }
+        guard !selectedContacts.isEmpty else { return selectedContacts }
+
+        // DB stores phones as digits-only (e.g. "19546080345"), iOS normalizes to E.164 ("+19546080345").
+        // Strip non-digits for the query so both sides match.
+        let digitsOnly = selectedContacts.map { $0.phoneNumber.filter(\.isNumber) }
+        guard !digitsOnly.isEmpty else { return selectedContacts }
 
         do {
             struct PhoneCheck: Decodable {
                 let phone_number: String
-                let id: UUID
             }
 
             let results: [PhoneCheck] = try await SupabaseService.shared.client
                 .from("users")
-                .select("phone_number, id")
-                .in("phone_number", values: phones)
+                .select("phone_number")
+                .in("phone_number", values: digitsOnly)
                 .execute()
                 .value
 
@@ -113,7 +115,7 @@ actor ContactPickerService {
 
             return selectedContacts.map { contact in
                 var updated = contact
-                updated.isAppUser = appUserPhones.contains(contact.phoneNumber)
+                updated.isAppUser = appUserPhones.contains(contact.phoneNumber.filter(\.isNumber))
                 return updated
             }
         } catch {
@@ -121,19 +123,27 @@ actor ContactPickerService {
         }
     }
 
+    /// Builds a phone→name map from all device contacts (digits-only phone key).
+    /// Used to resolve how the current user sees other people (contact name > display_name).
+    /// Only reads contacts if permission was already granted — never triggers a permission prompt.
+    func buildContactNameMap() async -> [String: String] {
+        guard authorizationStatus == .authorized else { return [:] }
+        let contacts = (try? await fetchLocalContacts()) ?? []
+        var map: [String: String] = [:]
+        for contact in contacts {
+            let key = PhoneNumberFormatter.normalizedForComparison(contact.phoneNumber)
+            if !key.isEmpty {
+                map[key] = contact.name
+            }
+        }
+        return map
+    }
+
     // MARK: - Phone normalization
 
+    /// Normalizes phone numbers to E.164 format (with +).
+    /// Delegates to PhoneNumberFormatter for consistency.
     static func normalizePhone(_ raw: String) -> String {
-        let digits = raw.filter(\.isNumber)
-        if digits.count == 10 {
-            return "+1\(digits)"  // Default US
-        }
-        if digits.hasPrefix("1") && digits.count == 11 {
-            return "+\(digits)"
-        }
-        if raw.hasPrefix("+") {
-            return "+\(digits)"
-        }
-        return "+\(digits)"
+        PhoneNumberFormatter.normalizeToE164(raw)
     }
 }

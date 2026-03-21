@@ -5,6 +5,7 @@ struct GameLibraryView: View {
     @State private var showAddGame = false
     @State private var showImportBGG = false
     @State private var showCreateCategory = false
+    @State private var showLogPlay = false
 
     var body: some View {
         NavigationStack {
@@ -20,6 +21,14 @@ struct GameLibraryView: View {
                             Spacer()
 
                             Menu {
+                                Button {
+                                    showLogPlay = true
+                                } label: {
+                                    Label("Log a Play", systemImage: "dice.fill")
+                                }
+
+                                Divider()
+
                                 Button {
                                     showAddGame = true
                                 } label: {
@@ -129,6 +138,9 @@ struct GameLibraryView: View {
             }
             .sheet(isPresented: $showImportBGG) {
                 ImportBGGSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showLogPlay) {
+                PlayLoggingSheet()
             }
             .sheet(isPresented: $showCreateCategory) {
                 CreateCategorySheet { name, icon in

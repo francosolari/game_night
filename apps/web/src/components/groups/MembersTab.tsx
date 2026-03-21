@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MemberRow } from "./MemberRow";
-import { AddMemberDialog } from "./AddMemberDialog";
+import { ContactListSheet } from "./ContactListSheet";
+import { addGroupMember } from "@/lib/groupQueries";
+import { toast } from "sonner";
 import type { GameGroup } from "@/lib/groupTypes";
 
 interface MembersTabProps {
@@ -12,11 +14,32 @@ interface MembersTabProps {
 }
 
 export function MembersTab({ group, onMemberRemoved, onMemberAdded }: MembersTabProps) {
-  const [showAdd, setShowAdd] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
+
+  const excludedPhones = useMemo(
+    () => new Set(group.members.map(m => m.phone_number)),
+    [group.members]
+  );
+
+  const handleSelect = async (contacts: { name: string; phone_number: string }[]) => {
+    let added = 0;
+    for (const c of contacts) {
+      try {
+        await addGroupMember(group.id, { phone_number: c.phone_number, display_name: c.name });
+        added++;
+      } catch {
+        // skip dupes
+      }
+    }
+    if (added > 0) {
+      toast.success(`Added ${added} ${added === 1 ? "member" : "members"}`);
+      onMemberAdded();
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <Button variant="outline" size="sm" onClick={() => setShowAdd(true)} className="w-full gap-2">
+      <Button variant="outline" size="sm" onClick={() => setShowContacts(true)} className="w-full gap-2">
         <UserPlus className="w-4 h-4" />
         Add Members
       </Button>
@@ -31,11 +54,11 @@ export function MembersTab({ group, onMemberRemoved, onMemberAdded }: MembersTab
         )}
       </div>
 
-      <AddMemberDialog
-        open={showAdd}
-        onOpenChange={setShowAdd}
-        groupId={group.id}
-        onAdded={onMemberAdded}
+      <ContactListSheet
+        open={showContacts}
+        onOpenChange={setShowContacts}
+        excludedPhones={excludedPhones}
+        onSelect={handleSelect}
       />
     </div>
   );

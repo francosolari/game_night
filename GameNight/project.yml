@@ -33,6 +33,12 @@ targets:
         NSCalendarsFullAccessUsageDescription: "CardboardWithMe can add game night events to your calendar so you never miss a session."
         CFBundleDisplayName: CWM
         CFBundleName: CardboardWithMe
+    entitlements:
+      path: GameNight/GameNight.entitlements
+      properties:
+        aps-environment: development
+        com.apple.developer.associated-domains:
+          - applinks:cardboardwithme.com
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cardboardwithme.app
@@ -41,6 +47,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: GameNight/GameNight.entitlements
     dependencies:
       - package: Supabase
 

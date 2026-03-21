@@ -19,40 +19,63 @@ struct ContactListSheet: View {
     let onSelect: ([UserContact]) -> Void
 
     private var allContacts: [UserContact] {
-        var seen = excludedPhones
+        // Normalize excluded phones for consistent comparison
+        let normalizedExcluded = excludedPhones.map { PhoneNumberFormatter.normalizedForComparison($0) }
+        var seen = Set(normalizedExcluded)
+
         if let currentUserPhone {
-            seen.insert(currentUserPhone)
+            seen.insert(PhoneNumberFormatter.normalizedForComparison(currentUserPhone))
         }
+
+        // Build set of phonebook phones so we can detect if a frequent contact
+        // is also in the user's address book (phonebook supersedes appConnection)
+        let phonebookPhones: Set<String> = {
+            var phones = Set<String>()
+            for sc in savedContacts {
+                phones.insert(PhoneNumberFormatter.normalizedForComparison(sc.phoneNumber))
+            }
+            for ic in importedContacts {
+                phones.insert(PhoneNumberFormatter.normalizedForComparison(ic.phoneNumber))
+            }
+            return phones
+        }()
+
         var result: [UserContact] = []
 
         for fc in frequentContacts {
             if let currentUserId, fc.contactUserId == currentUserId {
                 continue
             }
-            guard !seen.contains(fc.contactPhone) else { continue }
-            seen.insert(fc.contactPhone)
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(fc.contactPhone)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
+            let isFromPhonebook = phonebookPhones.contains(normalizedPhone)
             result.append(UserContact(
                 id: UUID(),
                 name: fc.contactName,
                 phoneNumber: fc.contactPhone,
                 avatarUrl: fc.contactAvatarUrl,
-                isAppUser: fc.isAppUser
+                isAppUser: fc.isAppUser,
+                appUserId: fc.contactUserId,
+                source: isFromPhonebook ? .phonebook : .appConnection
             ))
         }
 
         for sc in savedContacts {
-            guard !seen.contains(sc.phoneNumber) else { continue }
-            seen.insert(sc.phoneNumber)
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(sc.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
             result.append(sc.asUserContact)
         }
 
         for ic in importedContacts {
-            guard !seen.contains(ic.phoneNumber) else { continue }
-            seen.insert(ic.phoneNumber)
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(ic.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
             result.append(ic)
         }
 
-        return result
+        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private var filteredContacts: [UserContact] {
@@ -107,7 +130,7 @@ struct ContactListSheet: View {
                             }
 
                             if !appUserContacts.isEmpty {
-                                sectionHeader("On Game Night")
+                                sectionHeader("Game Night")
                                 ForEach(appUserContacts) { contact in
                                     ContactRow(
                                         contact: contact,
@@ -119,7 +142,7 @@ struct ContactListSheet: View {
                             }
 
                             if !otherContacts.isEmpty {
-                                sectionHeader(appUserContacts.isEmpty ? "Contacts" : "Others")
+                                sectionHeader("Contacts")
                                 ForEach(otherContacts) { contact in
                                     ContactRow(
                                         contact: contact,

@@ -17,12 +17,14 @@ import {
 import {
   ArrowLeft, User, LogOut, ChevronRight, Shield, Dice5, Bell, Palette,
   Trophy, CalendarDays, Lock, Trash2, Pencil, Crown, Star, Users, Package, Sparkles, Zap,
+  BookUser, Phone, Search,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchUserProfile, fetchProfileStats, fetchEventHistory,
   fetchBlockedUsers, unblockUser, updateUserProfile,
 } from "@/lib/queries";
+import { fetchAllContacts, type SavedContact } from "@/lib/contactQueries";
 import { toast } from "@/hooks/use-toast";
 import { GenerativeEventCover } from "@/components/GenerativeEventCover";
 import { format } from "date-fns";
@@ -49,6 +51,8 @@ export default function Profile() {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [bggOpen, setBggOpen] = useState(false);
   const [blockedOpen, setBlockedOpen] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
 
   // Edit form
   const [editName, setEditName] = useState("");
@@ -91,6 +95,12 @@ export default function Profile() {
     queryKey: ["blocked-users"],
     queryFn: fetchBlockedUsers,
     enabled: !!userId && blockedOpen,
+  });
+
+  const { data: savedContacts } = useQuery<SavedContact[]>({
+    queryKey: ["all-contacts"],
+    queryFn: fetchAllContacts,
+    enabled: !!userId,
   });
 
   const updateMut = useMutation({
@@ -300,6 +310,23 @@ export default function Profile() {
           )}
         </div>
 
+        {/* ─── My Contacts ─── */}
+        <div className="rounded-xl bg-card overflow-hidden">
+          <button
+            onClick={() => { setContactSearch(""); setContactsOpen(true); }}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <BookUser className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">My Contacts</span>
+              {savedContacts && savedContacts.length > 0 && (
+                <span className="text-xs text-muted-foreground">({savedContacts.length})</span>
+              )}
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
         {/* ─── Settings ─── */}
         <div className="rounded-xl bg-card overflow-hidden">
           <SettingsRow icon={<Shield className="w-4 h-4" />} label="Privacy & Safety" onClick={() => {
@@ -491,6 +518,74 @@ export default function Profile() {
               {profile?.bgg_username ? "Update" : "Link"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Contacts Dialog ─── */}
+      <Dialog open={contactsOpen} onOpenChange={setContactsOpen}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>My Contacts</DialogTitle>
+            <DialogDescription>
+              {savedContacts?.length ?? 0} saved {(savedContacts?.length ?? 0) === 1 ? "contact" : "contacts"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search contacts..."
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-1 min-h-0">
+            {(() => {
+              const filtered = (savedContacts ?? []).filter(
+                (c) =>
+                  c.name.toLowerCase().includes(contactSearch.toLowerCase()) ||
+                  c.phone_number.includes(contactSearch)
+              );
+              if (filtered.length === 0) {
+                return (
+                  <div className="py-10 flex flex-col items-center gap-2">
+                    <BookUser className="w-8 h-8 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      {contactSearch ? "No matching contacts" : "No contacts saved yet"}
+                    </p>
+                  </div>
+                );
+              }
+              return filtered.map((c) => (
+                <div key={c.id} className="flex items-center gap-3 py-2.5 px-1 rounded-lg">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-sm font-semibold text-primary">
+                      {c.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                      {c.is_app_user && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 text-primary border-0">
+                          GN
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs text-muted-foreground">{c.phone_number}</p>
+                      {c.source === "co-guest" && (
+                        <span className="text-[10px] text-muted-foreground/70">· Co-guest</span>
+                      )}
+                      {c.source === "group" && (
+                        <span className="text-[10px] text-muted-foreground/70">· Group</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

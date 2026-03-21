@@ -7,6 +7,7 @@ final class HomeViewModel: ObservableObject {
     @Published var myInvites: [Invite] = []
     @Published var drafts: [GameEvent] = []
     @Published var awaitingResponseEvents: [(event: GameEvent, invite: Invite)] = []
+    @Published var pendingGroupInvites: [(group: GameGroup, member: GroupMember)] = []
     @Published var isLoading = true
     @Published var error: String?
 
@@ -29,7 +30,16 @@ final class HomeViewModel: ObservableObject {
         if isInitialLoad {
             isLoading = true
         }
+        // Guarantee isLoading is always set to false, even if something unexpected happens
+        defer {
+            if isInitialLoad {
+                isLoading = false
+            }
+        }
         error = nil
+
+        // Mark past events as completed before fetching
+        await SupabaseService.shared.completePastEvents()
 
         let snapshot = await HomeDataLoader.load(
             fetchUpcomingEvents: { [supabase] in
@@ -46,7 +56,6 @@ final class HomeViewModel: ObservableObject {
         // If the task was cancelled (e.g. SwiftUI .refreshable releasing),
         // don't overwrite existing good data with empty results.
         guard !Task.isCancelled else {
-            if isInitialLoad { isLoading = false }
             return
         }
 
@@ -116,8 +125,20 @@ final class HomeViewModel: ObservableObject {
             print("🏠 [HomeViewModel] \(error)")
         }
 
-        if isInitialLoad {
-            isLoading = false
+        // defer handles isLoading = false
+
+        // Load pending group invites (non-blocking — runs after main content is shown)
+        if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
+            self.pendingGroupInvites = groupInvites
+        }
+    }
+
+    func respondToGroupInvite(memberId: UUID, accept: Bool) async {
+        do {
+            try await SupabaseService.shared.respondToGroupInvite(memberId: memberId, accept: accept)
+            pendingGroupInvites.removeAll { $0.member.id == memberId }
+        } catch {
+            print("🏠 [HomeViewModel] Group invite response failed: \(error)")
         }
     }
 
