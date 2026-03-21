@@ -125,8 +125,9 @@ actor ContactPickerService {
 
     /// Builds a phone→name map from all device contacts (digits-only phone key).
     /// Used to resolve how the current user sees other people (contact name > display_name).
+    /// Only reads contacts if permission was already granted — never triggers a permission prompt.
     func buildContactNameMap() async -> [String: String] {
-        guard (try? await requestAccess()) == true else { return [:] }
+        guard authorizationStatus == .authorized else { return [:] }
         let contacts = (try? await fetchLocalContacts()) ?? []
         var map: [String: String] = [:]
         for contact in contacts {

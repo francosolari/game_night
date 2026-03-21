@@ -152,6 +152,18 @@ struct HomeView: View {
                         }
                     }
 
+                    // Compute future events once for empty state check and display
+                    let startOfToday = Calendar.current.startOfDay(for: Date())
+                    let futureEvents = viewModel.upcomingEvents.filter { event in
+                        event.effectiveStartDate >= startOfToday
+                    }
+                    let awaitingResponseItems = viewModel.awaitingResponseEvents
+                    let pendingGroupInvites = viewModel.pendingGroupInvites
+                    let hasVisibleContent = !futureEvents.isEmpty
+                        || !awaitingResponseItems.isEmpty
+                        || !pendingGroupInvites.isEmpty
+                        || !viewModel.drafts.isEmpty
+
                     if viewModel.isLoading {
                         // Skeleton loading
                         VStack(spacing: Theme.Spacing.lg) {
@@ -163,19 +175,38 @@ struct HomeView: View {
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
-                    } else if viewModel.awaitingResponseEvents.isEmpty && viewModel.upcomingEvents.isEmpty && viewModel.drafts.isEmpty {
-                        EmptyStateView(
-                            icon: "dice.fill",
-                            title: "No Game Nights Yet",
-                            message: "Create your first game night and invite friends to play!",
-                            actionLabel: "Create Game Night"
-                        ) {
-                            appState.showCreateEvent = true
+                    } else if !hasVisibleContent {
+                        VStack(spacing: Theme.Spacing.xxl) {
+                            Spacer()
+                                .frame(height: 60)
+
+                            Image(systemName: "dice.fill")
+                                .font(.system(size: 52))
+                                .foregroundStyle(Theme.Gradients.primary)
+
+                            VStack(spacing: Theme.Spacing.sm) {
+                                Text("No Game Nights Yet")
+                                    .font(Theme.Typography.headlineLarge)
+                                    .foregroundColor(Theme.Colors.textPrimary)
+
+                                Text("Get the crew together — pick a game,\nset the date, and send out invites.")
+                                    .font(Theme.Typography.body)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                                    .multilineTextAlignment(.center)
+                            }
+
+                            Button {
+                                appState.showCreateEvent = true
+                            } label: {
+                                Text("Plan a Game Night")
+                                    .font(Theme.Typography.bodySemibold)
+                            }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .padding(.horizontal, Theme.Spacing.jumbo)
                         }
-                        .frame(minHeight: 400)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, Theme.Spacing.xl)
                     } else {
-                        let awaitingResponseItems = viewModel.awaitingResponseEvents
-                        let pendingGroupInvites = viewModel.pendingGroupInvites
                         if !awaitingResponseItems.isEmpty || !pendingGroupInvites.isEmpty {
                             VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                                 SectionHeader(title: "Awaiting Response")
@@ -216,14 +247,6 @@ struct HomeView: View {
                                 }
                                 .scrollTargetBehavior(.viewAligned)
                             }
-                        }
-
-                        // Next Up — horizontal carousel (future/today events only)
-                        let startOfToday = Calendar.current.startOfDay(for: Date())
-                        let futureEvents = viewModel.upcomingEvents.filter { event in
-                            // Include events starting today (even if already started) and future events.
-                            // An event that started today at noon still shows at 3pm.
-                            event.effectiveStartDate >= startOfToday
                         }
 
                         if !futureEvents.isEmpty {

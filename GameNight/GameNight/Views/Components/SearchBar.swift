@@ -98,7 +98,7 @@ struct EmptyStateView: View {
                     .padding(.horizontal, Theme.Spacing.jumbo)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
         .padding(Theme.Spacing.xl)
     }
 }
