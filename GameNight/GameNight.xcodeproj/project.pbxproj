@@ -76,6 +76,7 @@
 		8EBFE0CD5C9F9E0FADEB8B66 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35ACFC5CF2D84146F1B0E5B2 /* OnboardingView.swift */; };
 		906C411D5256C147CCE8BA4B /* PlayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80A0949142AE0BF19857D65 /* PlayDetailView.swift */; };
 		906DAF7FC4F3CB37704A0475 /* EventAccessPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = EABC2D147AC8B968A07D4B07 /* EventAccessPolicy.swift */; };
+		9085A8E56F9680825461E5CA /* AvatarUploadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF5AB0B1BD1D96FEA0A208E /* AvatarUploadViewModel.swift */; };
 		933D9C42930DEAE093897B1D /* GameDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A4207BA43E1C32B776B15E6 /* GameDetailViewModel.swift */; };
 		952D6E65529253DB318F9225 /* AccentBorderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E207E78E030FF6873F81D8 /* AccentBorderCard.swift */; };
 		98081CC0AB972190D03DABD9 /* ContactListSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC2A9C1BB5C965C30B05BA8 /* ContactListSheet.swift */; };
@@ -144,6 +145,7 @@
 		E4782D56AE4290B0E2B131C0 /* EventLocationLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E43FFCD35976C004FD647D /* EventLocationLabel.swift */; };
 		E5F0E4801AE22B9E0C6B5037 /* RatingBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 099F1FB524BC7122B983839B /* RatingBadge.swift */; };
 		E6A2924D49E15F10312F8295 /* JSONTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */; };
+		E6B1435B130AB7A328458A90 /* AvatarUploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C174491966DBDE589478368 /* AvatarUploadView.swift */; };
 		E8311D1C4D9FF5D6566829FB /* ImageUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D73D8C366775209C86706D3 /* ImageUploadTests.swift */; };
 		E891DE1624A246AF7EC816AF /* EventCoverPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB908E82EA559E0F90FC99D1 /* EventCoverPickerSheet.swift */; };
 		E94EDB0E593B5C1084DCEE6B /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D24417A59A465E98C69019 /* Secrets.swift */; };
@@ -250,6 +252,7 @@
 		66D59417AFF5CBCCAD157BFA /* NotificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationViewModel.swift; sourceTree = "<group>"; };
 		69561F42236C03A9796EB809 /* NotificationRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationRow.swift; sourceTree = "<group>"; };
 		6972870F7ABC7E856F6F116C /* ConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationView.swift; sourceTree = "<group>"; };
+		6C174491966DBDE589478368 /* AvatarUploadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarUploadView.swift; sourceTree = "<group>"; };
 		6D3FEEC34A1373C0210242FC /* GameLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLibraryViewModel.swift; sourceTree = "<group>"; };
 		6F38EB39579296EB1CC1BD9F /* GameEventDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameEventDecodingTests.swift; sourceTree = "<group>"; };
 		70D669B7A89C9E0E3A9E2AF7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -303,6 +306,7 @@
 		CCEA0C41E55640191654256D /* NewMessageSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewMessageSheet.swift; sourceTree = "<group>"; };
 		CE8FD5CA3969C4A60A9AEF48 /* DesignerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignerDetailView.swift; sourceTree = "<group>"; };
 		CEE44D563D71CBA8608FAF99 /* CreateEventViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventViewModel.swift; sourceTree = "<group>"; };
+		CFF5AB0B1BD1D96FEA0A208E /* AvatarUploadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarUploadViewModel.swift; sourceTree = "<group>"; };
 		D017EC525728B9B8D9291412 /* Play.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Play.swift; sourceTree = "<group>"; };
 		D0371A07CD113686C89A4573 /* SMSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMSService.swift; sourceTree = "<group>"; };
 		D08F48D130E6908AE7450663 /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
@@ -453,6 +457,7 @@
 		406E7A27D654D0E51AF7305C /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				CFF5AB0B1BD1D96FEA0A208E /* AvatarUploadViewModel.swift */,
 				97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */,
 				BF66335DE47AC248FA2EC911 /* ConversationViewModel.swift */,
 				CEE44D563D71CBA8608FAF99 /* CreateEventViewModel.swift */,
@@ -615,6 +620,7 @@
 		A1D70900596CC2BD4900E93A /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				6C174491966DBDE589478368 /* AvatarUploadView.swift */,
 				809BA94FD6371E24CF4DAD1D /* MyContactsView.swift */,
 				81ABA734BD7C429E16204F0A /* NotificationSettingsView.swift */,
 				491C5BC61EA3E94B1EA73171 /* PrivacySettingsView.swift */,
@@ -857,6 +863,8 @@
 				B284020735EE310424D45D56 /* AppDelegate.swift in Sources */,
 				767AE0C9B99E5CD98C19CC33 /* AppNotification.swift in Sources */,
 				F94FB46D73A94B95CAAB4410 /* AppState.swift in Sources */,
+				E6B1435B130AB7A328458A90 /* AvatarUploadView.swift in Sources */,
+				9085A8E56F9680825461E5CA /* AvatarUploadViewModel.swift in Sources */,
 				B8CB9F46799095CFDF66F26E /* BGGService.swift in Sources */,
 				1F834BF50C8D07CCF689978E /* BrandGuide.swift in Sources */,
 				581A7EB52A1D861724F70540 /* CalendarDayDetailView.swift in Sources */,

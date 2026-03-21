@@ -530,7 +530,20 @@ struct EditProfileSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: Theme.Spacing.xxl) {
-                AvatarView(url: appState.currentUser?.avatarUrl, size: 80)
+                AvatarUploadView(
+                    currentAvatarUrl: appState.currentUser?.avatarUrl,
+                    userId: appState.currentUser?.id,
+                    onAvatarUpdated: { newUrl in
+                        var user = appState.currentUser
+                        user?.avatarUrl = newUrl
+                        appState.currentUser = user
+                    },
+                    onAvatarDeleted: {
+                        var user = appState.currentUser
+                        user?.avatarUrl = nil
+                        appState.currentUser = user
+                    }
+                )
 
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     HStack {
