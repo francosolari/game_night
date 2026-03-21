@@ -30,6 +30,7 @@ struct GameEvent: Identifiable, Codable {
     var group: EventGroup?
     var coverVariant: Int
     var draftInvitees: [DraftInvitee]?
+    var shareToken: String?
     var deletedAt: Date?
     var createdAt: Date
     var updatedAt: Date
@@ -87,6 +88,7 @@ struct GameEvent: Identifiable, Codable {
         case group = "groups"
         case coverVariant = "cover_variant"
         case draftInvitees = "draft_invitees"
+        case shareToken = "share_token"
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -122,6 +124,7 @@ struct GameEvent: Identifiable, Codable {
         coverImageUrl: String? = nil,
         coverVariant: Int = 0,
         draftInvitees: [DraftInvitee]? = nil,
+        shareToken: String? = nil,
         deletedAt: Date? = nil,
         createdAt: Date,
         updatedAt: Date
@@ -155,6 +158,7 @@ struct GameEvent: Identifiable, Codable {
         self.coverImageUrl = coverImageUrl
         self.coverVariant = coverVariant
         self.draftInvitees = draftInvitees
+        self.shareToken = shareToken
         self.deletedAt = deletedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -191,6 +195,7 @@ struct GameEvent: Identifiable, Codable {
         coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
         coverVariant = try container.decodeIfPresent(Int.self, forKey: .coverVariant) ?? 0
         draftInvitees = try container.decodeIfPresent([DraftInvitee].self, forKey: .draftInvitees)
+        shareToken = try container.decodeIfPresent(String.self, forKey: .shareToken)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)

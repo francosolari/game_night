@@ -93,6 +93,14 @@ struct BlockedUser: Identifiable, Codable {
     }
 }
 
+// MARK: - Contact Source
+/// Tracks how a contact was discovered — controls phone number visibility in the UI.
+enum ContactSource: String, Hashable {
+    case phonebook      // From device address book (synced or picked)
+    case appConnection  // Discovered only through mutual events (FrequentContact RPC)
+    case manual         // Typed in manually by the host
+}
+
 // MARK: - User Contact (for invite picker — never bulk uploaded)
 struct UserContact: Identifiable, Hashable {
     let id: UUID
@@ -103,6 +111,18 @@ struct UserContact: Identifiable, Hashable {
     /// The contact's Supabase auth user ID (only set for app users).
     /// Use this for DMs/RPC calls — `id` may be a saved_contacts row PK.
     var appUserId: UUID?
+    /// How this contact was discovered — determines whether phone is visible in UI.
+    var source: ContactSource
+
+    init(id: UUID, name: String, phoneNumber: String, avatarUrl: String? = nil, isAppUser: Bool, appUserId: UUID? = nil, source: ContactSource = .phonebook) {
+        self.id = id
+        self.name = name
+        self.phoneNumber = phoneNumber
+        self.avatarUrl = avatarUrl
+        self.isAppUser = isAppUser
+        self.appUserId = appUserId
+        self.source = source
+    }
 
     static let preview = UserContact(
         id: UUID(),
@@ -144,7 +164,8 @@ struct SavedContact: Identifiable, Codable, Hashable {
             phoneNumber: phoneNumber,
             avatarUrl: avatarUrl,
             isAppUser: isAppUser,
-            appUserId: appUserId
+            appUserId: appUserId,
+            source: .phonebook
         )
     }
 }

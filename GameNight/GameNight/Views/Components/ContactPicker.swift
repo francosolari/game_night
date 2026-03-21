@@ -35,9 +35,15 @@ struct ContactRow: View {
                     Text(contact.name)
                         .font(Theme.Typography.bodyMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
-                    Text(PhoneNumberFormatter.formatForDisplay(contact.phoneNumber))
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
+                    if contact.source != .appConnection {
+                        Text(PhoneNumberFormatter.formatForDisplay(contact.phoneNumber))
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    } else {
+                        Text("via Game Night")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
+                    }
                 }
 
                 Spacer()
@@ -293,7 +299,8 @@ private struct NativeContactPicker: UIViewControllerRepresentable {
                     name: name,
                     phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
                     avatarUrl: nil,
-                    isAppUser: false
+                    isAppUser: false,
+                    source: .phonebook
                 )
             }
             onSelect(userContacts)

@@ -611,9 +611,15 @@ struct InviteeRow: View {
                             .font(.system(size: 12))
                     }
                 }
-                Text(invitee.phoneNumber)
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.textTertiary)
+                if invitee.source != .appConnection {
+                    Text(invitee.phoneNumber)
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                } else {
+                    Text("via Game Night")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary.opacity(0.6))
+                }
             }
 
             Spacer()

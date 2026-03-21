@@ -69,6 +69,29 @@ struct CreateEventInvitesStep: View {
                     addPeopleButton(icon: "person.badge.plus", label: "Phone") {
                         showContactPicker = true
                     }
+
+                    // Share link — available in edit mode when event has a share token
+                    if let shareToken = viewModel.eventToEdit?.shareToken,
+                       let url = URL(string: "https://cardboardwithme.com/event/\(shareToken)") {
+                        ShareLink(
+                            item: url,
+                            message: Text("Join me for \(viewModel.title.isEmpty ? "Game Night" : viewModel.title)!")
+                        ) {
+                            HStack(spacing: Theme.Spacing.sm) {
+                                Image(systemName: "link")
+                                    .font(.system(size: 14))
+                                Text("Link")
+                                    .font(Theme.Typography.calloutMedium)
+                            }
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.horizontal, Theme.Spacing.lg)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                    .fill(Theme.Colors.primary.opacity(0.1))
+                            )
+                        }
+                    }
                 }
             }
 

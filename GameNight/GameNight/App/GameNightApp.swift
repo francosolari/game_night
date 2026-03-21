@@ -51,7 +51,7 @@ struct GameNightApp: App {
             }
         }
 
-        // Handle https://cardboardwithme.com/invite/<token> (Universal Links)
+        // Handle https://cardboardwithme.com/invite/<token> or /event/<shareToken> (Universal Links)
         if url.host == "cardboardwithme.com" || url.host == "www.cardboardwithme.com" {
             let pathComponents = url.pathComponents
             if let inviteIndex = pathComponents.firstIndex(of: "invite"),
@@ -60,6 +60,29 @@ struct GameNightApp: App {
                 appState.deepLinkInviteToken = token
                 return
             }
+
+            // Handle /event/<shareToken> — resolve share token to event ID
+            if let eventIndex = pathComponents.firstIndex(of: "event"),
+               eventIndex + 1 < pathComponents.count {
+                let shareToken = pathComponents[eventIndex + 1]
+                Task {
+                    if let eventId = try? await SupabaseService.shared.fetchEventId(byShareToken: shareToken) {
+                        await MainActor.run { appState.deepLinkEventId = eventId.uuidString }
+                    }
+                }
+                return
+            }
+        }
+
+        // Handle gamenight://event/<shareToken>
+        if url.scheme == "gamenight", url.host == "event",
+           let shareToken = url.pathComponents.last, shareToken != "/" {
+            Task {
+                if let eventId = try? await SupabaseService.shared.fetchEventId(byShareToken: shareToken) {
+                    await MainActor.run { appState.deepLinkEventId = eventId.uuidString }
+                }
+            }
+            return
         }
 
         // Handle event deep links

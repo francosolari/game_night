@@ -26,6 +26,20 @@ struct ContactListSheet: View {
         if let currentUserPhone {
             seen.insert(PhoneNumberFormatter.normalizedForComparison(currentUserPhone))
         }
+
+        // Build set of phonebook phones so we can detect if a frequent contact
+        // is also in the user's address book (phonebook supersedes appConnection)
+        let phonebookPhones: Set<String> = {
+            var phones = Set<String>()
+            for sc in savedContacts {
+                phones.insert(PhoneNumberFormatter.normalizedForComparison(sc.phoneNumber))
+            }
+            for ic in importedContacts {
+                phones.insert(PhoneNumberFormatter.normalizedForComparison(ic.phoneNumber))
+            }
+            return phones
+        }()
+
         var result: [UserContact] = []
 
         for fc in frequentContacts {
@@ -35,12 +49,15 @@ struct ContactListSheet: View {
             let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(fc.contactPhone)
             guard !seen.contains(normalizedPhone) else { continue }
             seen.insert(normalizedPhone)
+            let isFromPhonebook = phonebookPhones.contains(normalizedPhone)
             result.append(UserContact(
                 id: UUID(),
                 name: fc.contactName,
                 phoneNumber: fc.contactPhone,
                 avatarUrl: fc.contactAvatarUrl,
-                isAppUser: fc.isAppUser
+                isAppUser: fc.isAppUser,
+                appUserId: fc.contactUserId,
+                source: isFromPhonebook ? .phonebook : .appConnection
             ))
         }
 
@@ -113,7 +130,7 @@ struct ContactListSheet: View {
                             }
 
                             if !appUserContacts.isEmpty {
-                                sectionHeader("on cardboardwithme")
+                                sectionHeader("Game Night")
                                 ForEach(appUserContacts) { contact in
                                     ContactRow(
                                         contact: contact,
@@ -125,7 +142,7 @@ struct ContactListSheet: View {
                             }
 
                             if !otherContacts.isEmpty {
-                                sectionHeader(appUserContacts.isEmpty ? "Contacts" : "Others")
+                                sectionHeader("Contacts")
                                 ForEach(otherContacts) { contact in
                                     ContactRow(
                                         contact: contact,

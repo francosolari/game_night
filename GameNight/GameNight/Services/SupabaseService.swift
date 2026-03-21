@@ -419,6 +419,19 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return event
     }
 
+    func fetchEventId(byShareToken shareToken: String) async throws -> UUID {
+        struct EventIdRow: Decodable { let id: UUID }
+        let row: EventIdRow = try await client
+            .from("events")
+            .select("id")
+            .eq("share_token", value: shareToken)
+            .is("deleted_at", value: nil)
+            .single()
+            .execute()
+            .value
+        return row.id
+    }
+
     func createEvent(_ event: GameEvent) async throws -> GameEvent {
         let created: GameEvent = try await client
             .from("events")

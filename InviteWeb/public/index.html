@@ -374,15 +374,23 @@
 
     <script src="config.js"></script>
     <script>
-        // Get invite token from URL
+        // Determine path type: /invite/<token> or /event/<share_token>
         const pathParts = window.location.pathname.split('/');
-        const inviteToken = pathParts[pathParts.length - 1];
+        const isEventLink = pathParts.includes('event');
+        const isInviteLink = pathParts.includes('invite');
+        const pathToken = pathParts[pathParts.length - 1];
+        const inviteToken = isInviteLink ? pathToken : null;
+        const shareToken = isEventLink ? pathToken : null;
 
         let inviteData = null;
         let eventData = null;
         let selectedTimeIds = new Set();
 
         async function fetchInvite() {
+            if (isEventLink && shareToken) {
+                return fetchEvent();
+            }
+
             try {
                 const res = await fetch(`${SUPABASE_URL}/functions/v1/get-public-invite`, {
                     method: 'POST',
@@ -405,6 +413,32 @@
                 renderInvite();
             } catch (err) {
                 showError('Failed to load invite. Please try again.');
+            }
+        }
+
+        async function fetchEvent() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/get-public-event`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_PUBLISHABLE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ share_token: shareToken })
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data) {
+                    showError('Event not found.');
+                    return;
+                }
+
+                // For event links, eventData IS the response (no nested .event)
+                eventData = data;
+                renderInvite();
+            } catch (err) {
+                showError('Failed to load event. Please try again.');
             }
         }
 
@@ -525,14 +559,20 @@
                 <div class="card">
                     <div class="section-title">RSVP</div>
                     <div class="rsvp-buttons">
-                        <button class="btn btn-primary" onclick="respond('accepted')">I'm Going!</button>
-                        <div class="btn-row">
-                            <button class="btn btn-secondary" onclick="respond('maybe')">Maybe</button>
-                            <button class="btn btn-decline" onclick="respond('declined')">Can't Go</button>
-                        </div>
-                        <p style="margin-top: 14px; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
-                            RSVP requires signing in with the phone number that received this invite.
-                        </p>
+                        ${isEventLink ? `
+                            <p style="margin-bottom: 14px; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
+                                Download the app to RSVP and join this game night!
+                            </p>
+                        ` : `
+                            <button class="btn btn-primary" onclick="respond('accepted')">I'm Going!</button>
+                            <div class="btn-row">
+                                <button class="btn btn-secondary" onclick="respond('maybe')">Maybe</button>
+                                <button class="btn btn-decline" onclick="respond('declined')">Can't Go</button>
+                            </div>
+                            <p style="margin-top: 14px; color: var(--text-secondary); font-size: 14px; line-height: 1.5;">
+                                RSVP requires signing in with the phone number that received this invite.
+                            </p>
+                        `}
                     </div>
                 </div>
             `;
@@ -589,7 +629,11 @@
         // Deep link into app
         const openInAppBtn = document.getElementById('open-in-app');
         if (openInAppBtn) {
-            openInAppBtn.href = `gamenight://invite/${inviteToken}`;
+            if (inviteToken) {
+                openInAppBtn.href = `gamenight://invite/${inviteToken}`;
+            } else if (shareToken) {
+                openInAppBtn.href = `gamenight://event/${shareToken}`;
+            }
         }
 
         // Initialize

@@ -421,11 +421,13 @@ final class EventViewModel: ObservableObject {
 
             let nextTierPosition = (invites.map(\.tierPosition).max() ?? -1) + 1
             let newInvites = newContacts.enumerated().map { index, contact in
-                Invite(
+                // App connections with known userId get push only (no SMS — host doesn't own their number)
+                let deliveryMethod: DeliveryMethod = (contact.source == .appConnection && contact.appUserId != nil) ? .push : .both
+                return Invite(
                     id: UUID(),
                     eventId: event.id,
                     hostUserId: event.hostId,
-                    userId: nil,
+                    userId: contact.appUserId,
                     phoneNumber: contact.phoneNumber,
                     displayName: contact.name,
                     status: .pending,
@@ -435,7 +437,7 @@ final class EventViewModel: ObservableObject {
                     respondedAt: nil,
                     selectedTimeOptionIds: [],
                     suggestedTimes: nil,
-                    sentVia: .both,
+                    sentVia: deliveryMethod,
                     smsDeliveryStatus: nil,
                     createdAt: Date()
                 )
