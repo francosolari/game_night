@@ -367,9 +367,15 @@ class MyContactsViewModel: ObservableObject {
                     )
                 }
                 .sorted { a, b in
+                    // First: mutual event count (descending)
                     if a.mutualEventCount != b.mutualEventCount {
                         return a.mutualEventCount > b.mutualEventCount
                     }
+                    // Second: app users (true first)
+                    if a.contact.isAppUser != b.contact.isAppUser {
+                        return a.contact.isAppUser
+                    }
+                    // Third: alphabetical
                     return a.contact.name.localizedCaseInsensitiveCompare(b.contact.name) == .orderedAscending
                 }
         } catch {

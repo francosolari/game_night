@@ -1244,10 +1244,35 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func saveContacts(_ contacts: [UserContact]) async throws -> [SavedContact] {
+        guard !contacts.isEmpty else { return [] }
         let session = try await client.auth.session
 
+        // Deduplicate by phone number (keep first occurrence)
+        var seen = Set<String>()
+        let uniqueContacts = contacts.filter { contact in
+            let key = contact.phoneNumber.filter(\.isNumber)
+            if seen.contains(key) {
+                return false
+            }
+            seen.insert(key)
+            return true
+        }
+
+        // Fetch existing contacts to avoid upserting unchanged ones
+        let existingContacts: [SavedContact] = try await client
+            .from("saved_contacts")
+            .select()
+            .eq("user_id", value: session.user.id.uuidString)
+            .execute()
+            .value
+
+        let existingByPhone = Dictionary(
+            existingContacts.map { ($0.phoneNumber.filter(\.isNumber), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
         // Check which contacts are app users before saving
-        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
+        let digitsOnly = uniqueContacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
         var appUserPhones = Set<String>()
         if !digitsOnly.isEmpty {
             struct PhoneCheck: Decodable { let phone_number: String }
@@ -1260,20 +1285,31 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             appUserPhones = Set(results.map(\.phone_number))
         }
 
-        let toSave = contacts.map { contact in
-            SavedContact(
-                id: UUID(),
-                userId: session.user.id,
-                name: contact.name,
-                phoneNumber: contact.phoneNumber,
-                avatarUrl: contact.avatarUrl,
-                isAppUser: appUserPhones.contains(contact.phoneNumber.filter(\.isNumber)),
-                createdAt: nil
-            )
+        // Only upsert contacts that are new or have a different name
+        let toUpsert = uniqueContacts.compactMap { contact -> SavedContact? in
+            let normalized = contact.phoneNumber.filter(\.isNumber)
+            let existing = existingByPhone[normalized]
+
+            // Only include if new or name changed
+            if existing == nil || existing?.name != contact.name {
+                return SavedContact(
+                    id: existing?.id ?? UUID(),
+                    userId: session.user.id,
+                    name: contact.name,
+                    phoneNumber: contact.phoneNumber,
+                    avatarUrl: contact.avatarUrl,
+                    isAppUser: appUserPhones.contains(normalized),
+                    createdAt: existing?.createdAt
+                )
+            }
+            return nil
         }
+
+        guard !toUpsert.isEmpty else { return existingContacts }
+
         let saved: [SavedContact] = try await client
             .from("saved_contacts")
-            .upsert(toSave, onConflict: "user_id,phone_number")
+            .upsert(toUpsert, onConflict: "user_id,phone_number")
             .select()
             .execute()
             .value

@@ -40,6 +40,16 @@ struct ContactListSheet: View {
             return phones
         }()
 
+        // Build a map of normalized phone → mutual event count for relevance sorting
+        let mutualEventCounts: [String: Int] = {
+            var map: [String: Int] = [:]
+            for fc in frequentContacts {
+                let normalized = PhoneNumberFormatter.normalizedForComparison(fc.contactPhone)
+                map[normalized] = fc.mutualEventCount
+            }
+            return map
+        }()
+
         var result: [UserContact] = []
 
         for fc in frequentContacts {
@@ -75,7 +85,27 @@ struct ContactListSheet: View {
             result.append(ic)
         }
 
-        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        // Sort by relevance: mutuals → app users → alphabetical
+        return result.sorted { a, b in
+            let aPhone = PhoneNumberFormatter.normalizedForComparison(a.phoneNumber)
+            let bPhone = PhoneNumberFormatter.normalizedForComparison(b.phoneNumber)
+
+            let aMutuals = mutualEventCounts[aPhone] ?? 0
+            let bMutuals = mutualEventCounts[bPhone] ?? 0
+
+            // First: prioritize by mutual event count (descending)
+            if aMutuals != bMutuals {
+                return aMutuals > bMutuals
+            }
+
+            // Second: prioritize app users
+            if a.isAppUser != b.isAppUser {
+                return a.isAppUser
+            }
+
+            // Third: alphabetical
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
     }
 
     private var filteredContacts: [UserContact] {
