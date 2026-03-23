@@ -4,6 +4,10 @@ struct GroupChatView: View {
     @ObservedObject var viewModel: GroupDetailViewModel
     @FocusState private var isCommentFocused: Bool
 
+    private var memberNames: Set<String> {
+        Set(viewModel.group.members.compactMap(\.displayName))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.isLoadingMessages && viewModel.messages.isEmpty {
@@ -51,9 +55,7 @@ struct GroupChatView: View {
                                                     .font(.system(size: 9))
                                                     .foregroundColor(Theme.Colors.textTertiary)
                                             }
-                                            Text(reply.content)
-                                                .font(Theme.Typography.callout)
-                                                .foregroundColor(Theme.Colors.textSecondary)
+                                            MentionText(content: reply.content, knownNames: memberNames)
                                         }
                                     }
                                     .padding(.leading, Theme.Spacing.lg + 40)
@@ -97,10 +99,7 @@ struct GroupChatView: View {
                         .foregroundColor(Theme.Colors.textTertiary)
                 }
 
-                Text(message.content)
-                    .font(Theme.Typography.body)
-                    .foregroundColor(Theme.Colors.textSecondary)
-                    .lineSpacing(2)
+                MentionText(content: message.content, knownNames: memberNames)
 
                 HStack(spacing: Theme.Spacing.md) {
                     Button {
@@ -127,6 +126,41 @@ struct GroupChatView: View {
 
     private var chatInputBar: some View {
         VStack(spacing: Theme.Spacing.xs) {
+            // Mention suggestions
+            if !viewModel.mentionCandidates.isEmpty {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(viewModel.mentionCandidates.prefix(5)) { member in
+                            Button {
+                                viewModel.insertMention(member)
+                            } label: {
+                                HStack(spacing: Theme.Spacing.sm) {
+                                    AvatarView(url: nil, size: 28)
+                                    Text(member.displayName ?? "Player")
+                                        .font(Theme.Typography.calloutMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, Theme.Spacing.md)
+                                .padding(.vertical, Theme.Spacing.sm)
+                            }
+                            .buttonStyle(.plain)
+
+                            if member.id != viewModel.mentionCandidates.prefix(5).last?.id {
+                                Divider().padding(.leading, 44)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 180)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .fill(Theme.Colors.cardBackground)
+                        .shadow(color: Theme.Shadows.card(), radius: 8, y: -2)
+                )
+                .padding(.horizontal, Theme.Spacing.lg)
+            }
+
             // Replying-to chip
             if let replyTarget = viewModel.replyingTo {
                 HStack(spacing: Theme.Spacing.xs) {
@@ -167,6 +201,9 @@ struct GroupChatView: View {
                                     .stroke(Theme.Colors.divider, lineWidth: 1)
                             )
                     )
+                    .onChange(of: viewModel.newMessageText) { _, newValue in
+                        viewModel.handleTextChange(newValue)
+                    }
 
                 if viewModel.isPostingMessage {
                     ProgressView()
@@ -187,5 +224,61 @@ struct GroupChatView: View {
             }
             .padding(.horizontal, Theme.Spacing.lg)
         }
+    }
+}
+
+// MARK: - Mention Text
+
+struct MentionText: View {
+    let content: String
+    let knownNames: Set<String>
+
+    var body: some View {
+        Text(attributedContent)
+            .font(Theme.Typography.body)
+            .lineSpacing(2)
+    }
+
+    private var attributedContent: AttributedString {
+        var result = AttributedString()
+        let text = content
+
+        var i = text.startIndex
+        while i < text.endIndex {
+            if text[i] == "@" {
+                // Try to match a known name after @
+                let afterAt = text.index(after: i)
+                if afterAt < text.endIndex {
+                    var matched: String?
+                    // Check longest names first to avoid partial matches
+                    for name in knownNames.sorted(by: { $0.count > $1.count }) {
+                        let end = text.index(afterAt, offsetBy: name.count, limitedBy: text.endIndex)
+                        if let end, String(text[afterAt..<end]).lowercased() == name.lowercased() {
+                            // Ensure it's a word boundary (end of string, space, or punctuation after)
+                            if end == text.endIndex || !text[end].isLetter {
+                                matched = name
+                                break
+                            }
+                        }
+                    }
+
+                    if let name = matched {
+                        var mention = AttributedString("@\(name)")
+                        mention.foregroundColor = Theme.Colors.primary
+                        mention.font = Theme.Typography.bodyMedium
+                        result += mention
+                        i = text.index(afterAt, offsetBy: name.count)
+                        continue
+                    }
+                }
+            }
+
+            var plain = AttributedString(String(text[i]))
+            plain.foregroundColor = Theme.Colors.textSecondary
+            result += plain
+            i = text.index(after: i)
+        }
+
+        return result
     }
 }

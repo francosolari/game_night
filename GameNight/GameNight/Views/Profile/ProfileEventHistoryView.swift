@@ -44,9 +44,6 @@ struct ProfileEventHistoryView: View {
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationTitle("Event History")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: GameEvent.self) { event in
-            EventDetailView(eventId: event.id)
-        }
         .task {
             await viewModel.loadData()
         }

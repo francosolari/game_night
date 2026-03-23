@@ -9,13 +9,13 @@ struct PlayCard: View {
             onTap?()
         } label: {
             HStack(spacing: Theme.Spacing.md) {
-                // Game thumbnail or icon
+                // Game cover art
                 ZStack {
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
                         .fill(Theme.Colors.primary.opacity(0.1))
                         .frame(width: 48, height: 48)
 
-                    if let url = play.game?.thumbnailUrl, let imageUrl = URL(string: url) {
+                    if let url = play.game?.imageUrl ?? play.game?.thumbnailUrl, let imageUrl = URL(string: url) {
                         AsyncImage(url: imageUrl) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
@@ -39,17 +39,14 @@ struct PlayCard: View {
                         .lineLimit(1)
 
                     HStack(spacing: Theme.Spacing.sm) {
-                        // Date
                         Text(play.playedAt.relativeDisplay)
                             .font(Theme.Typography.caption)
                             .foregroundColor(Theme.Colors.textTertiary)
 
-                        // Player count
-                        if !play.participants.isEmpty {
-                            Text("\(play.participants.count)p")
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        }
+                        Text(playerSummary)
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .lineLimit(1)
                     }
                 }
 
@@ -84,5 +81,14 @@ struct PlayCard: View {
             .cardStyle()
         }
         .buttonStyle(.plain)
+    }
+
+    private var playerSummary: String {
+        let names = play.participants.prefix(2).map(\.displayName)
+        let extra = play.participants.count - 2
+        if names.isEmpty { return "" }
+        var summary = names.joined(separator: ", ")
+        if extra > 0 { summary += " +\(extra)" }
+        return summary
     }
 }

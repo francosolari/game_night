@@ -148,7 +148,9 @@ struct GroupsView: View {
                             } else {
                                 LazyVStack(spacing: Theme.Spacing.sm) {
                                     ForEach(viewModel.recentPlays) { play in
-                                        RecentPlayRow(play: play, groups: viewModel.groups)
+                                        RecentPlayRow(play: play, groups: viewModel.groups) {
+                                            navigationPath.append(play)
+                                        }
                                     }
                                 }
                                 .padding(.horizontal, Theme.Spacing.xl)
@@ -164,6 +166,12 @@ struct GroupsView: View {
             }
             .navigationDestination(for: Game.self) { game in
                 GameDetailView(game: game)
+            }
+            .navigationDestination(for: Play.self) { play in
+                PlayDetailView(
+                    play: play,
+                    currentUserId: SupabaseService.shared.client.auth.currentSession?.user.id
+                )
             }
             .sheet(isPresented: $showCreateGroup) {
                 CreateGroupSheet(viewModel: viewModel, onResult: { resultToast in
@@ -211,6 +219,7 @@ struct GroupBubble: View {
 struct RecentPlayRow: View {
     let play: Play
     let groups: [GameGroup]
+    var onTap: (() -> Void)? = nil
 
     private var groupForPlay: GameGroup? {
         guard let groupId = play.groupId else { return nil }
@@ -218,90 +227,99 @@ struct RecentPlayRow: View {
     }
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.md) {
-            // Game thumbnail
-            ZStack {
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                    .fill(Theme.Colors.primary.opacity(0.1))
-                    .frame(width: 44, height: 44)
+        Button {
+            onTap?()
+        } label: {
+            HStack(spacing: Theme.Spacing.md) {
+                // Game cover art
+                ZStack {
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                        .fill(Theme.Colors.primary.opacity(0.1))
+                        .frame(width: 44, height: 44)
 
-                if let url = play.game?.thumbnailUrl, let imageUrl = URL(string: url) {
-                    AsyncImage(url: imageUrl) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
+                    if let url = play.game?.imageUrl ?? play.game?.thumbnailUrl, let imageUrl = URL(string: url) {
+                        AsyncImage(url: imageUrl) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Image(systemName: "gamecontroller.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(Theme.Colors.primary)
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+                    } else {
                         Image(systemName: "gamecontroller.fill")
                             .font(.system(size: 16))
                             .foregroundColor(Theme.Colors.primary)
                     }
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
-                } else {
-                    Image(systemName: "gamecontroller.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(Theme.Colors.primary)
                 }
-            }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(play.game?.name ?? "Unknown Game")
-                    .font(Theme.Typography.bodyMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(play.game?.name ?? "Unknown Game")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .lineLimit(1)
 
-                HStack(spacing: Theme.Spacing.sm) {
-                    // Group badge
-                    if let group = groupForPlay {
-                        HStack(spacing: 2) {
-                            Text(group.emoji ?? "🎲")
-                                .font(.system(size: 10))
-                            Text(group.name)
-                                .font(Theme.Typography.caption2)
+                    HStack(spacing: Theme.Spacing.sm) {
+                        // Group badge
+                        if let group = groupForPlay {
+                            HStack(spacing: 2) {
+                                Text(group.emoji ?? "🎲")
+                                    .font(.system(size: 10))
+                                Text(group.name)
+                                    .font(Theme.Typography.caption2)
+                            }
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Theme.Colors.primary.opacity(0.1)))
                         }
-                        .foregroundColor(Theme.Colors.primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Theme.Colors.primary.opacity(0.1)))
-                    }
 
-                    Text(play.playedAt.relativeDisplay)
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
-            }
-
-            Spacer()
-
-            // Winner
-            if play.isCooperative {
-                if let result = play.cooperativeResult {
-                    HStack(spacing: 4) {
-                        Image(systemName: result == .won ? "trophy.fill" : "xmark.circle")
-                            .font(.system(size: 12))
-                        Text(result == .won ? "Won" : "Lost")
+                        Text(play.playedAt.relativeDisplay)
                             .font(Theme.Typography.caption)
-                    }
-                    .foregroundColor(result == .won ? Theme.Colors.success : Theme.Colors.error)
-                }
-            } else {
-                let winners = play.participants.filter(\.isWinner)
-                if !winners.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.Colors.accentWarm)
-                        Text(winners.map(\.displayName).joined(separator: ", "))
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textSecondary)
-                            .lineLimit(1)
+                            .foregroundColor(Theme.Colors.textTertiary)
                     }
                 }
+
+                Spacer()
+
+                // Winner
+                if play.isCooperative {
+                    if let result = play.cooperativeResult {
+                        HStack(spacing: 4) {
+                            Image(systemName: result == .won ? "trophy.fill" : "xmark.circle")
+                                .font(.system(size: 12))
+                            Text(result == .won ? "Won" : "Lost")
+                                .font(Theme.Typography.caption)
+                        }
+                        .foregroundColor(result == .won ? Theme.Colors.success : Theme.Colors.error)
+                    }
+                } else {
+                    let winners = play.participants.filter(\.isWinner)
+                    if !winners.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.Colors.accentWarm)
+                            Text(winners.map(\.displayName).joined(separator: ", "))
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
+            .padding(Theme.Spacing.sm)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .fill(Theme.Colors.cardBackground)
+            )
         }
-        .padding(Theme.Spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .fill(Theme.Colors.cardBackground)
-        )
+        .buttonStyle(.plain)
     }
 }
 

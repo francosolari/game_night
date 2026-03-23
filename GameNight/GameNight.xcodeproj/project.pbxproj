@@ -146,6 +146,7 @@
 		E5F0E4801AE22B9E0C6B5037 /* RatingBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 099F1FB524BC7122B983839B /* RatingBadge.swift */; };
 		E6A2924D49E15F10312F8295 /* JSONTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */; };
 		E6B1435B130AB7A328458A90 /* AvatarUploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C174491966DBDE589478368 /* AvatarUploadView.swift */; };
+		E6C30AF396790C9A9916D782 /* PlayDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 849865B3EE616D28F5242E06 /* PlayDetailViewModel.swift */; };
 		E8311D1C4D9FF5D6566829FB /* ImageUploadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D73D8C366775209C86706D3 /* ImageUploadTests.swift */; };
 		E891DE1624A246AF7EC816AF /* EventCoverPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB908E82EA559E0F90FC99D1 /* EventCoverPickerSheet.swift */; };
 		E94EDB0E593B5C1084DCEE6B /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D24417A59A465E98C69019 /* Secrets.swift */; };
@@ -163,6 +164,7 @@
 		F9557B986DE64DEAFF785FF8 /* PollResultsDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80EE92F65BC5F5527D0B68FE /* PollResultsDetailView.swift */; };
 		FAC20CF4D3CB4EA6B19E8772 /* GameLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A8894EED32ECCDD900B4DE /* GameLibraryView.swift */; };
 		FC11BC10F2FC42E1CC5154E4 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81ABA734BD7C429E16204F0A /* NotificationSettingsView.swift */; };
+		FCE763BA71A7390C26EB83FC /* SegmentedTabPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED670DF94C0085A25A84EAEE /* SegmentedTabPicker.swift */; };
 		FD75F56DC6AAF1F1A7AFB3E2 /* InviteLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD8ECB4FD6B977AC4080015 /* InviteLinkSheet.swift */; };
 		FDECD26096E37C1D41EAEDE2 /* CreateGroupFromAttendeesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38CD0AF08CE4B5CEF7E0D505 /* CreateGroupFromAttendeesSheet.swift */; };
 		FE70CC74B5FAF957FBA867E7 /* InboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BECB5EF6B1D940C57C5292A /* InboxViewModel.swift */; };
@@ -274,6 +276,7 @@
 		82822A1740DFB720E14F4CCC /* LocationPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationPickerSheet.swift; sourceTree = "<group>"; };
 		828D232229F9583147DE35B5 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		844AF0B6BF7809B3F49C0A28 /* EventLocationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLocationPresentation.swift; sourceTree = "<group>"; };
+		849865B3EE616D28F5242E06 /* PlayDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayDetailViewModel.swift; sourceTree = "<group>"; };
 		851A081723C3E4F8CA9D2434 /* GameFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameFamily.swift; sourceTree = "<group>"; };
 		862498082D3926D6CAC90670 /* StatusDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusDot.swift; sourceTree = "<group>"; };
 		86CE311BFA4DA7766B8EF356 /* StarRatingPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingPicker.swift; sourceTree = "<group>"; };
@@ -330,6 +333,7 @@
 		EABC2D147AC8B968A07D4B07 /* EventAccessPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventAccessPolicy.swift; sourceTree = "<group>"; };
 		EB5DB24E5976E0BBEEAE0B41 /* SortFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortFilterBar.swift; sourceTree = "<group>"; };
 		EB908E82EA559E0F90FC99D1 /* EventCoverPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCoverPickerSheet.swift; sourceTree = "<group>"; };
+		ED670DF94C0085A25A84EAEE /* SegmentedTabPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentedTabPicker.swift; sourceTree = "<group>"; };
 		EF0A8DBBF814B763C287ADCF /* HomeDataLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDataLoaderTests.swift; sourceTree = "<group>"; };
 		F45F84908CD5A1C95CFFF098 /* BGGService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGService.swift; sourceTree = "<group>"; };
 		F47B45C3BEB73A0CAF96C797 /* ContactPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactPickerService.swift; sourceTree = "<group>"; };
@@ -475,6 +479,7 @@
 				F7C8D2CD62321FDE27933183 /* HomeViewModel.swift */,
 				1BECB5EF6B1D940C57C5292A /* InboxViewModel.swift */,
 				66D59417AFF5CBCCAD157BFA /* NotificationViewModel.swift */,
+				849865B3EE616D28F5242E06 /* PlayDetailViewModel.swift */,
 				46283920F6B72D92A4A3F332 /* PlayLoggingViewModel.swift */,
 				DE9A5F9CD88A16183D2A05E0 /* ProfileViewModel.swift */,
 			);
@@ -501,6 +506,7 @@
 				82822A1740DFB720E14F4CCC /* LocationPickerSheet.swift */,
 				2D0EA42EA853AC67A97206DA /* PlayerCountIndicator.swift */,
 				3493414C1EA4EA910807E03E /* SearchBar.swift */,
+				ED670DF94C0085A25A84EAEE /* SegmentedTabPicker.swift */,
 				86CE311BFA4DA7766B8EF356 /* StarRatingPicker.swift */,
 				862498082D3926D6CAC90670 /* StatusDot.swift */,
 				DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */,
@@ -966,6 +972,7 @@
 				48FB09F253EA3D13A22D5D3B /* Play.swift in Sources */,
 				F17E659EF6BA2319DA0B7B65 /* PlayCard.swift in Sources */,
 				906C411D5256C147CCE8BA4B /* PlayDetailView.swift in Sources */,
+				E6C30AF396790C9A9916D782 /* PlayDetailViewModel.swift in Sources */,
 				F7E2FD0A666B08F9BFDAE897 /* PlayLoggingSheet.swift in Sources */,
 				35C681922AD7C812A5C7BE6F /* PlayLoggingViewModel.swift in Sources */,
 				A5D7B071C00543DE5AC2A514 /* PlayParticipant.swift in Sources */,
@@ -984,6 +991,7 @@
 				08A92E97AF62C37F0764992B /* SMSService.swift in Sources */,
 				200C8E68E07D69CF159A0223 /* SearchBar.swift in Sources */,
 				E94EDB0E593B5C1084DCEE6B /* Secrets.swift in Sources */,
+				FCE763BA71A7390C26EB83FC /* SegmentedTabPicker.swift in Sources */,
 				C50FC1236834BE18DCDDB3D1 /* ShimmerLayoutMetrics.swift in Sources */,
 				DBCC8760EF460EE40CCAC85C /* SortFilterBar.swift in Sources */,
 				E39AEF4CC943EC0A76627C24 /* SortOption.swift in Sources */,

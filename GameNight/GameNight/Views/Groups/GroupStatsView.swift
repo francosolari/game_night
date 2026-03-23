@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GroupStatsView: View {
     @ObservedObject var viewModel: GroupDetailViewModel
+    @State private var showFilterSheet = false
 
     private var stats: GroupStatsData { viewModel.stats }
 
@@ -15,13 +16,13 @@ struct GroupStatsView: View {
                 )
                 .frame(minHeight: 200)
             } else {
-                // Filter (shared with history)
-                Picker("Filter", selection: $viewModel.playFilter) {
-                    ForEach(PlayFilterMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
+                // Filter
+                PlayFilterButton(
+                    filter: $viewModel.playFilter,
+                    customMembers: $viewModel.customFilterMembers,
+                    groupMembers: viewModel.group.members,
+                    showSheet: $showFilterSheet
+                )
 
                 // Fun stats row
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -54,31 +55,50 @@ struct GroupStatsView: View {
                         SectionHeader(title: "Leaderboard")
 
                         ForEach(Array(stats.leaderboard.enumerated()), id: \.element.id) { index, player in
-                            HStack(spacing: Theme.Spacing.md) {
-                                Text("#\(index + 1)")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(index == 0 ? Theme.Colors.accentWarm : Theme.Colors.textTertiary)
-                                    .frame(width: 28)
+                            VStack(spacing: Theme.Spacing.sm) {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    Text("#\(index + 1)")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(index == 0 ? Theme.Colors.accentWarm : Theme.Colors.textTertiary)
+                                        .frame(width: 28)
 
-                                Text(player.name)
-                                    .font(Theme.Typography.bodyMedium)
-                                    .foregroundColor(Theme.Colors.textPrimary)
+                                    Text(player.name)
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(Theme.Colors.textPrimary)
 
-                                Spacer()
+                                    Spacer()
 
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "crown.fill")
-                                            .font(.system(size: 10))
-                                            .foregroundColor(Theme.Colors.accentWarm)
-                                        Text("\(player.wins)")
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("\(player.wins)W / \(player.totalPlays) plays")
                                             .font(Theme.Typography.calloutMedium)
                                             .foregroundColor(Theme.Colors.textPrimary)
+
+                                        HStack(spacing: Theme.Spacing.sm) {
+                                            Text("\(Int(player.winRate * 100))%")
+                                                .font(Theme.Typography.caption2)
+                                                .foregroundColor(Theme.Colors.primary)
+
+                                            if let avgP = player.averagePlacement {
+                                                Text("avg #\(String(format: "%.1f", avgP))")
+                                                    .font(Theme.Typography.caption2)
+                                                    .foregroundColor(Theme.Colors.textTertiary)
+                                            }
+                                        }
                                     }
-                                    Text("\(Int(player.winRate * 100))% win rate")
-                                        .font(Theme.Typography.caption2)
-                                        .foregroundColor(Theme.Colors.textTertiary)
                                 }
+
+                                // Win rate bar
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Theme.Colors.primary.opacity(0.1))
+                                            .frame(height: 4)
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Theme.Colors.primary)
+                                            .frame(width: geo.size.width * player.winRate, height: 4)
+                                    }
+                                }
+                                .frame(height: 4)
                             }
                             .padding(.vertical, Theme.Spacing.xs)
                         }

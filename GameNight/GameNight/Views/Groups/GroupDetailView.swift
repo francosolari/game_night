@@ -83,12 +83,7 @@ struct GroupDetailView: View {
                 }
 
                 // Tab picker
-                Picker("Tab", selection: $viewModel.selectedTab) {
-                    ForEach(GroupDetailTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
+                SegmentedTabPicker(selection: $viewModel.selectedTab)
 
                 // Tab content
                 switch viewModel.selectedTab {

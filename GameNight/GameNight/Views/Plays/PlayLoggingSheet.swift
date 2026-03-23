@@ -8,6 +8,7 @@ struct PlayLoggingSheet: View {
     @State private var showDatePicker = false
     @State private var showContactPicker = false
     @State private var durationText = ""
+    @State private var showAdvancedByGame: Set<UUID> = []
 
     let event: GameEvent?
     let group: GameGroup?
@@ -222,9 +223,37 @@ struct PlayLoggingSheet: View {
                     .font(Theme.Typography.label)
                     .foregroundColor(Theme.Colors.textSecondary)
 
+                // Advanced toggle (non-coop only)
+                if !isCoop.wrappedValue {
+                    Button {
+                        withAnimation(Theme.Animation.snappy) {
+                            if showAdvancedByGame.contains(game.id) {
+                                showAdvancedByGame.remove(game.id)
+                            } else {
+                                showAdvancedByGame.insert(game.id)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: showAdvancedByGame.contains(game.id) ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text("Placements & scores")
+                                .font(Theme.Typography.caption)
+                        }
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 if let participants = viewModel.participantsByGame[game.id], !participants.isEmpty {
                     ForEach(Array(participants.enumerated()), id: \.element.id) { index, participant in
-                        participantRow(gameId: game.id, index: index, participant: participant, isCoop: isCoop.wrappedValue)
+                        participantRow(
+                            gameId: game.id,
+                            index: index,
+                            participant: participant,
+                            isCoop: isCoop.wrappedValue,
+                            showAdvanced: showAdvancedByGame.contains(game.id)
+                        )
                     }
                 }
 
@@ -275,34 +304,81 @@ struct PlayLoggingSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func participantRow(gameId: UUID, index: Int, participant: PlayParticipantDraft, isCoop: Bool) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            // Playing toggle
-            Button {
-                viewModel.participantsByGame[gameId]?[index].isPlaying.toggle()
-            } label: {
-                Image(systemName: participant.isPlaying ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
-                    .foregroundColor(participant.isPlaying ? Theme.Colors.primary : Theme.Colors.textTertiary)
-            }
-            .buttonStyle(.plain)
-
-            Text(participant.displayName)
-                .font(Theme.Typography.bodyMedium)
-                .foregroundColor(participant.isPlaying ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
-
-            Spacer()
-
-            // Winner toggle (only for competitive, playing participants)
-            if participant.isPlaying && !isCoop {
+    private func participantRow(gameId: UUID, index: Int, participant: PlayParticipantDraft, isCoop: Bool, showAdvanced: Bool = false) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: Theme.Spacing.md) {
+                // Playing toggle
                 Button {
-                    viewModel.participantsByGame[gameId]?[index].isWinner.toggle()
+                    viewModel.participantsByGame[gameId]?[index].isPlaying.toggle()
                 } label: {
-                    Image(systemName: participant.isWinner ? "crown.fill" : "crown")
-                        .font(.system(size: 16))
-                        .foregroundColor(participant.isWinner ? Theme.Colors.accentWarm : Theme.Colors.textTertiary)
+                    Image(systemName: participant.isPlaying ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20))
+                        .foregroundColor(participant.isPlaying ? Theme.Colors.primary : Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
+
+                Text(participant.displayName)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(participant.isPlaying ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
+
+                Spacer()
+
+                // Winner toggle (only for competitive, playing participants)
+                if participant.isPlaying && !isCoop {
+                    Button {
+                        viewModel.participantsByGame[gameId]?[index].isWinner.toggle()
+                    } label: {
+                        Image(systemName: participant.isWinner ? "crown.fill" : "crown")
+                            .font(.system(size: 16))
+                            .foregroundColor(participant.isWinner ? Theme.Colors.accentWarm : Theme.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Inline placement & score (advanced mode, playing, non-coop)
+                if showAdvanced && participant.isPlaying && !isCoop {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        // Placement
+                        TextField("#", text: Binding(
+                            get: {
+                                if let p = participant.placement { return "\(p)" }
+                                return ""
+                            },
+                            set: { viewModel.participantsByGame[gameId]?[index].placement = Int($0) }
+                        ))
+                        .keyboardType(.numberPad)
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .frame(width: 36)
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Theme.Colors.fieldBackground)
+                        )
+
+                        // Score
+                        TextField("pts", text: Binding(
+                            get: {
+                                if let s = participant.score { return "\(s)" }
+                                return ""
+                            },
+                            set: { viewModel.participantsByGame[gameId]?[index].score = Int($0) }
+                        ))
+                        .keyboardType(.numberPad)
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .frame(width: 48)
+                        .multilineTextAlignment(.center)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Theme.Colors.fieldBackground)
+                        )
+                    }
+                }
             }
         }
         .padding(.vertical, Theme.Spacing.xs)
