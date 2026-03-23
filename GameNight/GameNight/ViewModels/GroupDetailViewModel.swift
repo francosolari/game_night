@@ -115,7 +115,7 @@ final class GroupDetailViewModel: ObservableObject {
             let member = GroupMember(
                 id: UUID(),
                 groupId: group.id,
-                userId: nil,
+                userId: contact.appUserId,
                 phoneNumber: normalized,
                 displayName: contact.name,
                 tier: 1,
@@ -244,11 +244,13 @@ final class GroupDetailViewModel: ObservableObject {
     // MARK: - Linked Events
 
     var upcomingLinkedEvents: [GameEvent] {
-        linkedEvents.filter { $0.status != .completed && $0.status != .cancelled }
+        let now = Date()
+        return linkedEvents.filter { $0.status != .cancelled && $0.effectiveEndDate >= now }
     }
 
     var pastLinkedEvents: [GameEvent] {
-        linkedEvents.filter { $0.status == .completed }
+        let now = Date()
+        return linkedEvents.filter { $0.status != .cancelled && $0.effectiveEndDate < now }
     }
 
     // MARK: - Helpers

@@ -54,8 +54,9 @@ struct GameEvent: Identifiable, Codable {
            let end = confirmed.endTime {
             return end
         }
-        // Fall back to end of the start day
-        return Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: effectiveStartDate) ?? effectiveStartDate
+        // Fall back to midnight (start of the next day)
+        let cal = Calendar.current
+        return cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: effectiveStartDate)) ?? effectiveStartDate
     }
 
     enum CodingKeys: String, CodingKey {
