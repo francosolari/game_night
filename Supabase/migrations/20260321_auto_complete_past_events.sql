@@ -1,7 +1,7 @@
 -- Function to mark past events as completed.
--- An event is "past" when its effective end date has passed:
---   - If a confirmed_time_option_id is set, use that time option's end_time (or end of start day)
---   - Otherwise, use the latest end_time across all time options (or end of latest start day)
+-- An event is "past" when:
+--   - If a time option has an end_time, complete once that end_time has passed
+--   - If NO end_time, complete at midnight (start of the next day after the event)
 -- Only transitions published/confirmed events. Drafts, cancelled, and already-completed are untouched.
 CREATE OR REPLACE FUNCTION complete_past_events()
 RETURNS integer
@@ -21,14 +21,14 @@ BEGIN
       AND (
         -- If event has a confirmed time option, check that one
         (e.confirmed_time_option_id IS NOT NULL AND (
-          SELECT COALESCE(t.end_time, (t.start_time::date + interval '1 day' - interval '1 second'))
+          SELECT COALESCE(t.end_time, (t.start_time::date + interval '1 day'))
           FROM time_options t
           WHERE t.id = e.confirmed_time_option_id
         ) < now())
         OR
         -- Otherwise, check the latest time option
         (e.confirmed_time_option_id IS NULL AND (
-          SELECT MAX(COALESCE(t.end_time, (t.start_time::date + interval '1 day' - interval '1 second')))
+          SELECT MAX(COALESCE(t.end_time, (t.start_time::date + interval '1 day')))
           FROM time_options t
           WHERE t.event_id = e.id
         ) < now())
