@@ -84,12 +84,16 @@ final class PushNotificationManager: NSObject, ObservableObject, UNUserNotificat
     private func handleNotificationTap(userInfo: [AnyHashable: Any]) {
         // Route based on notification type
         if let eventId = userInfo["event_id"] as? String {
-            // Navigate to event
-            // AppState will handle this via deepLinkEventId
             NotificationCenter.default.post(
                 name: .pushNotificationTapped,
                 object: nil,
                 userInfo: ["event_id": eventId]
+            )
+        } else if let groupId = userInfo["group_id"] as? String {
+            NotificationCenter.default.post(
+                name: .pushNotificationTapped,
+                object: nil,
+                userInfo: ["group_id": groupId]
             )
         } else if let conversationId = userInfo["conversation_id"] as? String {
             NotificationCenter.default.post(

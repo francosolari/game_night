@@ -1148,6 +1148,17 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return groups
     }
 
+    func fetchGroupById(_ id: UUID) async throws -> GameGroup {
+        let group: GameGroup = try await client
+            .from("groups")
+            .select("*, members:group_members(*)")
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+        return group
+    }
+
     func createGroup(_ group: GameGroup) async throws -> GameGroup {
         let created: GameGroup = try await client
             .from("groups")
@@ -1229,6 +1240,10 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .update(["status": newStatus])
             .eq("id", value: memberId.uuidString)
             .execute()
+    }
+
+    func expireStaleGroupInvites() async throws {
+        try await client.rpc("expire_stale_group_invites").execute()
     }
 
     // MARK: - Saved Contacts

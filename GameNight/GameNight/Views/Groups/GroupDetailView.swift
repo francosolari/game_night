@@ -5,7 +5,9 @@ struct GroupDetailView: View {
     @EnvironmentObject var appState: AppState
     @State private var showAddMembers = false
     @State private var showPlayLogging = false
+    @State private var showDeleteConfirmation = false
     @State private var toast: ToastItem?
+    @Environment(\.dismiss) private var dismiss
 
     init(group: GameGroup) {
         _viewModel = StateObject(wrappedValue: GroupDetailViewModel(group: group))
@@ -122,6 +124,41 @@ struct GroupDetailView: View {
             }
         }
         .toast($toast)
+        .toolbar {
+            if isOwner {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Group", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete \(viewModel.group.name)?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Group", role: .destructive) {
+                Task {
+                    do {
+                        try await SupabaseService.shared.deleteGroup(id: viewModel.group.id)
+                        dismiss()
+                    } catch {
+                        toast = ToastItem(style: .error, message: "Failed to delete group")
+                    }
+                }
+            }
+        } message: {
+            Text("This will permanently delete the group, all members, and chat history. This can't be undone.")
+        }
         .task {
             await viewModel.loadAllData()
             viewModel.subscribeToChatUpdates()
@@ -129,6 +166,10 @@ struct GroupDetailView: View {
         .onDisappear {
             viewModel.unsubscribeFromChat()
         }
+    }
+
+    private var isOwner: Bool {
+        viewModel.group.ownerId == appState.currentUser?.id
     }
 
     // MARK: - Members Tab

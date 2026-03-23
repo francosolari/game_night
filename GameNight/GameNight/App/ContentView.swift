@@ -39,6 +39,8 @@ struct MainTabView: View {
                                 InboxView(navigationPath: $homeNavigationPath)
                             case .eventDetail(let id):
                                 EventDetailView(eventId: id)
+                            case .groupDetail(let id):
+                                GroupDetailLoadingView(groupId: id)
                             }
                         }
                         .navigationDestination(for: DMNavDestination.self) { dest in
@@ -110,6 +112,10 @@ struct MainTabView: View {
                let uuid = UUID(uuidString: eventId) {
                 appState.selectedTab = .home
                 homeNavigationPath.append(HomeDestination.eventDetail(uuid))
+            } else if let groupId = note.userInfo?["group_id"] as? String,
+                      let uuid = UUID(uuidString: groupId) {
+                appState.selectedTab = .home
+                homeNavigationPath.append(HomeDestination.groupDetail(uuid))
             } else if note.userInfo?["conversation_id"] != nil {
                 appState.selectedTab = .home
                 homeNavigationPath.append(HomeDestination.inbox)

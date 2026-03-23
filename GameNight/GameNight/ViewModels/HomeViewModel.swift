@@ -127,7 +127,8 @@ final class HomeViewModel: ObservableObject {
 
         // defer handles isLoading = false
 
-        // Load pending group invites (non-blocking — runs after main content is shown)
+        // Expire stale group invites, then load pending ones
+        try? await SupabaseService.shared.expireStaleGroupInvites()
         if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
             self.pendingGroupInvites = groupInvites
         }

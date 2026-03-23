@@ -44,6 +44,8 @@ struct NotificationFeedView: View {
                         Task { await viewModel.markAsRead(notification) }
                         if let eventId = notification.eventId {
                             navigationPath.append(HomeDestination.eventDetail(eventId))
+                        } else if notification.type == .groupInvite, let groupId = notification.groupId {
+                            navigationPath.append(HomeDestination.groupDetail(groupId))
                         }
                     } label: {
                         NotificationRow(notification: notification)

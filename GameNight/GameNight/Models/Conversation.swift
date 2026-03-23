@@ -95,6 +95,7 @@ struct DirectMessage: Identifiable, Codable {
         case text
         case invite
         case system
+        case groupInvite = "group_invite"
     }
 
     enum CodingKeys: String, CodingKey {
@@ -142,6 +143,10 @@ struct MessageMetadata: Codable {
     var hostName: String?
     var timeLabel: String?
     var inviteToken: String?
+    var groupId: String?
+    var groupName: String?
+    var groupEmoji: String?
+    var memberId: String?
 
     enum CodingKeys: String, CodingKey {
         case eventId = "event_id"
@@ -151,6 +156,10 @@ struct MessageMetadata: Codable {
         case hostName = "host_name"
         case timeLabel = "time_label"
         case inviteToken = "invite_token"
+        case groupId = "group_id"
+        case groupName = "group_name"
+        case groupEmoji = "group_emoji"
+        case memberId = "member_id"
     }
 }
 
