@@ -81,6 +81,7 @@ serve(async (req) => {
               artists: game.artists,
               min_age: game.min_age,
               bgg_rank: game.bgg_rank,
+              recommended_players: game.recommended_players,
               bgg_last_synced: new Date().toISOString(),
             },
             { onConflict: "bgg_id" },

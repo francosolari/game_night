@@ -103,6 +103,7 @@ export interface ParsedGame {
   artists: string[];
   min_age: number | null;
   bgg_rank: number | null;
+  recommended_players: number[] | null;
 }
 
 export interface ParsedGameRelations {
@@ -168,6 +169,28 @@ export function parseThingResponse(xml: string): ParsedGameRelations[] {
 
       const avgRating = parseFloat(stats?.average?.["@_value"] ?? "0");
 
+      // Parse recommended player counts from BGG poll data
+      const recommendedPlayers: number[] = [];
+      const polls = Array.isArray(item.poll) ? item.poll : item.poll ? [item.poll] : [];
+      const numplayersPoll = polls.find((p: any) => p["@_name"] === "suggested_numplayers");
+      if (numplayersPoll) {
+        const pollResults = Array.isArray(numplayersPoll.results)
+          ? numplayersPoll.results
+          : numplayersPoll.results ? [numplayersPoll.results] : [];
+        for (const result of pollResults) {
+          const numplayers = parseInt(result["@_numplayers"]);
+          if (isNaN(numplayers)) continue;
+          const votes = Array.isArray(result.result) ? result.result : result.result ? [result.result] : [];
+          const bestVotes = parseInt(votes.find((v: any) => v["@_value"] === "Best")?.["@_numvotes"] ?? "0") || 0;
+          const recVotes = parseInt(votes.find((v: any) => v["@_value"] === "Recommended")?.["@_numvotes"] ?? "0") || 0;
+          const notRecVotes = parseInt(votes.find((v: any) => v["@_value"] === "Not Recommended")?.["@_numvotes"] ?? "0") || 0;
+          const totalVotes = bestVotes + recVotes + notRecVotes;
+          if (totalVotes > 0 && (bestVotes + recVotes) > notRecVotes) {
+            recommendedPlayers.push(numplayers);
+          }
+        }
+      }
+
       const game: ParsedGame = {
         bgg_id: parseInt(item["@_id"]),
         name: primaryName,
@@ -188,6 +211,7 @@ export function parseThingResponse(xml: string): ParsedGameRelations[] {
         artists,
         min_age: intOrNull(item.minage?.["@_value"]),
         bgg_rank: bggRank,
+        recommended_players: recommendedPlayers.length > 0 ? recommendedPlayers.sort((a, b) => a - b) : null,
       };
 
       return { game, expansions, families };
