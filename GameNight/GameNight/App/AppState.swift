@@ -59,6 +59,7 @@ final class AppState: ObservableObject {
                 fetchDrafts: { try await supabase.fetchDrafts() }
             )
             self.preloadedHomeSnapshot = snapshot
+            preloadImages(for: snapshot)
         } else {
             self.isAuthenticated = false
         }
@@ -74,6 +75,20 @@ final class AppState: ObservableObject {
         
         UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
         self.isLoading = false
+    }
+
+    private func preloadImages(for snapshot: HomeDataLoadSnapshot) {
+        let upcomingUrls = snapshot.upcomingEvents.compactMap { $0.preferredCoverImageURLString }
+        let inviteUrls = snapshot.myInvites.compactMap { $0.event?.preferredCoverImageURLString }
+        let draftUrls = snapshot.drafts.compactMap { $0.preferredCoverImageURLString }
+        
+        let urls = Set(upcomingUrls + inviteUrls + draftUrls)
+        
+        for urlString in urls {
+            guard let url = URL(string: urlString) else { continue }
+            // Trigger a data task to fill the system cache
+            URLSession.shared.dataTask(with: url).resume()
+        }
     }
 
     /// Loads device contacts into the contactNameMap (fire-and-forget; silently fails if no permission).

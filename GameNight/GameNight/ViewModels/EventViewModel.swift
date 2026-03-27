@@ -151,6 +151,16 @@ final class EventViewModel: ObservableObject {
     }
 
     func loadEvent(id: UUID) async {
+        // Restore from cache instantly (no loading spinner)
+        if let cached = EventDetailCache.shared.get(id) {
+            restoreFromCache(cached)
+            // Subscribe to realtime updates
+            subscribeIfNeeded(eventId: id)
+            // Silent background refresh
+            await refreshEventData(eventId: id)
+            return
+        }
+
         isLoading = true
         do {
             async let eventResult = supabase.fetchEvent(id: id)
@@ -168,21 +178,17 @@ final class EventViewModel: ObservableObject {
                 self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
             }
 
-            // Load activity feed, game votes, and poll voter details
-            await loadActivityFeed(eventId: id)
-            await loadGameVotes(eventId: id, currentUserId: session.user.id)
-            await loadPollVoterDetails(eventId: id)
+            // Load activity feed, game votes, and poll voter details in parallel
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadActivityFeed(eventId: id) }
+                group.addTask { await self.loadGameVotes(eventId: id, currentUserId: session.user.id) }
+                group.addTask { await self.loadPollVoterDetails(eventId: id) }
+            }
+
+            saveToCache(eventId: id)
 
             // Subscribe to realtime updates
-            if subscribedEventId != id {
-                subscribeToUpdates(eventId: id)
-                subscribedEventId = id
-            }
-
-            if subscribedActivityEventId != id {
-                subscribeToActivityFeed(eventId: id)
-                subscribedActivityEventId = id
-            }
+            subscribeIfNeeded(eventId: id)
         } catch {
             self.error = error.localizedDescription
         }
@@ -205,8 +211,12 @@ final class EventViewModel: ObservableObject {
                 self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
             }
 
-            await loadPollVoterDetails(eventId: eventId)
-            await loadGameVotes(eventId: eventId, currentUserId: session.user.id)
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadPollVoterDetails(eventId: eventId) }
+                group.addTask { await self.loadGameVotes(eventId: eventId, currentUserId: session.user.id) }
+            }
+
+            saveToCache(eventId: eventId)
         } catch {
             // Non-critical for background refresh
         }
@@ -482,6 +492,48 @@ final class EventViewModel: ObservableObject {
             Task { @MainActor in
                 await self?.loadActivityFeed(eventId: eventId)
             }
+        }
+    }
+
+    // MARK: - Cache Helpers
+
+    private func restoreFromCache(_ snapshot: EventDetailCache.Snapshot) {
+        self.event = snapshot.event
+        self.invites = snapshot.invites
+        self.myInvite = snapshot.myInvite
+        self.myPollVotes = snapshot.myPollVotes
+        self.activityFeed = snapshot.activityFeed
+        self.gameVotes = snapshot.gameVotes
+        self.myGameVotes = snapshot.myGameVotes
+        self.timeOptionVoters = snapshot.timeOptionVoters
+        self.gameVoterDetails = snapshot.gameVoterDetails
+    }
+
+    private func saveToCache(eventId: UUID) {
+        guard let event else { return }
+        let snapshot = EventDetailCache.Snapshot(
+            event: event,
+            invites: invites,
+            myInvite: myInvite,
+            myPollVotes: myPollVotes,
+            activityFeed: activityFeed,
+            gameVotes: gameVotes,
+            myGameVotes: myGameVotes,
+            timeOptionVoters: timeOptionVoters,
+            gameVoterDetails: gameVoterDetails,
+            cachedAt: Date()
+        )
+        EventDetailCache.shared.set(eventId, snapshot: snapshot)
+    }
+
+    private func subscribeIfNeeded(eventId: UUID) {
+        if subscribedEventId != eventId {
+            subscribeToUpdates(eventId: eventId)
+            subscribedEventId = eventId
+        }
+        if subscribedActivityEventId != eventId {
+            subscribeToActivityFeed(eventId: eventId)
+            subscribedActivityEventId = eventId
         }
     }
 
