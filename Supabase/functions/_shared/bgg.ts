@@ -16,7 +16,7 @@ const xmlParser = new XMLParser({
   },
 });
 
-/** Fetch from BGG XML API2 with Bearer auth, 202 retry, and 500/503 retry */
+/** Fetch from BGG XML API2 with Bearer auth, 202 retry, and 429/500/503 retry */
 export async function fetchFromBGG(
   path: string,
   params: Record<string, string> = {},
@@ -35,7 +35,7 @@ export async function fetchFromBGG(
   for (let attempt = 0; attempt <= max202Retries; attempt++) {
     let response: Response;
 
-    // Handle 500/503 (rate limited) responses
+    // Handle 429/500/503 (rate limited) responses
     for (let retryCount = 0; retryCount <= max5xxRetries; retryCount++) {
       response = await fetch(url.toString(), {
         headers: {
@@ -43,7 +43,7 @@ export async function fetchFromBGG(
         },
       });
 
-      if (response.status !== 500 && response.status !== 503) {
+      if (response.status !== 429 && response.status !== 500 && response.status !== 503) {
         break;
       }
 
@@ -178,7 +178,7 @@ export function parseThingResponse(xml: string): ParsedGameRelations[] {
         max_playtime: parseInt(item.maxplaytime?.["@_value"] ?? "60") || 60,
         complexity: parseFloat(stats?.averageweight?.["@_value"] ?? "0") || 0,
         bgg_rating: avgRating > 0 ? avgRating : null,
-        description: item.description ?? null,
+        description: item.description ? stripHtml(item.description) : null,
         categories,
         mechanics,
         designers,
@@ -343,6 +343,50 @@ export function parsePlaysResponse(xml: string): { plays: ParsedPlay[]; total: n
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
+
+function stripHtml(text: string): string {
+  // Keep basic paragraph/line-break structure before stripping other tags.
+  let output = text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<p[^>]*>/gi, "");
+
+  output = output.replace(/<[^>]+>/g, "");
+
+  // Decode common named entities plus numeric entities from BGG payloads.
+  const namedEntities: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": "\"",
+    "&nbsp;": " ",
+    "&#39;": "'",
+  };
+
+  output = output.replace(/&(amp|lt|gt|quot|nbsp|#39);|&#\d+;/gi, (match) => {
+    const normalized = match.toLowerCase();
+    if (namedEntities[normalized]) return namedEntities[normalized];
+
+    const numericMatch = normalized.match(/^&#(\d+);$/);
+    if (!numericMatch) return match;
+
+    const codePoint = parseInt(numericMatch[1], 10);
+    if (Number.isNaN(codePoint)) return match;
+
+    try {
+      return String.fromCodePoint(codePoint);
+    } catch {
+      return match;
+    }
+  });
+
+  output = output
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return output;
+}
 
 function intOrNull(val: string | undefined | null): number | null {
   if (!val) return null;

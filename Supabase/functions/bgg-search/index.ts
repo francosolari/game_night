@@ -7,6 +7,7 @@ import {
   fetchFromBGG,
   parseSearchResponse,
   parseHotResponse,
+  parseThingResponse,
   type ParsedSearchResult,
   type ParsedHotGame,
 } from "../_shared/bgg.ts";
@@ -71,6 +72,11 @@ async function handleSearch(db: any, query: string): Promise<Response> {
         { onConflict: "bgg_id", ignoreDuplicates: true },
       );
   }
+
+  const topIds = Array.from(new Set(results.slice(0, 20).map((r) => r.bgg_id)));
+  void hydrateGameBatch(db, topIds).catch((error) => {
+    console.error("search hydration failed:", error);
+  });
 
   // Return results for immediate display
   const games = results.slice(0, 50).map((r) => ({
@@ -153,6 +159,11 @@ async function handleHotGames(db: any): Promise<Response> {
       );
   }
 
+  const hotIds = Array.from(new Set(hotGames.slice(0, 50).map((g) => g.bgg_id)));
+  void hydrateGameBatch(db, hotIds).catch((error) => {
+    console.error("hot-games hydration failed:", error);
+  });
+
   return jsonResponse({
     games: hotGames.map((g) => ({
       bgg_id: g.bgg_id,
@@ -168,4 +179,49 @@ function jsonResponse(body: any, status = 200): Response {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+async function hydrateGameBatch(db: any, bggIds: number[]): Promise<void> {
+  const uniqueIds = Array.from(new Set(bggIds)).slice(0, 50);
+  if (uniqueIds.length === 0) return;
+
+  for (let i = 0; i < uniqueIds.length; i += 20) {
+    const batch = uniqueIds.slice(i, i + 20);
+    const xml = await fetchFromBGG("/thing", {
+      id: batch.join(","),
+      stats: "1",
+    });
+    const parsed = parseThingResponse(xml);
+
+    for (const result of parsed) {
+      const { game } = result;
+      await db
+        .from("games")
+        .upsert(
+          {
+            bgg_id: game.bgg_id,
+            name: game.name,
+            year_published: game.year_published,
+            thumbnail_url: game.thumbnail_url,
+            image_url: game.image_url,
+            min_players: game.min_players,
+            max_players: game.max_players,
+            min_playtime: game.min_playtime,
+            max_playtime: game.max_playtime,
+            complexity: game.complexity,
+            bgg_rating: game.bgg_rating,
+            description: game.description,
+            categories: game.categories,
+            mechanics: game.mechanics,
+            designers: game.designers,
+            publishers: game.publishers,
+            artists: game.artists,
+            min_age: game.min_age,
+            bgg_rank: game.bgg_rank,
+            bgg_last_synced: new Date().toISOString(),
+          },
+          { onConflict: "bgg_id" },
+        );
+    }
+  }
 }
