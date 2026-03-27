@@ -107,14 +107,21 @@ actor BGGService {
     // MARK: - Local Search Helper
 
     private func localGameSearch(query: String) async throws -> [BGGSearchResult] {
-        // Use Supabase PostgREST ilike query on the games table
+        struct SearchGamesFuzzyParams: Encodable {
+            let searchQuery: String
+            let resultLimit: Int
+
+            enum CodingKeys: String, CodingKey {
+                case searchQuery = "search_query"
+                case resultLimit = "result_limit"
+            }
+        }
+
         let games: [Game] = try await supabase.client
-            .from("games")
-            .select("*")
-            .ilike("name", pattern: "%\(query)%")
-            .not("bgg_id", operator: .is, value: "null")
-            .order("bgg_rank", ascending: true, nullsFirst: false)
-            .limit(30)
+            .rpc("search_games_fuzzy", params: SearchGamesFuzzyParams(
+                searchQuery: query,
+                resultLimit: 30
+            ))
             .execute()
             .value
 

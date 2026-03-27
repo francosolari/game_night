@@ -39,15 +39,18 @@ final class GameDetailViewModel: ObservableObject {
 
     func loadRelatedData() async {
         isLoading = true
-        do {
-            try await hydrateFromBGGIfNeeded()
-        } catch {
-            // Non-critical — fallback to whatever local data is already available.
-        }
 
         async let expansionsResult = supabase.fetchExpansions(gameId: game.id)
         async let baseGameResult = supabase.fetchBaseGame(expansionGameId: game.id)
         async let familiesResult = supabase.fetchFamilyMembers(gameId: game.id)
+
+        var hydrationSucceeded = false
+        do {
+            try await hydrateFromBGGIfNeeded()
+            hydrationSucceeded = true
+        } catch {
+            // Non-critical — fallback to whatever local data is already available.
+        }
 
         do {
             expansions = try await expansionsResult
@@ -55,6 +58,20 @@ final class GameDetailViewModel: ObservableObject {
             families = try await familiesResult
         } catch {
             // Non-critical — detail page still shows game info
+        }
+
+        if hydrationSucceeded {
+            async let refreshedExpansions = supabase.fetchExpansions(gameId: game.id)
+            async let refreshedBase = supabase.fetchBaseGame(expansionGameId: game.id)
+            async let refreshedFamilies = supabase.fetchFamilyMembers(gameId: game.id)
+
+            do {
+                expansions = try await refreshedExpansions
+                baseGame = try await refreshedBase
+                families = try await refreshedFamilies
+            } catch {
+                // Non-critical — keep initial relation fetch.
+            }
         }
         isLoading = false
     }

@@ -35,6 +35,35 @@ struct GameDetailView: View {
         return initials.isEmpty ? "GM" : initials
     }
 
+    private static let filteredFamilyPrefixes = [
+        "Mechanism:",
+        "Category:",
+        "Theme:",
+        "Continents:",
+        "Players:",
+        "Digital Implementations:",
+        "Components:",
+        "Setting:",
+        "Crowdfunding:",
+        "Admin:"
+    ]
+
+    private var relevantFamilies: [(family: GameFamily, games: [Game])] {
+        viewModel.families.filter { familyData in
+            !Self.filteredFamilyPrefixes.contains { prefix in
+                familyData.family.name.lowercased().hasPrefix(prefix.lowercased())
+            }
+        }
+    }
+
+    private var visibleFamilies: [(family: GameFamily, games: [Game])] {
+        Array(relevantFamilies.prefix(3))
+    }
+
+    private var hiddenFamilyCount: Int {
+        max(relevantFamilies.count - visibleFamilies.count, 0)
+    }
+
     init(game: Game) {
         _viewModel = StateObject(wrappedValue: GameDetailViewModel(game: game))
     }
@@ -160,7 +189,7 @@ struct GameDetailView: View {
                         ManualDescriptionEditorSection(game: draftBinding)
                     } else if let desc = displayedGame.description, !desc.isEmpty {
                         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            Text(desc)
+                            Text(desc.strippingHTML())
                                 .font(Theme.Typography.body)
                                 .foregroundColor(Theme.Colors.textSecondary)
                                 .lineLimit(isDescriptionExpanded ? nil : 3)
@@ -196,7 +225,7 @@ struct GameDetailView: View {
 
                     // 7. Family links
                     if !isEditingManualGame {
-                        ForEach(viewModel.families, id: \.family.id) { familyData in
+                        ForEach(visibleFamilies, id: \.family.id) { familyData in
                             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                                 NavigationLink(
                                     value: GameFamilyDestination(
@@ -222,6 +251,12 @@ struct GameDetailView: View {
                                     games: familyData.games.filter { $0.id != displayedGame.id }
                                 )
                             }
+                        }
+
+                        if hiddenFamilyCount > 0 {
+                            Text("+ \(hiddenFamilyCount) more series")
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                     }
 
@@ -295,10 +330,10 @@ struct GameDetailView: View {
                     .foregroundColor(Theme.Colors.textTertiary)
                 }
                 if !designerLinks.isEmpty {
-                    creatorRow(links: designerLinks)
+                    creatorRow(links: designerLinks, maxVisible: 2)
                 }
                 if !publisherLinks.isEmpty {
-                    creatorRow(links: publisherLinks)
+                    creatorRow(links: publisherLinks, maxVisible: 1)
                 }
                 if let year = displayedGame.yearPublished {
                     Label(String(year), systemImage: "calendar")
@@ -316,9 +351,15 @@ struct GameDetailView: View {
     }
 
     @ViewBuilder
-    private func creatorRow(links: [(name: String, destination: CreatorDestination)]) -> some View {
+    private func creatorRow(
+        links: [(name: String, destination: CreatorDestination)],
+        maxVisible: Int
+    ) -> some View {
+        let visibleLinks = Array(links.prefix(maxVisible))
+        let hiddenCount = max(links.count - visibleLinks.count, 0)
+
         HStack(spacing: Theme.Spacing.xs) {
-            ForEach(Array(links.enumerated()), id: \.offset) { index, item in
+            ForEach(Array(visibleLinks.enumerated()), id: \.offset) { index, item in
                 if index > 0 {
                     Text("\u{00B7}")
                         .foregroundColor(Theme.Colors.textTertiary)
@@ -329,6 +370,16 @@ struct GameDetailView: View {
                         .font(Theme.Typography.callout)
                         .foregroundColor(Theme.Colors.accent)
                 }
+            }
+
+            if hiddenCount > 0 {
+                if !visibleLinks.isEmpty {
+                    Text("\u{00B7}")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+                Text("+ \(hiddenCount) more")
+                    .font(Theme.Typography.callout)
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
         }
     }
@@ -878,5 +929,31 @@ struct GameFamilyDetailView: View {
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private extension String {
+    func strippingHTML() -> String {
+        let wrapped = "<div>\(self)</div>"
+        if let data = wrapped.data(using: .utf8),
+           let attributed = try? NSAttributedString(
+            data: data,
+            options: [
+                .documentType: NSAttributedString.DocumentType.html,
+                .characterEncoding: String.Encoding.utf8.rawValue
+            ],
+            documentAttributes: nil
+           ) {
+            return attributed.string
+                .replacingOccurrences(of: "\r\n", with: "\n")
+                .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return self
+            .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "</p>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

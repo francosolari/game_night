@@ -845,13 +845,22 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     /// Search the cached BGG games table by name (local-first, no BGG API call).
     func searchCachedGames(query: String) async throws -> [Game] {
         guard !query.isEmpty else { return [] }
+
+        struct SearchGamesFuzzyParams: Encodable {
+            let searchQuery: String
+            let resultLimit: Int
+
+            enum CodingKeys: String, CodingKey {
+                case searchQuery = "search_query"
+                case resultLimit = "result_limit"
+            }
+        }
+
         let games: [Game] = try await client
-            .from("games")
-            .select("*")
-            .ilike("name", pattern: "%\(query)%")
-            .not("bgg_id", operator: .is, value: "null")
-            .order("bgg_rank", ascending: true, nullsFirst: false)
-            .limit(20)
+            .rpc("search_games_fuzzy", params: SearchGamesFuzzyParams(
+                searchQuery: query,
+                resultLimit: 20
+            ))
             .execute()
             .value
         return games
