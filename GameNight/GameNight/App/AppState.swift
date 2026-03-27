@@ -62,7 +62,7 @@ final class AppState: ObservableObject {
         if isFirstLaunch {
             // Exactly 1 second of splash screen on first launch
             let elapsed = Date().timeIntervalSince(startTime)
-            let minimumTime: TimeInterval = 1.0
+            let minimumTime: TimeInterval = 1.5
             
             if elapsed < minimumTime {
                 let delay = UInt64((minimumTime - elapsed) * 1_000_000_000)

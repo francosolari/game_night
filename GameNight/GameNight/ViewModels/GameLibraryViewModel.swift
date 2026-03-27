@@ -11,11 +11,15 @@ final class GameLibraryViewModel: ObservableObject {
     @Published var error: String?
     @Published var toast: ToastItem?
 
-    // BGG Search
+    // BGG Search (AddGameSheet)
     @Published var bggSearchQuery = ""
     @Published var bggSearchResults: [BGGSearchResult] = []
     @Published var isSearchingBGG = false
     @Published var hotGames: [BGGSearchResult] = []
+
+    // Cached game search (inline in library tab)
+    @Published var cachedGameResults: [Game] = []
+    @Published var isSearchingCache = false
 
     // Add game state
     @Published var selectedGameDetail: Game?
@@ -25,6 +29,7 @@ final class GameLibraryViewModel: ObservableObject {
     private let supabase = SupabaseService.shared
     private let bgg = BGGService.shared
     private var searchTask: Task<Void, Never>?
+    private var cacheSearchTask: Task<Void, Never>?
     private var selectedGameParseResult: BGGGameParseResult?
 
     var filteredEntries: [GameLibraryEntry] {
@@ -78,6 +83,38 @@ final class GameLibraryViewModel: ObservableObject {
                 }
             }
             isSearchingBGG = false
+        }
+    }
+
+    /// Search the cached games table — triggered from the inline library search bar.
+    func searchCachedGames() {
+        cacheSearchTask?.cancel()
+        cacheSearchTask = Task {
+            guard !searchQuery.isEmpty else {
+                cachedGameResults = []
+                return
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            isSearchingCache = true
+            do {
+                cachedGameResults = try await supabase.searchCachedGames(query: searchQuery)
+            } catch {
+                if !Task.isCancelled { cachedGameResults = [] }
+            }
+            isSearchingCache = false
+        }
+    }
+
+    /// Add a cached Game (from the search results) to the user's library.
+    func addCachedGameToLibrary(game: Game) async {
+        do {
+            let saved = try await supabase.upsertGame(game)
+            try await supabase.addGameToLibrary(gameId: saved.id, categoryId: nil)
+            await loadLibrary()
+            toast = ToastItem(style: .success, message: "Added \(game.name) to library")
+        } catch {
+            toast = ToastItem(style: .error, message: error.localizedDescription)
         }
     }
 

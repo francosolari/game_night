@@ -10,6 +10,8 @@ struct SplashScreen: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
+                Spacer()
+
                 Image("MeepleLogo")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -23,6 +25,16 @@ struct SplashScreen: View {
                 Text("Gather around the table")
                     .font(Theme.Typography.body)
                     .foregroundColor(Theme.Colors.textSecondary)
+
+                Spacer()
+
+                Link(destination: URL(string: "https://boardgamegeek.com")!) {
+                    Image("PoweredByBGG")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 36)
+                }
+                .padding(.bottom, 24)
             }
             .opacity(opacity)
         }

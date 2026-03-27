@@ -54,6 +54,9 @@ struct GameLibraryView: View {
                         }
 
                         SearchBar(text: $viewModel.searchQuery, placeholder: "Search your library...")
+                            .onChange(of: viewModel.searchQuery) { _, _ in
+                                viewModel.searchCachedGames()
+                            }
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.lg)
@@ -97,6 +100,9 @@ struct GameLibraryView: View {
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
+                    } else if !viewModel.searchQuery.isEmpty {
+                        // Dual-section search: My Library + BGG cache
+                        LibrarySearchResultsView(viewModel: viewModel)
                     } else if viewModel.filteredEntries.isEmpty {
                         EmptyStateView(
                             icon: "dice.fill",
@@ -165,6 +171,172 @@ struct GameLibraryView: View {
         .task {
             await viewModel.loadLibrary()
         }
+    }
+}
+
+// MARK: - Dual-section Search Results
+
+struct LibrarySearchResultsView: View {
+    @ObservedObject var viewModel: GameLibraryViewModel
+
+    private var libraryGameIds: Set<UUID> {
+        Set(viewModel.libraryEntries.compactMap { $0.gameId })
+    }
+
+    /// Cached games that are NOT already in the user's library.
+    private var newCachedGames: [Game] {
+        viewModel.cachedGameResults.filter { game in !libraryGameIds.contains(game.id) }
+    }
+
+    var body: some View {
+        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+
+            // ── My Library ──────────────────────────────────────
+            Section {
+                if viewModel.filteredEntries.isEmpty {
+                    HStack {
+                        Text("No matches in your library")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.vertical, Theme.Spacing.sm)
+                } else {
+                    VStack(spacing: Theme.Spacing.md) {
+                        ForEach(viewModel.filteredEntries) { entry in
+                            if let game = entry.game {
+                                NavigationLink(value: game) {
+                                    GameCard(game: game)
+                                }
+                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        Task { await viewModel.removeFromLibrary(entryId: entry.id) }
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                }
+            } header: {
+                HStack {
+                    Text("MY LIBRARY")
+                        .font(Theme.Typography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Spacer()
+                }
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.vertical, Theme.Spacing.xs)
+                .background(Theme.Colors.background)
+            }
+
+            // ── Thin divider ────────────────────────────────────
+            Rectangle()
+                .fill(Theme.Colors.divider)
+                .frame(height: 0.5)
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.vertical, Theme.Spacing.md)
+
+            // ── BGG Cache ────────────────────────────────────────
+            Section {
+                if viewModel.isSearchingCache {
+                    ProgressView()
+                        .tint(Theme.Colors.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.md)
+                } else if newCachedGames.isEmpty {
+                    HStack {
+                        Text("No other results in cache")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.vertical, Theme.Spacing.sm)
+                } else {
+                    VStack(spacing: Theme.Spacing.sm) {
+                        ForEach(newCachedGames) { game in
+                            CachedGameRow(game: game) {
+                                Task { await viewModel.addCachedGameToLibrary(game: game) }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                }
+            } header: {
+                HStack {
+                    Text("ALL GAMES")
+                        .font(Theme.Typography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                    Spacer()
+                }
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.vertical, Theme.Spacing.xs)
+                .background(Theme.Colors.background)
+            }
+        }
+    }
+}
+
+// MARK: - Cached Game Row
+
+struct CachedGameRow: View {
+    let game: Game
+    let onAdd: () -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            // Thumbnail — tappable to game detail
+            NavigationLink(value: game) {
+                GameThumbnail(url: game.thumbnailUrl, size: 48)
+            }
+            .buttonStyle(.plain)
+
+            // Name + year — tappable to game detail
+            NavigationLink(value: game) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(game.name)
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+                        .lineLimit(1)
+
+                    HStack(spacing: Theme.Spacing.xs) {
+                        if let year = game.yearPublished {
+                            Text("(\(year))")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                        if let rank = game.bggRank {
+                            Text("· BGG #\(rank)")
+                                .font(Theme.Typography.caption)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            // Add to library button
+            Button(action: onAdd) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(Theme.Gradients.primary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(Theme.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                .fill(Theme.Colors.backgroundElevated)
+        )
     }
 }
 

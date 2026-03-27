@@ -10,6 +10,10 @@ struct PlayParticipant: Identifiable, Codable {
     var isWinner: Bool
     var score: Int?
     var team: String?
+    var startPosition: String?
+    var color: String?
+    var newToGame: Bool?
+    var bggRating: Double?
     var createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -22,6 +26,10 @@ struct PlayParticipant: Identifiable, Codable {
         case isWinner = "is_winner"
         case score
         case team
+        case startPosition = "start_position"
+        case color
+        case newToGame = "new_to_game"
+        case bggRating = "bgg_rating"
         case createdAt = "created_at"
     }
 
@@ -35,6 +43,10 @@ struct PlayParticipant: Identifiable, Codable {
         isWinner: Bool = false,
         score: Int? = nil,
         team: String? = nil,
+        startPosition: String? = nil,
+        color: String? = nil,
+        newToGame: Bool? = nil,
+        bggRating: Double? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -46,6 +58,10 @@ struct PlayParticipant: Identifiable, Codable {
         self.isWinner = isWinner
         self.score = score
         self.team = team
+        self.startPosition = startPosition
+        self.color = color
+        self.newToGame = newToGame
+        self.bggRating = bggRating
         self.createdAt = createdAt
     }
 
@@ -60,6 +76,10 @@ struct PlayParticipant: Identifiable, Codable {
         isWinner = try container.decodeIfPresent(Bool.self, forKey: .isWinner) ?? false
         score = try container.decodeIfPresent(Int.self, forKey: .score)
         team = try container.decodeIfPresent(String.self, forKey: .team)
+        startPosition = try container.decodeIfPresent(String.self, forKey: .startPosition)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        newToGame = try container.decodeIfPresent(Bool.self, forKey: .newToGame)
+        bggRating = try container.decodeIfPresent(Double.self, forKey: .bggRating)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 

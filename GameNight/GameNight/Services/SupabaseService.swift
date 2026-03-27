@@ -842,6 +842,21 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Games
 
+    /// Search the cached BGG games table by name (local-first, no BGG API call).
+    func searchCachedGames(query: String) async throws -> [Game] {
+        guard !query.isEmpty else { return [] }
+        let games: [Game] = try await client
+            .from("games")
+            .select("*")
+            .ilike("name", pattern: "%\(query)%")
+            .not("bgg_id", operator: .is, value: "null")
+            .order("bgg_rank", ascending: true, nullsFirst: false)
+            .limit(20)
+            .execute()
+            .value
+        return games
+    }
+
     func fetchGameLibrary() async throws -> [GameLibraryEntry] {
         let session = try await client.auth.session
         let entries: [GameLibraryEntry] = try await client
