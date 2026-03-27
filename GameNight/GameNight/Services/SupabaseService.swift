@@ -904,6 +904,60 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    // MARK: - Wishlist
+
+    func fetchWishlist() async throws -> [GameWishlistEntry] {
+        let session = try await client.auth.session
+        return try await client
+            .from("game_wishlist")
+            .select("*, game:games(*)")
+            .eq("user_id", value: session.user.id.uuidString)
+            .order("added_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func addToWishlist(gameId: UUID) async throws {
+        let session = try await client.auth.session
+        let entry: [String: AnyJSON] = [
+            "user_id": .string(session.user.id.uuidString),
+            "game_id": .string(gameId.uuidString),
+        ]
+        try await client
+            .from("game_wishlist")
+            .insert(entry)
+            .execute()
+    }
+
+    func removeFromWishlist(entryId: UUID) async throws {
+        try await client
+            .from("game_wishlist")
+            .delete()
+            .eq("id", value: entryId.uuidString)
+            .execute()
+    }
+
+    func isOnWishlist(gameId: UUID) async throws -> UUID? {
+        let session = try await client.auth.session
+        let entries: [GameWishlistEntry] = try await client
+            .from("game_wishlist")
+            .select("id")
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("game_id", value: gameId.uuidString)
+            .execute()
+            .value
+        return entries.first?.id
+    }
+
+    func updateLibraryEntryCategory(entryId: UUID, categoryId: UUID?) async throws {
+        let value: AnyJSON = categoryId.map { .string($0.uuidString) } ?? .null
+        try await client
+            .from("game_library")
+            .update(["category_id": value])
+            .eq("id", value: entryId.uuidString)
+            .execute()
+    }
+
     private func normalizedGameForUpsert(_ game: Game) async throws -> Game {
         var normalized = game
         if normalized.bggId == nil && normalized.ownerId == nil {

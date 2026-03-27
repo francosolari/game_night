@@ -17,10 +17,14 @@ final class CreatorDetailViewModel: ObservableObject {
         switch sortMode {
         case .topRated:
             sorted = games.sorted { ($0.bggRating ?? 0) > ($1.bggRating ?? 0) }
+        case .alphabetical:
+            sorted = games.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .byYear:
             sorted = games.sorted { ($0.yearPublished ?? 0) > ($1.yearPublished ?? 0) }
         case .byWeight:
             sorted = games.sorted { $0.complexity > $1.complexity }
+        case .recentlyAdded:
+            sorted = games
         }
         return isExpanded ? sorted : Array(sorted.prefix(5))
     }

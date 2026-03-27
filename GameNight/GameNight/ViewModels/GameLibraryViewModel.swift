@@ -7,6 +7,7 @@ final class GameLibraryViewModel: ObservableObject {
     @Published var categories: [GameCategory] = []
     @Published var selectedCategory: GameCategory?
     @Published var searchQuery = ""
+    @Published var sortOption: SortOption = .recentlyAdded
     @Published var isLoading = true
     @Published var error: String?
     @Published var toast: ToastItem?
@@ -20,6 +21,9 @@ final class GameLibraryViewModel: ObservableObject {
     // Cached game search (inline in library tab)
     @Published var cachedGameResults: [Game] = []
     @Published var isSearchingCache = false
+
+    // Wishlist
+    @Published var wishlistEntries: [GameWishlistEntry] = []
 
     // Add game state
     @Published var selectedGameDetail: Game?
@@ -45,7 +49,30 @@ final class GameLibraryViewModel: ObservableObject {
             }
         }
 
+        switch sortOption {
+        case .recentlyAdded:
+            break // already sorted by added_at descending from fetch
+        case .topRated:
+            entries.sort { ($0.game?.bggRating ?? 0) > ($1.game?.bggRating ?? 0) }
+        case .alphabetical:
+            entries.sort {
+                ($0.game?.name ?? "").localizedCaseInsensitiveCompare($1.game?.name ?? "") == .orderedAscending
+            }
+        case .byYear:
+            entries.sort { ($0.game?.yearPublished ?? 0) > ($1.game?.yearPublished ?? 0) }
+        case .byWeight:
+            entries.sort { ($0.game?.complexity ?? 0) > ($1.game?.complexity ?? 0) }
+        }
+
         return entries
+    }
+
+    func countForCategory(_ categoryId: UUID) -> Int {
+        libraryEntries.filter { $0.categoryId == categoryId }.count
+    }
+
+    var wishlistGameIds: Set<UUID> {
+        Set(wishlistEntries.compactMap { $0.gameId })
     }
 
     func loadLibrary() async {
@@ -53,13 +80,43 @@ final class GameLibraryViewModel: ObservableObject {
         do {
             async let entriesResult = supabase.fetchGameLibrary()
             async let catsResult = supabase.fetchCategories()
+            async let wishlistResult = supabase.fetchWishlist()
 
             self.libraryEntries = try await entriesResult
             self.categories = try await catsResult
+            self.wishlistEntries = try await wishlistResult
         } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
+    }
+
+    func addToWishlist(game: Game) async {
+        do {
+            let saved = try await supabase.upsertGame(game)
+            try await supabase.addToWishlist(gameId: saved.id)
+            let entry = GameWishlistEntry(
+                id: UUID(),
+                userId: UUID(),
+                gameId: saved.id,
+                game: saved,
+                addedAt: Date(),
+                notes: nil
+            )
+            wishlistEntries.insert(entry, at: 0)
+            toast = ToastItem(style: .success, message: "Added \(game.name) to wishlist")
+        } catch {
+            toast = ToastItem(style: .error, message: error.localizedDescription)
+        }
+    }
+
+    func removeFromWishlist(entryId: UUID) async {
+        do {
+            try await supabase.removeFromWishlist(entryId: entryId)
+            wishlistEntries.removeAll { $0.id == entryId }
+        } catch {
+            toast = ToastItem(style: .error, message: error.localizedDescription)
+        }
     }
 
     func searchBGG() {
@@ -94,7 +151,7 @@ final class GameLibraryViewModel: ObservableObject {
                 cachedGameResults = []
                 return
             }
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 150_000_000)
             guard !Task.isCancelled else { return }
             isSearchingCache = true
             do {
@@ -162,6 +219,20 @@ final class GameLibraryViewModel: ObservableObject {
             libraryEntries.removeAll { $0.id == entryId }
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    func moveGameToCategory(entryId: UUID, categoryId: UUID?, categoryName: String?) async {
+        do {
+            try await supabase.updateLibraryEntryCategory(entryId: entryId, categoryId: categoryId)
+            if let index = libraryEntries.firstIndex(where: { $0.id == entryId }) {
+                libraryEntries[index].categoryId = categoryId
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            let label = categoryName ?? "No Category"
+            toast = ToastItem(style: .success, message: "Moved to \(label)")
+        } catch {
+            toast = ToastItem(style: .error, message: error.localizedDescription)
         }
     }
 

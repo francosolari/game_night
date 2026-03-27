@@ -10,6 +10,7 @@ struct GameDetailView: View {
     @State private var showImageCropPicker = false
     @State private var isUploadingImage = false
     @State private var imageUploadError: String?
+    @State private var expandedCreatorRoles: Set<CreatorRole> = []
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -188,18 +189,10 @@ struct GameDetailView: View {
                     if isEditingManualGame, let draftBinding = manualDraftBinding {
                         ManualDescriptionEditorSection(game: draftBinding)
                     } else if let desc = displayedGame.description, !desc.isEmpty {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            Text(desc.strippingHTML())
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                                .lineLimit(isDescriptionExpanded ? nil : 3)
-
-                            Button(isDescriptionExpanded ? "Show less" : "Read more") {
-                                withAnimation { isDescriptionExpanded.toggle() }
-                            }
-                            .font(Theme.Typography.calloutMedium)
-                            .foregroundColor(Theme.Colors.primary)
-                        }
+                        DescriptionSection(
+                            text: desc.strippingHTML(),
+                            isExpanded: $isDescriptionExpanded
+                        )
                     }
 
                     // 6. Base game link
@@ -270,7 +263,7 @@ struct GameDetailView: View {
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
             }
-            .padding(.bottom, 100)
+            .padding(.bottom, 160)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -330,10 +323,10 @@ struct GameDetailView: View {
                     .foregroundColor(Theme.Colors.textTertiary)
                 }
                 if !designerLinks.isEmpty {
-                    creatorRow(links: designerLinks, maxVisible: 2)
+                    creatorRow(links: designerLinks, maxVisible: 2, role: .designer)
                 }
                 if !publisherLinks.isEmpty {
-                    creatorRow(links: publisherLinks, maxVisible: 1)
+                    creatorRow(links: publisherLinks, maxVisible: 1, role: .publisher)
                 }
                 if let year = displayedGame.yearPublished {
                     Label(String(year), systemImage: "calendar")
@@ -353,35 +346,23 @@ struct GameDetailView: View {
     @ViewBuilder
     private func creatorRow(
         links: [(name: String, destination: CreatorDestination)],
-        maxVisible: Int
+        maxVisible: Int,
+        role: CreatorRole
     ) -> some View {
-        let visibleLinks = Array(links.prefix(maxVisible))
-        let hiddenCount = max(links.count - visibleLinks.count, 0)
-
-        HStack(spacing: Theme.Spacing.xs) {
-            ForEach(Array(visibleLinks.enumerated()), id: \.offset) { index, item in
-                if index > 0 {
-                    Text("\u{00B7}")
-                        .foregroundColor(Theme.Colors.textTertiary)
+        ExpandableCreatorRow(
+            links: links,
+            maxVisible: maxVisible,
+            isExpanded: Binding(
+                get: { expandedCreatorRoles.contains(role) },
+                set: { newValue in
+                    if newValue {
+                        expandedCreatorRoles.insert(role)
+                    } else {
+                        expandedCreatorRoles.remove(role)
+                    }
                 }
-
-                NavigationLink(value: item.destination) {
-                    Text(item.name)
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.accent)
-                }
-            }
-
-            if hiddenCount > 0 {
-                if !visibleLinks.isEmpty {
-                    Text("\u{00B7}")
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
-                Text("+ \(hiddenCount) more")
-                    .font(Theme.Typography.callout)
-                    .foregroundColor(Theme.Colors.textTertiary)
-            }
-        }
+            )
+        )
     }
 
     private var manualDraftBinding: Binding<Game>? {
@@ -929,6 +910,102 @@ struct GameFamilyDetailView: View {
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Description Section (isolated view for reliable tap handling)
+
+private struct DescriptionSection: View {
+    let text: String
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(text)
+                .font(Theme.Typography.body)
+                .foregroundColor(Theme.Colors.textSecondary)
+                .lineLimit(isExpanded ? nil : 3)
+                .animation(.easeInOut(duration: 0.25), value: isExpanded)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                Text(isExpanded ? "Show less" : "Read more")
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.primary)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+}
+
+// MARK: - Expandable Creator Row (isolated view for reliable tap handling)
+
+private struct ExpandableCreatorRow: View {
+    let links: [(name: String, destination: CreatorDestination)]
+    let maxVisible: Int
+    @Binding var isExpanded: Bool
+
+    private var displayLinks: [(name: String, destination: CreatorDestination)] {
+        isExpanded ? links : Array(links.prefix(maxVisible))
+    }
+
+    private var hiddenCount: Int {
+        isExpanded ? 0 : max(links.count - maxVisible, 0)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            HStack(spacing: Theme.Spacing.xs) {
+                ForEach(Array(displayLinks.enumerated()), id: \.offset) { index, item in
+                    if index > 0 {
+                        Text("\u{00B7}")
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    NavigationLink(value: item.destination) {
+                        Text(item.name)
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if hiddenCount > 0 {
+                    Text("\u{00B7}")
+                        .foregroundColor(Theme.Colors.textTertiary)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isExpanded = true
+                        }
+                    } label: {
+                        Text("+ \(hiddenCount) more")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.vertical, Theme.Spacing.xs)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            if isExpanded && links.count > maxVisible {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded = false
+                    }
+                } label: {
+                    Text("Show less")
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.primary)
+                        .padding(.vertical, Theme.Spacing.xs)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
     }
 }
 

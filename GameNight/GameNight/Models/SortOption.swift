@@ -1,7 +1,9 @@
 import Foundation
 
 enum SortOption: String, CaseIterable, Identifiable, Hashable {
+    case recentlyAdded = "Recent"
     case topRated = "Top Rated"
+    case alphabetical = "A-Z"
     case byYear = "By Year"
     case byWeight = "By Weight"
 

@@ -9,57 +9,55 @@ struct GameLibraryView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: Theme.Spacing.xxl) {
-                    // Header with search
-                    VStack(spacing: Theme.Spacing.md) {
-                        HStack {
-                            Text("My Games")
-                                .font(Theme.Typography.displayLarge)
-                                .foregroundColor(Theme.Colors.textPrimary)
+            VStack(spacing: 0) {
+                // ── Pinned header ─────────────────────────────────
+                VStack(spacing: Theme.Spacing.md) {
+                    HStack {
+                        Text("My Games")
+                            .font(Theme.Typography.displayLarge)
+                            .foregroundColor(Theme.Colors.textPrimary)
 
-                            Spacer()
+                        Spacer()
 
-                            Menu {
-                                Button {
-                                    showLogPlay = true
-                                } label: {
-                                    Label("Log a Play", systemImage: "dice.fill")
-                                }
-
-                                Divider()
-
-                                Button {
-                                    showAddGame = true
-                                } label: {
-                                    Label("Search BGG", systemImage: "magnifyingglass")
-                                }
-
-                                Button {
-                                    showImportBGG = true
-                                } label: {
-                                    Label("Import BGG Collection", systemImage: "square.and.arrow.down")
-                                }
-
-                                Button {
-                                    showCreateCategory = true
-                                } label: {
-                                    Label("New Category", systemImage: "folder.badge.plus")
-                                }
+                        Menu {
+                            Button {
+                                showLogPlay = true
                             } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(Theme.Gradients.primary)
+                                Label("Log a Play", systemImage: "dice.fill")
                             }
-                        }
 
-                        SearchBar(text: $viewModel.searchQuery, placeholder: "Search your library...")
-                            .onChange(of: viewModel.searchQuery) { _, _ in
-                                viewModel.searchCachedGames()
+                            Divider()
+
+                            Button {
+                                showAddGame = true
+                            } label: {
+                                Label("Search BGG", systemImage: "magnifyingglass")
                             }
+
+                            Button {
+                                showImportBGG = true
+                            } label: {
+                                Label("Import BGG Collection", systemImage: "square.and.arrow.down")
+                            }
+
+                            Button {
+                                showCreateCategory = true
+                            } label: {
+                                Label("New Category", systemImage: "folder.badge.plus")
+                            }
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(Theme.Gradients.primary)
+                        }
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
-                    .padding(.top, Theme.Spacing.lg)
+
+                    SearchBar(text: $viewModel.searchQuery, placeholder: "Search your library...")
+                        .padding(.horizontal, Theme.Spacing.xl)
+                        .onChange(of: viewModel.searchQuery) { _, _ in
+                            viewModel.searchCachedGames()
+                        }
 
                     // Category filter chips
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -67,7 +65,7 @@ struct GameLibraryView: View {
                             Button {
                                 viewModel.selectedCategory = nil
                             } label: {
-                                Text("All")
+                                Text("All (\(viewModel.libraryEntries.count))")
                                     .chipStyle(
                                         color: Theme.Colors.primary,
                                         isSelected: viewModel.selectedCategory == nil
@@ -75,10 +73,11 @@ struct GameLibraryView: View {
                             }
 
                             ForEach(viewModel.categories) { category in
+                                let count = viewModel.countForCategory(category.id)
                                 Button {
                                     viewModel.selectedCategory = category
                                 } label: {
-                                    Text(category.name)
+                                    Text("\(category.name) (\(count))")
                                         .chipStyle(
                                             color: Theme.Colors.primary,
                                             isSelected: viewModel.selectedCategory?.id == category.id
@@ -89,8 +88,16 @@ struct GameLibraryView: View {
                         .padding(.horizontal, Theme.Spacing.xl)
                     }
 
-                    // Game list
-                    if viewModel.isLoading {
+                    // Sort options
+                    SortFilterBar(options: SortOption.allCases, selected: $viewModel.sortOption)
+                        .padding(.horizontal, Theme.Spacing.xl)
+                }
+                .padding(.top, Theme.Spacing.lg)
+                .padding(.bottom, Theme.Spacing.sm)
+
+                // ── Scrollable game list ──────────────────────────
+                if viewModel.isLoading {
+                    ScrollView {
                         VStack(spacing: Theme.Spacing.md) {
                             ForEach(0..<5, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
@@ -100,10 +107,22 @@ struct GameLibraryView: View {
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
-                    } else if !viewModel.searchQuery.isEmpty {
-                        // Dual-section search: My Library + BGG cache
+                        .padding(.top, Theme.Spacing.sm)
+                    }
+                } else if !viewModel.searchQuery.isEmpty {
+                    ScrollView {
                         LibrarySearchResultsView(viewModel: viewModel)
-                    } else if viewModel.filteredEntries.isEmpty {
+                            .padding(.top, Theme.Spacing.sm)
+                    }
+                } else if viewModel.filteredEntries.isEmpty {
+                    Spacer()
+                    if viewModel.selectedCategory != nil {
+                        EmptyStateView(
+                            icon: "folder",
+                            title: "No Games Here",
+                            message: "Long-press a game to move it into this category."
+                        )
+                    } else {
                         EmptyStateView(
                             icon: "dice.fill",
                             title: "No Games Yet",
@@ -112,8 +131,10 @@ struct GameLibraryView: View {
                         ) {
                             showAddGame = true
                         }
-                        .frame(minHeight: 300)
-                    } else {
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
                         LazyVStack(spacing: Theme.Spacing.md) {
                             ForEach(viewModel.filteredEntries) { entry in
                                 if let game = entry.game {
@@ -121,22 +142,20 @@ struct GameLibraryView: View {
                                         GameCard(game: game)
                                     }
                                     .buttonStyle(.plain)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            Task {
-                                                await viewModel.removeFromLibrary(entryId: entry.id)
-                                            }
-                                        } label: {
-                                            Label("Remove", systemImage: "trash")
-                                        }
+                                    .contextMenu {
+                                        LibraryGameContextMenu(
+                                            entry: entry,
+                                            viewModel: viewModel
+                                        )
                                     }
                                 }
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.xl)
+                        .padding(.top, Theme.Spacing.sm)
+                        .padding(.bottom, 100)
                     }
                 }
-                .padding(.bottom, 100)
             }
             .background(Theme.Colors.background.ignoresSafeArea())
             .sheet(isPresented: $showAddGame) {
@@ -170,6 +189,53 @@ struct GameLibraryView: View {
         }
         .task {
             await viewModel.loadLibrary()
+        }
+    }
+
+}
+
+// MARK: - Library Game Context Menu
+
+struct LibraryGameContextMenu: View {
+    let entry: GameLibraryEntry
+    @ObservedObject var viewModel: GameLibraryViewModel
+
+    var body: some View {
+        Menu {
+            Button {
+                Task { await viewModel.moveGameToCategory(entryId: entry.id, categoryId: nil, categoryName: nil) }
+            } label: {
+                Label("No Category", systemImage: entry.categoryId == nil ? "checkmark" : "folder")
+            }
+
+            ForEach(viewModel.categories) { category in
+                Button {
+                    Task {
+                        await viewModel.moveGameToCategory(
+                            entryId: entry.id,
+                            categoryId: category.id,
+                            categoryName: category.name
+                        )
+                    }
+                } label: {
+                    Label(
+                        category.name,
+                        systemImage: entry.categoryId == category.id
+                            ? "checkmark"
+                            : (category.icon ?? "folder")
+                    )
+                }
+            }
+        } label: {
+            Label("Move to...", systemImage: "folder")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            Task { await viewModel.removeFromLibrary(entryId: entry.id) }
+        } label: {
+            Label("Remove from Library", systemImage: "trash")
         }
     }
 }
@@ -210,6 +276,12 @@ struct LibrarySearchResultsView: View {
                                     GameCard(game: game)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    LibraryGameContextMenu(
+                                        entry: entry,
+                                        viewModel: viewModel
+                                    )
+                                }
                                 .swipeActions(edge: .trailing) {
                                     Button(role: .destructive) {
                                         Task { await viewModel.removeFromLibrary(entryId: entry.id) }
@@ -261,9 +333,16 @@ struct LibrarySearchResultsView: View {
                 } else {
                     VStack(spacing: Theme.Spacing.sm) {
                         ForEach(newCachedGames) { game in
-                            CachedGameRow(game: game) {
-                                Task { await viewModel.addCachedGameToLibrary(game: game) }
-                            }
+                            CachedGameRow(
+                                game: game,
+                                isWishlisted: viewModel.wishlistGameIds.contains(game.id),
+                                onAdd: {
+                                    Task { await viewModel.addCachedGameToLibrary(game: game) }
+                                },
+                                onWishlist: {
+                                    Task { await viewModel.addToWishlist(game: game) }
+                                }
+                            )
                         }
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
@@ -288,17 +367,17 @@ struct LibrarySearchResultsView: View {
 
 struct CachedGameRow: View {
     let game: Game
+    let isWishlisted: Bool
     let onAdd: () -> Void
+    let onWishlist: () -> Void
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            // Thumbnail — tappable to game detail
             NavigationLink(value: game) {
                 GameThumbnail(url: game.thumbnailUrl, size: 48)
             }
             .buttonStyle(.plain)
 
-            // Name + year — tappable to game detail
             NavigationLink(value: game) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.name)
@@ -308,14 +387,23 @@ struct CachedGameRow: View {
 
                     HStack(spacing: Theme.Spacing.xs) {
                         if let year = game.yearPublished {
-                            Text("(\(year))")
+                            Text("(\(String(year)))")
                                 .font(Theme.Typography.caption)
                                 .foregroundColor(Theme.Colors.textTertiary)
                         }
                         if let rank = game.bggRank {
-                            Text("· BGG #\(rank)")
-                                .font(Theme.Typography.caption)
+                            Text("BGG")
+                                .font(Theme.Typography.caption2)
                                 .foregroundColor(Theme.Colors.textTertiary)
+                            Text("#\(String(rank))")
+                                .font(Theme.Typography.caption.weight(.semibold))
+                                .foregroundColor(Theme.Colors.accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(Theme.Colors.accent.opacity(0.12))
+                                )
                         }
                     }
                 }
@@ -324,7 +412,17 @@ struct CachedGameRow: View {
 
             Spacer()
 
-            // Add to library button
+            if let rating = game.bggRating {
+                RatingBadge(rating: rating, size: .small)
+            }
+
+            Button(action: onWishlist) {
+                Image(systemName: isWishlisted ? "heart.fill" : "heart")
+                    .font(.system(size: 20))
+                    .foregroundColor(isWishlisted ? Theme.Colors.primary : Theme.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+
             Button(action: onAdd) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 24))

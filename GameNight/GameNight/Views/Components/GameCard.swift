@@ -63,14 +63,7 @@ struct GameCard: View {
             }
 
             if let rating = game.bggRating {
-                VStack(spacing: 2) {
-                    Text(String(format: "%.1f", rating))
-                        .font(Theme.Typography.titleMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    Text("BGG")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
+                RatingBadge(rating: rating, size: .small)
             }
         }
     }

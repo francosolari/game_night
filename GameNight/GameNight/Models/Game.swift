@@ -248,6 +248,24 @@ struct GameLibraryEntry: Identifiable, Codable {
     }
 }
 
+struct GameWishlistEntry: Identifiable, Codable {
+    let id: UUID
+    var userId: UUID
+    var gameId: UUID
+    var game: Game?
+    var addedAt: Date
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case gameId = "game_id"
+        case game
+        case addedAt = "added_at"
+        case notes
+    }
+}
+
 struct GameCategory: Identifiable, Codable, Hashable {
     let id: UUID
     var userId: UUID
