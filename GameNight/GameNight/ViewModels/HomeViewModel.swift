@@ -24,10 +24,10 @@ final class HomeViewModel: ObservableObject {
         self.init(supabase: SupabaseService.shared)
     }
 
-    func loadData() async {
+    func loadData(preloadedSnapshot: HomeDataLoadSnapshot? = nil) async {
         // Only show skeleton on initial load, not on pull-to-refresh
         let isInitialLoad = upcomingEvents.isEmpty && myInvites.isEmpty && drafts.isEmpty
-        if isInitialLoad {
+        if isInitialLoad && preloadedSnapshot == nil {
             isLoading = true
         }
         // Guarantee isLoading is always set to false, even if something unexpected happens
@@ -41,17 +41,23 @@ final class HomeViewModel: ObservableObject {
         // Mark past events as completed before fetching
         await SupabaseService.shared.completePastEvents()
 
-        let snapshot = await HomeDataLoader.load(
-            fetchUpcomingEvents: { [supabase] in
-                try await supabase.fetchUpcomingEvents()
-            },
-            fetchMyInvites: { [supabase] in
-                try await supabase.fetchMyInvites()
-            },
-            fetchDrafts: { [supabase] in
-                try await supabase.fetchDrafts()
-            }
-        )
+        let snapshot: HomeDataLoadSnapshot
+        if let preloaded = preloadedSnapshot {
+            print("🏠 [HomeViewModel] Using preloaded snapshot.")
+            snapshot = preloaded
+        } else {
+            snapshot = await HomeDataLoader.load(
+                fetchUpcomingEvents: { [supabase] in
+                    try await supabase.fetchUpcomingEvents()
+                },
+                fetchMyInvites: { [supabase] in
+                    try await supabase.fetchMyInvites()
+                },
+                fetchDrafts: { [supabase] in
+                    try await supabase.fetchDrafts()
+                }
+            )
+        }
 
         // If the task was cancelled (e.g. SwiftUI .refreshable releasing),
         // don't overwrite existing good data with empty results.

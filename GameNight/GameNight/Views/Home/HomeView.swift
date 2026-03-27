@@ -351,7 +351,9 @@ struct HomeView: View {
                 await viewModel.loadData()
             }
         .task {
-            await viewModel.loadData()
+            let preloaded = appState.preloadedHomeSnapshot
+            appState.preloadedHomeSnapshot = nil
+            await viewModel.loadData(preloadedSnapshot: preloaded)
             await loadEventsNeedingPlayLog()
         }
         .sheet(item: $draftToResume) { draft in

@@ -314,7 +314,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let activeStatuses = "status.eq.published,status.eq.confirmed,status.eq.completed"
 
-        let publicEvents: [GameEvent] = try await client
+        async let publicEventsTask: [GameEvent] = client
             .from("events")
             .select(Self.eventSelect)
             .eq("visibility", value: EventVisibility.public.rawValue)
@@ -324,7 +324,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
 
-        let hostedEvents: [GameEvent] = try await client
+        async let hostedEventsTask: [GameEvent] = client
             .from("events")
             .select(Self.eventSelect)
             .eq("host_id", value: userId)
@@ -339,13 +339,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             let eventId: UUID
             enum CodingKeys: String, CodingKey { case eventId = "event_id" }
         }
-        let myInviteRefs: [InviteRef] = try await client
+        async let myInviteRefsTask: [InviteRef] = client
             .from("invites")
             .select("event_id")
             .eq("user_id", value: userId)
             .in("status", values: ["accepted", "maybe", "pending"])
             .execute()
             .value
+
+        let (publicEvents, hostedEvents, myInviteRefs) = try await (publicEventsTask, hostedEventsTask, myInviteRefsTask)
         let invitedEventIds = Set(myInviteRefs.map(\.eventId))
 
         var mergedById = Dictionary(uniqueKeysWithValues: publicEvents.map { ($0.id, $0) })
