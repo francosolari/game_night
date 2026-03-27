@@ -133,7 +133,7 @@ export function parseThingResponse(xml: string): ParsedGameRelations[] {
 
       for (const link of links) {
         const type = link["@_type"];
-        const value = link["@_value"];
+        const value = decodeHtmlEntities(link["@_value"] ?? "");
         const id = parseInt(link["@_id"]);
 
         switch (type) {
@@ -153,7 +153,9 @@ export function parseThingResponse(xml: string): ParsedGameRelations[] {
 
       // Extract primary name
       const names = Array.isArray(item.name) ? item.name : [item.name];
-      const primaryName = names.find((n: any) => n["@_type"] === "primary")?.["@_value"] ?? "";
+      const primaryName = decodeHtmlEntities(
+        names.find((n: any) => n["@_type"] === "primary")?.["@_value"] ?? "",
+      );
 
       // Extract BGG rank
       let bggRank: number | null = null;
@@ -208,8 +210,10 @@ export function parseSearchResponse(xml: string): ParsedSearchResult[] {
 
   return items.map((item: any) => {
     const names = Array.isArray(item.name) ? item.name : [item.name];
-    const primaryName = names.find((n: any) => n["@_type"] === "primary")?.["@_value"] ??
-                        names[0]?.["@_value"] ?? "";
+    const primaryName = decodeHtmlEntities(
+      names.find((n: any) => n["@_type"] === "primary")?.["@_value"] ??
+      names[0]?.["@_value"] ?? "",
+    );
 
     return {
       bgg_id: parseInt(item["@_id"]),
@@ -237,7 +241,7 @@ export function parseHotResponse(xml: string): ParsedHotGame[] {
 
   return items.map((item: any) => ({
     bgg_id: parseInt(item["@_id"]),
-    name: item.name?.["@_value"] ?? "",
+    name: decodeHtmlEntities(item.name?.["@_value"] ?? ""),
     year_published: intOrNull(item.yearpublished?.["@_value"]),
     thumbnail_url: item.thumbnail?.["@_value"] ?? null,
     rank: parseInt(item["@_rank"]) || 0,
@@ -266,7 +270,9 @@ export function parseCollectionResponse(xml: string): ParsedCollectionItem[] {
     const userRating = parseFloat(item.stats?.rating?.["@_value"] ?? "0");
     return {
       bgg_id: parseInt(item["@_objectid"]),
-      name: typeof item.name === "string" ? item.name : item.name?.["#text"] ?? "",
+      name: decodeHtmlEntities(
+        typeof item.name === "string" ? item.name : item.name?.["#text"] ?? "",
+      ),
       year_published: intOrNull(item.yearpublished),
       thumbnail_url: item.thumbnail ?? null,
       image_url: item.image ?? null,
@@ -353,21 +359,42 @@ function stripHtml(text: string): string {
 
   output = output.replace(/<[^>]+>/g, "");
 
-  // Decode common named entities plus numeric entities from BGG payloads.
+  output = decodeHtmlEntities(output);
+
+  output = output
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return output;
+}
+
+function decodeHtmlEntities(text: string): string {
   const namedEntities: Record<string, string> = {
     "&amp;": "&",
     "&lt;": "<",
     "&gt;": ">",
     "&quot;": "\"",
     "&nbsp;": " ",
-    "&#39;": "'",
+    "&apos;": "'",
   };
 
-  output = output.replace(/&(amp|lt|gt|quot|nbsp|#39);|&#\d+;/gi, (match) => {
+  return text.replace(/&(amp|lt|gt|quot|nbsp|apos);|&#x[0-9a-f]+;|&#0*\d+;/gi, (match) => {
     const normalized = match.toLowerCase();
     if (namedEntities[normalized]) return namedEntities[normalized];
 
-    const numericMatch = normalized.match(/^&#(\d+);$/);
+    const hexNumericMatch = normalized.match(/^&#x([0-9a-f]+);$/);
+    if (hexNumericMatch) {
+      const codePoint = parseInt(hexNumericMatch[1], 16);
+      if (Number.isNaN(codePoint)) return match;
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return match;
+      }
+    }
+
+    const numericMatch = normalized.match(/^&#0*(\d+);$/);
     if (!numericMatch) return match;
 
     const codePoint = parseInt(numericMatch[1], 10);
@@ -379,13 +406,6 @@ function stripHtml(text: string): string {
       return match;
     }
   });
-
-  output = output
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return output;
 }
 
 function intOrNull(val: string | undefined | null): number | null {
