@@ -1246,6 +1246,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         try await client.rpc("expire_stale_group_invites").execute()
     }
 
+    func fetchGroupInvitePreview(groupId: UUID) async throws -> GroupInvitePreview {
+        let response = try await client
+            .rpc("get_group_invite_preview", params: ["p_group_id": groupId.uuidString])
+            .execute()
+        let preview = try JSONDecoder().decode(GroupInvitePreview.self, from: response.data)
+        return preview
+    }
+
     // MARK: - Saved Contacts
 
     func fetchSavedContacts() async throws -> [SavedContact] {

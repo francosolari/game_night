@@ -9,9 +9,15 @@ struct GroupInviteCard: View {
     let onDecline: () -> Void
 
     @State private var isResponding = false
+    @State private var showPreview = false
 
     private var acceptedMembers: [GroupMember] {
         group.members.filter(\.isAccepted)
+    }
+
+    /// Total member count including the owner (who isn't in group_members)
+    private var totalMemberCount: Int {
+        acceptedMembers.count + 1
     }
 
     private var expiresText: String? {
@@ -28,91 +34,99 @@ struct GroupInviteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header banner with emoji + gradient
-            ZStack(alignment: .bottomLeading) {
-                // Gradient background
-                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Theme.Colors.primary.opacity(0.25),
-                                Theme.Colors.accentWarm.opacity(0.15)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+            // Tappable area — header + content
+            Button {
+                showPreview = true
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header banner with emoji + gradient
+                    ZStack(alignment: .bottomLeading) {
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Theme.Colors.primary.opacity(0.25),
+                                        Theme.Colors.accentWarm.opacity(0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(height: 100)
+                            .overlay(
+                                Text(group.emoji ?? "🎲")
+                                    .font(.system(size: 48))
+                                    .opacity(0.3),
+                                alignment: .center
+                            )
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Theme.Colors.highlight)
+                                .frame(width: 6, height: 6)
+                            Text("Group Invite")
+                                .font(Theme.Typography.label)
+                                .foregroundColor(Theme.Colors.primary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Theme.Colors.cardBackground.opacity(0.9))
                         )
-                    )
-                    .frame(height: 100)
-                    .overlay(
-                        Text(group.emoji ?? "🎲")
-                            .font(.system(size: 48))
-                            .opacity(0.3),
-                        alignment: .center
-                    )
+                        .padding(8)
+                    }
+                    .padding(Theme.Spacing.xs)
 
-                // Status badge
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Theme.Colors.highlight)
-                        .frame(width: 6, height: 6)
-                    Text("Group Invite")
-                        .font(Theme.Typography.label)
-                        .foregroundColor(Theme.Colors.primary)
+                    // Content
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            ZStack {
+                                Circle()
+                                    .fill(Theme.Colors.primarySubtle)
+                                    .frame(width: 32, height: 32)
+                                Text(group.emoji ?? "🎲")
+                                    .font(.system(size: 16))
+                            }
+
+                            Text(group.name)
+                                .font(Theme.Typography.calloutMedium.weight(.bold))
+                                .foregroundColor(Theme.Colors.textPrimary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.3.fill")
+                                .font(.system(size: 9))
+                            Text("\(totalMemberCount) member\(totalMemberCount == 1 ? "" : "s")")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(Theme.Colors.textTertiary)
+
+                        if let expiresText {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 9))
+                                Text(expiresText)
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundColor(Theme.Colors.accentWarm)
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.top, 2)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Theme.Colors.cardBackground.opacity(0.9))
-                )
-                .padding(8)
             }
-            .padding(Theme.Spacing.xs)
+            .buttonStyle(.plain)
 
-            // Content
-            VStack(alignment: .leading, spacing: 6) {
-                // Group emoji + name
-                HStack(spacing: Theme.Spacing.sm) {
-                    ZStack {
-                        Circle()
-                            .fill(Theme.Colors.primarySubtle)
-                            .frame(width: 32, height: 32)
-                        Text(group.emoji ?? "🎲")
-                            .font(.system(size: 16))
-                    }
+            Spacer(minLength: 4)
 
-                    Text(group.name)
-                        .font(Theme.Typography.calloutMedium.weight(.bold))
-                        .foregroundColor(Theme.Colors.textPrimary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                // Member count
-                HStack(spacing: 4) {
-                    Image(systemName: "person.3.fill")
-                        .font(.system(size: 9))
-                    Text("\(acceptedMembers.count) member\(acceptedMembers.count == 1 ? "" : "s")")
-                        .font(.system(size: 11, weight: .medium))
-                }
-                .foregroundColor(Theme.Colors.textTertiary)
-
-                // Expiry
-                if let expiresText {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 9))
-                        Text(expiresText)
-                            .font(.system(size: 10, weight: .medium))
-                    }
-                    .foregroundColor(Theme.Colors.accentWarm)
-                }
-
-                Spacer(minLength: 4)
-
+            // Accept / Decline buttons (not part of tap-to-preview)
+            VStack(spacing: 0) {
                 Divider().opacity(0.4)
+                    .padding(.horizontal, Theme.Spacing.sm)
 
-                // Accept / Decline
                 HStack(spacing: Theme.Spacing.sm) {
                     Button {
                         guard !isResponding else { return }
@@ -150,10 +164,9 @@ struct GroupInviteCard: View {
                     .buttonStyle(.plain)
                     .disabled(isResponding)
                 }
+                .padding(.horizontal, Theme.Spacing.sm)
+                .padding(.vertical, Theme.Spacing.sm)
             }
-            .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.bottom, Theme.Spacing.sm)
-            .padding(.top, 2)
         }
         .background(
             RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
@@ -164,5 +177,20 @@ struct GroupInviteCard: View {
             RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
                 .stroke(Theme.Colors.border.opacity(0.5), lineWidth: 0.5)
         )
+        .sheet(isPresented: $showPreview) {
+            GroupInvitePreviewSheet(
+                groupId: group.id,
+                onAccept: {
+                    isResponding = true
+                    onAccept()
+                },
+                onDecline: {
+                    isResponding = true
+                    onDecline()
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
     }
 }

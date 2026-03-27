@@ -86,6 +86,7 @@
 		9B68501F3F9105CF25668A3A /* ContactPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D392FFBFA41DB94F99E14E09 /* ContactPicker.swift */; };
 		9C4B34C6F57042927F930415 /* GroupStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DE09CCDB99795D271DDAD5 /* GroupStatsView.swift */; };
 		9E72702398FD0A62ABC50C5B /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EDAABF8B93412395C477350 /* ViewModifiers.swift */; };
+		9FBB45CC96A2E7F71C5013D2 /* GroupInvitePreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB83C739BF047B0D25687FA /* GroupInvitePreviewSheet.swift */; };
 		A145154DBEE35DEBC0B93B9D /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B0C917F3210D3DEE57EA0F /* SupabaseService.swift */; };
 		A2079F91698C1D93D4095B14 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5172697AF06B732769EEB48D /* Conversation.swift */; };
 		A25F897E22AE83280EA23650 /* HomeDataProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5EB8337036912A556D1B42 /* HomeDataProviding.swift */; };
@@ -297,6 +298,7 @@
 		A3EBA617F8648EB89DD27D6A /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTestHelpers.swift; sourceTree = "<group>"; };
 		AC348B1DF846B0EA1FED19F6 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
+		ACB83C739BF047B0D25687FA /* GroupInvitePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupInvitePreviewSheet.swift; sourceTree = "<group>"; };
 		AFAFBC98FCB83FD971A6F753 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		AFCD7292A0C4E019CD712C73 /* CreateEventViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventViewModelTests.swift; sourceTree = "<group>"; };
 		B28400BD598D5C4BB6D33C6F /* GroupDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupDetailView.swift; sourceTree = "<group>"; };
@@ -505,6 +507,7 @@
 				D468AF0B1FB54A10EF29F05F /* GroupedGuestSection.swift */,
 				9980167E08A72DABE640CA43 /* GroupInviteCard.swift */,
 				D228F05B144DFA7F9153F20B /* GroupInviteMessageCard.swift */,
+				ACB83C739BF047B0D25687FA /* GroupInvitePreviewSheet.swift */,
 				9CD8ECB4FD6B977AC4080015 /* InviteLinkSheet.swift */,
 				3156D065E97CAE4F24885443 /* InviteMessageCard.swift */,
 				D72031D7106E225252F4D3BC /* ListEventCard.swift */,
@@ -943,6 +946,7 @@
 				08A6E2DEB261C7D78480D0D1 /* GroupDetailViewModel.swift in Sources */,
 				D94640388C537F8DD69FD0B5 /* GroupInviteCard.swift in Sources */,
 				FBF68624C5E823F75E7CD1D6 /* GroupInviteMessageCard.swift in Sources */,
+				9FBB45CC96A2E7F71C5013D2 /* GroupInvitePreviewSheet.swift in Sources */,
 				801F62917586BF780DFD31E7 /* GroupMessage.swift in Sources */,
 				DB72C1DD32762AF82DCBBDCD /* GroupPickerSheet.swift in Sources */,
 				D7358196973474782DD6ABDD /* GroupPlayHistoryView.swift in Sources */,

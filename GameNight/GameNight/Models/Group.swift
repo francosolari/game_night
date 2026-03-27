@@ -113,3 +113,53 @@ struct GroupMember: Identifiable, Codable, Hashable {
         addedAt: Date()
     )
 }
+
+// MARK: - Group Invite Preview (from RPC)
+
+struct GroupInvitePreview: Codable {
+    let group: GroupPreviewInfo
+    let owner: GroupMemberPreview
+    let members: [GroupMemberPreview]
+
+    /// Total count including the owner
+    var totalMemberCount: Int { members.count + 1 }
+}
+
+struct GroupPreviewInfo: Codable {
+    let id: UUID
+    let name: String
+    let emoji: String
+    let description: String?
+    let ownerId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, emoji, description
+        case ownerId = "owner_id"
+    }
+}
+
+struct GroupMemberPreview: Codable, Identifiable {
+    let id: UUID
+    let displayName: String
+    let avatarUrl: String?
+    let topGames: [GamePreviewInfo]
+
+    var userId: UUID? { nil }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+        case topGames = "top_games"
+    }
+}
+
+struct GamePreviewInfo: Codable {
+    let name: String
+    let thumbnailUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case thumbnailUrl = "thumbnail_url"
+    }
+}
