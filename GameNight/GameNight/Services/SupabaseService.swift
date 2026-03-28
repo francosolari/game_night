@@ -1169,26 +1169,26 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         }
     }
 
-    func fetchGamesByDesigner(name: String, limit: Int? = 50) async throws -> [Game] {
-        var query = client
-            .from("games")
-            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
-            .contains("designers", value: [name])
+    func fetchGamesByDesigner(name: String) async throws -> [Game] {
+        try await client
+            .from("game_creators")
+            .select("id:game_id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
+            .eq("creator_name", value: name)
+            .eq("creator_role", value: "designer")
             .order("bgg_rating", ascending: false)
-        if let limit { query = query.limit(limit) }
-        let games: [Game] = try await query.execute().value
-        return games
+            .execute()
+            .value
     }
 
-    func fetchGamesByPublisher(name: String, limit: Int? = 50) async throws -> [Game] {
-        var query = client
-            .from("games")
-            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
-            .contains("publishers", value: [name])
+    func fetchGamesByPublisher(name: String) async throws -> [Game] {
+        try await client
+            .from("game_creators")
+            .select("id:game_id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
+            .eq("creator_name", value: name)
+            .eq("creator_role", value: "publisher")
             .order("bgg_rating", ascending: false)
-        if let limit { query = query.limit(limit) }
-        let games: [Game] = try await query.execute().value
-        return games
+            .execute()
+            .value
     }
 
     // MARK: - Categories

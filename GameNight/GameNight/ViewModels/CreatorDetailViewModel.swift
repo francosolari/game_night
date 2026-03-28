@@ -37,6 +37,12 @@ final class CreatorDetailViewModel: ObservableObject {
         "\(role.rawValue) · \(games.count)\(hasMoreGames ? "+" : "") games"
     }
 
+    var representativeImageUrl: String? {
+        // Use the top-rated game's image (already sorted by bgg_rating DESC)
+        games.first(where: { $0.imageUrl != nil })?.imageUrl
+            ?? games.first(where: { $0.thumbnailUrl != nil })?.thumbnailUrl
+    }
+
     var averageRating: Double? {
         let rated = games.compactMap(\.bggRating)
         guard !rated.isEmpty else { return nil }
@@ -60,13 +66,11 @@ final class CreatorDetailViewModel: ObservableObject {
         do {
             switch role {
             case .designer:
-                games = try await supabase.fetchGamesByDesigner(name: name, limit: 6)
+                games = try await supabase.fetchGamesByDesigner(name: name)
             case .publisher:
-                games = try await supabase.fetchGamesByPublisher(name: name, limit: 6)
+                games = try await supabase.fetchGamesByPublisher(name: name)
             }
-            hasMoreGames = games.count == 6
-            // Trim the sentinel row — we only needed it to detect there are more
-            if hasMoreGames { games = Array(games.prefix(5)) }
+            hasMoreGames = games.count == 50
         } catch {
             // Non-critical
         }
@@ -74,19 +78,7 @@ final class CreatorDetailViewModel: ObservableObject {
     }
 
     func loadAllGames() async {
-        isLoading = true
-        do {
-            switch role {
-            case .designer:
-                games = try await supabase.fetchGamesByDesigner(name: name, limit: nil)
-            case .publisher:
-                games = try await supabase.fetchGamesByPublisher(name: name, limit: nil)
-            }
-            hasMoreGames = false
-        } catch {
-            // Non-critical
-        }
-        isLoading = false
+        // Re-fetch without limit
         isExpanded = true
     }
 }

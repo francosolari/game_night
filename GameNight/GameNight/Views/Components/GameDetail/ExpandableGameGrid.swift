@@ -44,9 +44,9 @@ struct ExpandableGameGrid: View {
                                         .font(Theme.Typography.caption)
                                         .foregroundColor(Theme.Colors.textTertiary)
                                 }
-                                Text(String(format: "%.1f", game.complexity))
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.textTertiary)
+                                if game.complexity > 0 {
+                                    WeightDisplay(weight: game.complexity)
+                                }
                             }
                         }
 

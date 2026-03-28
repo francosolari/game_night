@@ -79,6 +79,13 @@ final class GameDetailViewModel: ObservableObject {
     private func hydrateFromBGGIfNeeded() async throws {
         guard let bggId = game.bggId else { return }
 
+        // Skip hydration if the game is already fully populated.
+        // Key signal: description + at least one mechanic/category means BGG data is present.
+        let isHydrated = game.description != nil
+            && !game.mechanics.isEmpty
+            && !game.categories.isEmpty
+        if isHydrated { return }
+
         let parseResult = try await bgg.fetchGameDetailsWithRelations(bggId: bggId)
         let savedGame = try await supabase.upsertGame(
             Game(

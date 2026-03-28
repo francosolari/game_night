@@ -16,7 +16,7 @@ struct CreatorDetailContent: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                 // 1. Hero with initials
                 DetailHeroImage(
-                    imageUrl: nil,
+                    imageUrl: viewModel.representativeImageUrl,
                     fallbackInitials: initials,
                     gradientColors: [Theme.Colors.accent.opacity(0.6), Theme.Colors.primary.opacity(0.4)]
                 )
@@ -53,27 +53,11 @@ struct CreatorDetailContent: View {
                             selected: $viewModel.sortMode
                         )
 
-                        // 5. Game grid
+                        // 5. Game grid (ExpandableGameGrid handles show/hide internally)
                         ExpandableGameGrid(
-                            games: viewModel.displayedGames,
+                            games: viewModel.games,
                             sortMode: viewModel.sortMode
                         )
-
-                        if viewModel.showExpandButton {
-                            Button {
-                                Task { await viewModel.loadAllGames() }
-                            } label: {
-                                Text("Show All Games")
-                                    .font(Theme.Typography.calloutMedium)
-                                    .foregroundColor(Theme.Colors.primary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(Theme.Spacing.md)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                                            .fill(Theme.Colors.primary.opacity(0.1))
-                                    )
-                            }
-                        }
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
