@@ -6,6 +6,7 @@ struct GameLibraryView: View {
     @State private var showImportBGG = false
     @State private var showCreateCategory = false
     @State private var showLogPlay = false
+    @State private var showingWishlist = false
 
     var body: some View {
         NavigationStack {
@@ -63,24 +64,43 @@ struct GameLibraryView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: Theme.Spacing.sm) {
                             Button {
+                                showingWishlist = false
                                 viewModel.selectedCategory = nil
                             } label: {
                                 Text("All (\(viewModel.libraryEntries.count))")
                                     .chipStyle(
                                         color: Theme.Colors.primary,
-                                        isSelected: viewModel.selectedCategory == nil
+                                        isSelected: !showingWishlist && viewModel.selectedCategory == nil
                                     )
+                            }
+
+                            if !viewModel.wishlistEntries.isEmpty {
+                                Button {
+                                    showingWishlist = true
+                                    viewModel.selectedCategory = nil
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "heart.fill")
+                                            .font(.system(size: 11))
+                                        Text("Wishlist (\(viewModel.wishlistEntries.count))")
+                                    }
+                                    .chipStyle(
+                                        color: Theme.Colors.primary,
+                                        isSelected: showingWishlist
+                                    )
+                                }
                             }
 
                             ForEach(viewModel.categories) { category in
                                 let count = viewModel.countForCategory(category.id)
                                 Button {
+                                    showingWishlist = false
                                     viewModel.selectedCategory = category
                                 } label: {
                                     Text("\(category.name) (\(count))")
                                         .chipStyle(
                                             color: Theme.Colors.primary,
-                                            isSelected: viewModel.selectedCategory?.id == category.id
+                                            isSelected: !showingWishlist && viewModel.selectedCategory?.id == category.id
                                         )
                                 }
                             }
@@ -114,6 +134,8 @@ struct GameLibraryView: View {
                         LibrarySearchResultsView(viewModel: viewModel)
                             .padding(.top, Theme.Spacing.sm)
                     }
+                } else if showingWishlist {
+                    WishlistSectionView(viewModel: viewModel)
                 } else if viewModel.filteredEntries.isEmpty {
                     Spacer()
                     if viewModel.selectedCategory != nil {
@@ -595,6 +617,98 @@ struct ImportBGGSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Wishlist Section
+
+struct WishlistSectionView: View {
+    @ObservedObject var viewModel: GameLibraryViewModel
+
+    var body: some View {
+        if viewModel.wishlistEntries.isEmpty {
+            Spacer()
+            EmptyStateView(
+                icon: "heart",
+                title: "No Wishlist Items",
+                message: "Search for games and tap the heart to add them to your wishlist."
+            )
+            Spacer()
+        } else {
+            ScrollView {
+                LazyVStack(spacing: Theme.Spacing.md) {
+                    ForEach(viewModel.wishlistEntries) { entry in
+                        if let game = entry.game {
+                            NavigationLink(value: game) {
+                                WishlistGameCard(game: game) {
+                                    Task { await viewModel.removeFromWishlist(entryId: entry.id) }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.top, Theme.Spacing.sm)
+                .padding(.bottom, 100)
+            }
+        }
+    }
+}
+
+// MARK: - Wishlist Game Card
+
+struct WishlistGameCard: View {
+    let game: Game
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            GameThumbnail(url: game.imageUrl ?? game.thumbnailUrl, size: 72)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(game.name)
+                    .font(Theme.Typography.titleMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                if let year = game.yearPublished {
+                    Text("(\(String(year)))")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
+
+                HStack(spacing: Theme.Spacing.md) {
+                    Label(game.playerCountDisplay, systemImage: "person.2.fill")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textSecondary)
+
+                    Label(game.playtimeDisplay, systemImage: "clock.fill")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textSecondary)
+                }
+
+                if game.complexity > 0 {
+                    ComplexityBadge(weight: game.complexity)
+                }
+            }
+
+            Spacer()
+
+            VStack(spacing: Theme.Spacing.sm) {
+                if let rating = game.bggRating {
+                    RatingBadge(rating: rating, size: .small)
+                }
+
+                Button(action: onRemove) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(Theme.Colors.primary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .cardStyle()
     }
 }
 

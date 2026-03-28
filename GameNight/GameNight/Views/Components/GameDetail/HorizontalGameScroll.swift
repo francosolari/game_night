@@ -3,6 +3,7 @@ import SwiftUI
 struct HorizontalGameScroll: View {
     let title: String
     let games: [Game]
+    var contentPadding: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
@@ -11,6 +12,7 @@ struct HorizontalGameScroll: View {
                     .font(Theme.Typography.label)
                     .foregroundColor(Theme.Colors.textTertiary)
                     .textCase(.uppercase)
+                    .padding(.leading, contentPadding)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -36,6 +38,7 @@ struct HorizontalGameScroll: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, contentPadding)
             }
         }
     }

@@ -60,11 +60,13 @@ final class CreatorDetailViewModel: ObservableObject {
         do {
             switch role {
             case .designer:
-                games = try await supabase.fetchGamesByDesigner(name: name)
+                games = try await supabase.fetchGamesByDesigner(name: name, limit: 6)
             case .publisher:
-                games = try await supabase.fetchGamesByPublisher(name: name)
+                games = try await supabase.fetchGamesByPublisher(name: name, limit: 6)
             }
-            hasMoreGames = games.count == 50
+            hasMoreGames = games.count == 6
+            // Trim the sentinel row — we only needed it to detect there are more
+            if hasMoreGames { games = Array(games.prefix(5)) }
         } catch {
             // Non-critical
         }
@@ -72,8 +74,19 @@ final class CreatorDetailViewModel: ObservableObject {
     }
 
     func loadAllGames() async {
-        // Re-fetch without limit — requires adding unlimited fetch methods
-        // For now, the initial 50 is sufficient
+        isLoading = true
+        do {
+            switch role {
+            case .designer:
+                games = try await supabase.fetchGamesByDesigner(name: name, limit: nil)
+            case .publisher:
+                games = try await supabase.fetchGamesByPublisher(name: name, limit: nil)
+            }
+            hasMoreGames = false
+        } catch {
+            // Non-critical
+        }
+        isLoading = false
         isExpanded = true
     }
 }

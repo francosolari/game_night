@@ -1169,27 +1169,25 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         }
     }
 
-    func fetchGamesByDesigner(name: String) async throws -> [Game] {
-        let games: [Game] = try await client
+    func fetchGamesByDesigner(name: String, limit: Int? = 50) async throws -> [Game] {
+        var query = client
             .from("games")
-            .select()
+            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
             .contains("designers", value: [name])
             .order("bgg_rating", ascending: false)
-            .limit(50)
-            .execute()
-            .value
+        if let limit { query = query.limit(limit) }
+        let games: [Game] = try await query.execute().value
         return games
     }
 
-    func fetchGamesByPublisher(name: String) async throws -> [Game] {
-        let games: [Game] = try await client
+    func fetchGamesByPublisher(name: String, limit: Int? = 50) async throws -> [Game] {
+        var query = client
             .from("games")
-            .select()
+            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
             .contains("publishers", value: [name])
             .order("bgg_rating", ascending: false)
-            .limit(50)
-            .execute()
-            .value
+        if let limit { query = query.limit(limit) }
+        let games: [Game] = try await query.execute().value
         return games
     }
 

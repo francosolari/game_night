@@ -216,52 +216,57 @@ struct GameDetailView: View {
                         }
                     }
 
-                    // 7. Family links
-                    if !isEditingManualGame {
-                        ForEach(visibleFamilies, id: \.family.id) { familyData in
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                NavigationLink(
-                                    value: GameFamilyDestination(
-                                        family: familyData.family,
-                                        games: familyData.games
-                                    )
-                                ) {
-                                    HStack(spacing: Theme.Spacing.sm) {
-                                        Text("Part of \(familyData.family.name)")
-                                            .font(Theme.Typography.label)
-                                            .foregroundColor(Theme.Colors.accent)
-                                            .textCase(.uppercase)
-
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundColor(Theme.Colors.textTertiary)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-
-                                HorizontalGameScroll(
-                                    title: "",
-                                    games: familyData.games.filter { $0.id != displayedGame.id }
-                                )
-                            }
-                        }
-
-                        if hiddenFamilyCount > 0 {
-                            Text("+ \(hiddenFamilyCount) more series")
-                                .font(Theme.Typography.callout)
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        }
-                    }
-
-                    // 8. Expansions
-                    if !isEditingManualGame, !viewModel.expansions.isEmpty {
-                        HorizontalGameScroll(
-                            title: "Expansions",
-                            games: viewModel.expansions
-                        )
-                    }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
+
+                // 7. Family links (edge-to-edge horizontal scroll)
+                if !isEditingManualGame {
+                    ForEach(visibleFamilies, id: \.family.id) { familyData in
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            NavigationLink(
+                                value: GameFamilyDestination(
+                                    family: familyData.family,
+                                    games: familyData.games
+                                )
+                            ) {
+                                HStack(spacing: Theme.Spacing.sm) {
+                                    Text("Part of \(familyData.family.name)")
+                                        .font(Theme.Typography.label)
+                                        .foregroundColor(Theme.Colors.accent)
+                                        .textCase(.uppercase)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, Theme.Spacing.xl)
+
+                            HorizontalGameScroll(
+                                title: "",
+                                games: familyData.games.filter { $0.id != displayedGame.id },
+                                contentPadding: Theme.Spacing.xl
+                            )
+                        }
+                    }
+
+                    if hiddenFamilyCount > 0 {
+                        Text("+ \(hiddenFamilyCount) more series")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .padding(.horizontal, Theme.Spacing.xl)
+                    }
+                }
+
+                // 8. Expansions (edge-to-edge horizontal scroll)
+                if !isEditingManualGame, !viewModel.expansions.isEmpty {
+                    HorizontalGameScroll(
+                        title: "Expansions",
+                        games: viewModel.expansions,
+                        contentPadding: Theme.Spacing.xl
+                    )
+                }
             }
             .padding(.bottom, 160)
         }

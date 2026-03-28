@@ -55,9 +55,25 @@ struct CreatorDetailContent: View {
 
                         // 5. Game grid
                         ExpandableGameGrid(
-                            games: viewModel.games,
+                            games: viewModel.displayedGames,
                             sortMode: viewModel.sortMode
                         )
+
+                        if viewModel.showExpandButton {
+                            Button {
+                                Task { await viewModel.loadAllGames() }
+                            } label: {
+                                Text("Show All Games")
+                                    .font(Theme.Typography.calloutMedium)
+                                    .foregroundColor(Theme.Colors.primary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(Theme.Spacing.md)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                            .fill(Theme.Colors.primary.opacity(0.1))
+                                    )
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)

@@ -13,6 +13,7 @@ struct AvatarUploadView: View {
     @State private var showCropSheet = false
     @State private var errorToast: ToastItem?
     @State private var isDeleting = false
+    @State private var displayUrl: String?
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -21,7 +22,7 @@ struct AvatarUploadView: View {
                     selection: $selectedItem,
                     matching: .images,
                     label: {
-                        AvatarView(url: currentAvatarUrl, size: 80)
+                        AvatarView(url: displayUrl, size: 80)
                     }
                 )
 
@@ -86,9 +87,13 @@ struct AvatarUploadView: View {
         }
         .onChange(of: avatarUploadViewModel.uploadedImageUrl) {
             if let url = avatarUploadViewModel.uploadedImageUrl {
+                displayUrl = url
                 onAvatarUpdated(url)
                 selectedImage = nil
             }
+        }
+        .onAppear {
+            displayUrl = currentAvatarUrl
         }
         .toast($errorToast)
     }
@@ -120,6 +125,7 @@ struct AvatarUploadView: View {
             user.avatarUrl = nil
             try await SupabaseService.shared.updateUser(user)
 
+            displayUrl = nil
             onAvatarDeleted()
         } catch {
             errorToast = ToastItem(style: .error, message: "Failed to delete picture")
@@ -136,8 +142,25 @@ struct CircularCropView: View {
     let onCrop: (UIImage) -> Void
 
     @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
     let circleSize: CGFloat = 280
+
+    /// The display size of the image when it fills the circle (scaledToFill behavior).
+    private var baseFillSize: CGSize {
+        guard image.size.width > 0, image.size.height > 0 else {
+            return CGSize(width: circleSize, height: circleSize)
+        }
+        let imageAspect = image.size.width / image.size.height
+        if imageAspect > 1.0 {
+            // Landscape — height matches circle, width overflows
+            return CGSize(width: circleSize * imageAspect, height: circleSize)
+        } else {
+            // Portrait — width matches circle, height overflows
+            return CGSize(width: circleSize, height: circleSize / imageAspect)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -147,21 +170,31 @@ struct CircularCropView: View {
                     .foregroundColor(Theme.Colors.textPrimary)
 
                 ZStack {
-                    // Image with pinch-to-zoom
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
+                        .frame(width: circleSize, height: circleSize)
                         .scaleEffect(scale)
                         .offset(offset)
                         .gesture(
                             SimultaneousGesture(
                                 MagnificationGesture()
                                     .onChanged { value in
-                                        scale = value
+                                        scale = lastScale * value
+                                    }
+                                    .onEnded { _ in
+                                        scale = max(scale, 1.0)
+                                        lastScale = scale
                                     },
                                 DragGesture()
                                     .onChanged { value in
-                                        offset = value.translation
+                                        offset = CGSize(
+                                            width: lastOffset.width + value.translation.width,
+                                            height: lastOffset.height + value.translation.height
+                                        )
+                                    }
+                                    .onEnded { _ in
+                                        lastOffset = offset
                                     }
                             )
                         )
@@ -171,10 +204,8 @@ struct CircularCropView: View {
                         .stroke(Theme.Colors.primaryAction, lineWidth: 2)
                         .frame(width: circleSize, height: circleSize)
                 }
-                .frame(height: 400)
-                .background(Theme.Colors.backgroundElevated)
-                .clipShape(Circle())
                 .frame(width: circleSize, height: circleSize)
+                .clipShape(Circle())
 
                 Spacer()
 
@@ -196,25 +227,29 @@ struct CircularCropView: View {
     }
 
     private func cropAndDismiss() {
-        let cropSize = circleSize
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: cropSize, height: cropSize))
+        // Render at 2x for retina quality
+        let outputSize = circleSize * 2
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: outputSize, height: outputSize))
 
-        let croppedImage = renderer.image { context in
-            let drawRect = CGRect(x: 0, y: 0, width: cropSize, height: cropSize)
-
-            // Draw clipped circle
-            context.cgContext.setFillColor(UIColor.black.cgColor)
-            context.cgContext.fillEllipse(in: drawRect)
-            context.cgContext.setBlendMode(.sourceIn)
-
-            // Draw scaled and offset image
-            let scaledSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-            let drawOrigin = CGPoint(
-                x: (cropSize - scaledSize.width) / 2 + offset.width,
-                y: (cropSize - scaledSize.height) / 2 + offset.height
+        let croppedImage = renderer.image { _ in
+            // Calculate scaled display size matching what's on screen
+            let displaySize = CGSize(
+                width: baseFillSize.width * scale,
+                height: baseFillSize.height * scale
             )
 
-            image.draw(in: CGRect(origin: drawOrigin, size: scaledSize))
+            // Map to output coordinates (2x of screen points)
+            let scaleFactor: CGFloat = outputSize / circleSize
+            let drawSize = CGSize(
+                width: displaySize.width * scaleFactor,
+                height: displaySize.height * scaleFactor
+            )
+            let drawOrigin = CGPoint(
+                x: (outputSize - drawSize.width) / 2 + offset.width * scaleFactor,
+                y: (outputSize - drawSize.height) / 2 + offset.height * scaleFactor
+            )
+
+            image.draw(in: CGRect(origin: drawOrigin, size: drawSize))
         }
 
         onCrop(croppedImage)
