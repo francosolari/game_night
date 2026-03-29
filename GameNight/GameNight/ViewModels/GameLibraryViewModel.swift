@@ -35,6 +35,10 @@ final class GameLibraryViewModel: ObservableObject {
     private var searchTask: Task<Void, Never>?
     private var cacheSearchTask: Task<Void, Never>?
     private var selectedGameParseResult: BGGGameParseResult?
+    private var normalizedSearchQuery: String {
+        searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    var hasActiveSearchQuery: Bool { !normalizedSearchQuery.isEmpty }
 
     var filteredEntries: [GameLibraryEntry] {
         var entries = libraryEntries
@@ -43,9 +47,10 @@ final class GameLibraryViewModel: ObservableObject {
             entries = entries.filter { $0.categoryId == category.id }
         }
 
-        if !searchQuery.isEmpty {
+        let query = normalizedSearchQuery
+        if !query.isEmpty {
             entries = entries.filter { entry in
-                entry.game?.name.localizedCaseInsensitiveContains(searchQuery) ?? false
+                entry.game?.name.localizedCaseInsensitiveContains(query) ?? false
             }
         }
 
@@ -147,17 +152,23 @@ final class GameLibraryViewModel: ObservableObject {
     func searchCachedGames() {
         cacheSearchTask?.cancel()
         cacheSearchTask = Task {
-            guard !searchQuery.isEmpty else {
+            let query = normalizedSearchQuery
+            guard query.count >= 3 else {
                 cachedGameResults = []
                 return
             }
-            try? await Task.sleep(nanoseconds: 150_000_000)
+            try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled else { return }
             isSearchingCache = true
             do {
-                cachedGameResults = try await supabase.searchCachedGames(query: searchQuery)
+                cachedGameResults = try await supabase.searchCachedGames(query: query)
+                print("[GameSearch] query=\(query) results=\(cachedGameResults.count)")
             } catch {
-                if !Task.isCancelled { cachedGameResults = [] }
+                if !Task.isCancelled {
+                    cachedGameResults = []
+                    print("[GameSearch] query=\(query) failed: \(error.localizedDescription)")
+                    self.toast = ToastItem(style: .error, message: "Game search failed. Please try again.")
+                }
             }
             isSearchingCache = false
         }

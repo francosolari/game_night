@@ -1221,6 +1221,10 @@ private final class StubGameDetailDataProvider: GameDetailDataProviding {
         self.expansions = expansions
     }
 
+    func fetchGame(id: UUID) async throws -> Game? {
+        nil
+    }
+
     func upsertGame(_ game: Game) async throws -> Game {
         upsertedGames.append(game)
         if let bggId = game.bggId, let result = upsertResults[bggId] {

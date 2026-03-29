@@ -844,9 +844,21 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Games
 
+    func fetchGame(id: UUID) async throws -> Game? {
+        let games: [Game] = try await client
+            .from("games")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return games.first
+    }
+
     /// Search the cached BGG games table by name (local-first, no BGG API call).
     func searchCachedGames(query: String) async throws -> [Game] {
-        guard !query.isEmpty else { return [] }
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.isEmpty else { return [] }
 
         struct SearchGamesFuzzyParams: Encodable {
             let searchQuery: String
@@ -860,8 +872,8 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let games: [Game] = try await client
             .rpc("search_games_fuzzy", params: SearchGamesFuzzyParams(
-                searchQuery: query,
-                resultLimit: 20
+                searchQuery: normalizedQuery,
+                resultLimit: 100
             ))
             .execute()
             .value

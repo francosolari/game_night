@@ -129,7 +129,7 @@ struct GameLibraryView: View {
                         .padding(.horizontal, Theme.Spacing.xl)
                         .padding(.top, Theme.Spacing.sm)
                     }
-                } else if !viewModel.searchQuery.isEmpty {
+                } else if viewModel.hasActiveSearchQuery {
                     ScrollView {
                         LibrarySearchResultsView(viewModel: viewModel)
                             .padding(.top, Theme.Spacing.sm)
@@ -343,9 +343,18 @@ struct LibrarySearchResultsView: View {
                         .tint(Theme.Colors.primary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Theme.Spacing.md)
+                } else if viewModel.cachedGameResults.isEmpty {
+                    HStack {
+                        Text("No results in cache")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.vertical, Theme.Spacing.sm)
                 } else if newCachedGames.isEmpty {
                     HStack {
-                        Text("No other results in cache")
+                        Text("All matching cache results are already in your library")
                             .font(Theme.Typography.caption)
                             .foregroundColor(Theme.Colors.textTertiary)
                         Spacer()
