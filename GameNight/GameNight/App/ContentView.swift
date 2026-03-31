@@ -15,8 +15,11 @@ struct MainTabView: View {
                         .navigationDestination(for: GameEvent.self) { event in
                             EventDetailView(eventId: event.id)
                         }
-                        .navigationDestination(for: CalendarDestination.self) { _ in
-                            CalendarView(navigationPath: $homeNavigationPath)
+                        .navigationDestination(for: CalendarDestination.self) { dest in
+                            CalendarView(
+                                navigationPath: $homeNavigationPath,
+                                defaultViewMode: dest.startInListMode ? .list : .calendar
+                            )
                         }
                         .navigationDestination(for: Game.self) { game in
                             GameDetailView(game: game)
@@ -106,6 +109,13 @@ struct MainTabView: View {
             appState.deepLinkEventId = nil
             appState.selectedTab = .home
             homeNavigationPath.append(HomeDestination.eventDetail(uuid))
+        }
+        .onChange(of: appState.navigateToCalendar) { _, newValue in
+            if newValue {
+                appState.navigateToCalendar = false
+                appState.selectedTab = .home
+                homeNavigationPath.append(CalendarDestination(startInListMode: true))
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .pushNotificationTapped)) { note in
             if let eventId = note.userInfo?["event_id"] as? String,

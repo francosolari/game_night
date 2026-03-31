@@ -8,7 +8,6 @@ struct ProfileView: View {
     @State private var showBGGLink = false
     @State private var showPrivacy = false
     @State private var showContacts = false
-    @State private var showEventHistory = false
     @State private var showNotificationSettings = false
 
     var body: some View {
@@ -51,9 +50,6 @@ struct ProfileView: View {
             }
             .navigationDestination(isPresented: $showContacts) {
                 MyContactsView()
-            }
-            .navigationDestination(isPresented: $showEventHistory) {
-                ProfileEventHistoryView()
             }
             .navigationDestination(isPresented: $showNotificationSettings) {
                 NotificationSettingsView()
@@ -185,7 +181,7 @@ struct ProfileView: View {
                 Spacer()
 
                 Button("View All") {
-                    showEventHistory = true
+                    appState.navigateToCalendar = true
                 }
                 .font(Theme.Typography.bodySemibold)
                 .foregroundColor(Theme.Colors.primaryAction)

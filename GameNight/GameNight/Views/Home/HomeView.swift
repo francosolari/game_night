@@ -238,6 +238,12 @@ struct HomeView: View {
                             }
                             .buttonStyle(PrimaryButtonStyle())
                             .padding(.horizontal, Theme.Spacing.jumbo)
+
+                            Button("View All Events") {
+                                navigationPath.append(CalendarDestination())
+                            }
+                            .font(Theme.Typography.bodySemibold)
+                            .foregroundColor(Theme.Colors.primaryAction)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, Theme.Spacing.xl)
@@ -520,7 +526,9 @@ extension GameEvent: Hashable {
 }
 
 // MARK: - Calendar Navigation Destination
-struct CalendarDestination: Hashable {}
+struct CalendarDestination: Hashable {
+    var startInListMode: Bool = false
+}
 
 // MARK: - Home Navigation Destinations
 enum HomeDestination: Hashable {

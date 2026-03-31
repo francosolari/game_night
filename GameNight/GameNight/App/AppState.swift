@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     @Published var unreadNotificationCount: Int = 0
     @Published var unreadMessageCount: Int = 0
     @Published var preloadedHomeSnapshot: HomeDataLoadSnapshot?
+    @Published var navigateToCalendar = false
 
     /// Maps digits-only phone number → the current user's contact name for that person.
     /// Used to show contact names instead of app display names for people in your address book.

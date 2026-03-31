@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - When doing UI Elements reference the BrandGuidelines and support light and dark mode
 - For interactive elements be sure to add toasts where necessary
 - When doing any RLS policies reference (`.agents/skills/supabase-audit-rls/`) to validate 
+- xcodegen and xcodebuild to verify iOS changes
 
 ## Project Overview
 
