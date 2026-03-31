@@ -1183,22 +1183,16 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchGamesByDesigner(name: String) async throws -> [Game] {
         try await client
-            .from("game_creators")
-            .select("id:game_id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
-            .eq("creator_name", value: name)
-            .eq("creator_role", value: "designer")
-            .order("bgg_rating", ascending: false)
+            .rpc("fetch_games_by_designer", params: ["designer_name": name])
+            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
             .execute()
             .value
     }
 
     func fetchGamesByPublisher(name: String) async throws -> [Game] {
         try await client
-            .from("game_creators")
-            .select("id:game_id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
-            .eq("creator_name", value: name)
-            .eq("creator_role", value: "publisher")
-            .order("bgg_rating", ascending: false)
+            .rpc("fetch_games_by_publisher", params: ["publisher_name": name])
+            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
             .execute()
             .value
     }
