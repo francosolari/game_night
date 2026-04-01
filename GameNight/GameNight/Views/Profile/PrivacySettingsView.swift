@@ -4,6 +4,7 @@ struct PrivacySettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var phoneVisible: Bool = false
     @State private var discoverableByPhone: Bool = true
+    @State private var gameLibraryPublic: Bool = true
     @State private var marketingOptIn: Bool = false
     @State private var showBlockedUsers = false
     @State private var showDeleteConfirm = false
@@ -52,6 +53,19 @@ struct PrivacySettingsView: View {
                         title: "Discoverable by phone number",
                         description: "Friends who have your number can find you on Game Night",
                         isOn: $discoverableByPhone
+                    )
+                }
+                .cardStyle()
+
+                // Game Library
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    SectionHeader(title: "Game Library")
+
+                    PrivacyToggle(
+                        icon: "books.vertical.fill",
+                        title: "Game library visible to others",
+                        description: "Group members can see your game collection on your profile",
+                        isOn: $gameLibraryPublic
                     )
                 }
                 .cardStyle()
@@ -211,6 +225,7 @@ struct PrivacySettingsView: View {
         .onAppear {
             phoneVisible = appState.currentUser?.phoneVisible ?? false
             discoverableByPhone = appState.currentUser?.discoverableByPhone ?? true
+            gameLibraryPublic = appState.currentUser?.gameLibraryPublic ?? true
             marketingOptIn = appState.currentUser?.marketingOptIn ?? false
         }
     }
@@ -220,6 +235,7 @@ struct PrivacySettingsView: View {
         isSaving = true
         user.phoneVisible = phoneVisible
         user.discoverableByPhone = discoverableByPhone
+        user.gameLibraryPublic = gameLibraryPublic
         user.marketingOptIn = marketingOptIn
         try? await SupabaseService.shared.updateUser(user)
         appState.currentUser = user

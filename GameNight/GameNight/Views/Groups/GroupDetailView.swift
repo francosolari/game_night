@@ -7,6 +7,7 @@ struct GroupDetailView: View {
     @State private var showPlayLogging = false
     @State private var showDeleteConfirmation = false
     @State private var toast: ToastItem?
+    @State private var hasLoadedData = false
     @Environment(\.dismiss) private var dismiss
 
     init(group: GameGroup) {
@@ -160,6 +161,8 @@ struct GroupDetailView: View {
             Text("This will permanently delete the group, all members, and chat history. This can't be undone.")
         }
         .task {
+            guard !hasLoadedData else { return }
+            hasLoadedData = true
             await viewModel.loadAllData()
             viewModel.subscribeToChatUpdates()
         }
@@ -172,38 +175,41 @@ struct GroupDetailView: View {
         viewModel.group.ownerId == appState.currentUser?.id
     }
 
+    private var currentUserCanManage: Bool {
+        guard let userId = appState.currentUser?.id else { return false }
+        if viewModel.group.ownerId == userId { return true }
+        return viewModel.group.members.first(where: { $0.userId == userId })?.role == .coOwner
+    }
+
     // MARK: - Members Tab
 
     private var membersTab: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            Button {
-                showAddMembers = true
-            } label: {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "person.badge.plus")
-                        .font(.system(size: 14))
-                    Text("Add Members")
-                        .font(Theme.Typography.calloutMedium)
+            if currentUserCanManage {
+                Button {
+                    showAddMembers = true
+                } label: {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Image(systemName: "person.badge.plus")
+                            .font(.system(size: 14))
+                        Text("Add Members")
+                            .font(Theme.Typography.calloutMedium)
+                    }
+                    .foregroundColor(Theme.Colors.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .fill(Theme.Colors.primary.opacity(0.1))
+                    )
                 }
-                .foregroundColor(Theme.Colors.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.md)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                        .fill(Theme.Colors.primary.opacity(0.1))
-                )
             }
 
             // Confirmed members
             let confirmedMembers = viewModel.group.members.filter(\.isAccepted)
             if !confirmedMembers.isEmpty {
                 ForEach(confirmedMembers) { member in
-                    MemberRow(
-                        member: member,
-                        resolvedName: appState.resolveDisplayName(phone: member.phoneNumber, fallback: member.displayName)
-                    ) {
-                        await viewModel.removeMember(id: member.id)
-                    }
+                    memberRow(for: member)
                 }
             }
 
@@ -217,13 +223,8 @@ struct GroupDetailView: View {
                         .padding(.top, Theme.Spacing.xs)
 
                     ForEach(pendingMembers) { member in
-                        MemberRow(
-                            member: member,
-                            resolvedName: appState.resolveDisplayName(phone: member.phoneNumber, fallback: member.displayName)
-                        ) {
-                            await viewModel.removeMember(id: member.id)
-                        }
-                        .opacity(0.65)
+                        memberRow(for: member)
+                            .opacity(0.65)
                     }
                 }
             }
@@ -261,6 +262,32 @@ struct GroupDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func memberRow(for member: GroupMember) -> some View {
+        let row = MemberRow(
+            member: member,
+            resolvedName: appState.resolveDisplayName(phone: member.phoneNumber, fallback: member.displayName),
+            avatarUrl: member.userId.flatMap { viewModel.memberUsers[$0]?.avatarUrl },
+            isGroupOwner: member.userId == viewModel.group.ownerId,
+            isCurrentUserOwnerOrCoOwner: currentUserCanManage,
+            onRoleChange: { role in
+                Task { await viewModel.updateMemberRole(memberId: member.id, role: role) }
+            },
+            onRemove: { await viewModel.removeMember(id: member.id) }
+        )
+
+        if member.userId != nil {
+            NavigationLink {
+                MemberPublicProfileView(member: member, viewModel: viewModel)
+            } label: {
+                row
+            }
+            .buttonStyle(.plain)
+        } else {
+            row
         }
     }
 }

@@ -465,35 +465,81 @@ struct CreateGroupSheet: View {
 }
 
 // MARK: - Member Row
+
 struct MemberRow: View {
     let member: GroupMember
     var resolvedName: String? = nil
-    let onRemove: () async -> Void
+    var avatarUrl: String? = nil
+    var isGroupOwner: Bool = false
+    var isCurrentUserOwnerOrCoOwner: Bool = false
+    var onRoleChange: ((GroupMemberRole) -> Void)? = nil
+    var onRemove: (() async -> Void)? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            AvatarView(url: nil, size: 36)
+            AvatarView(url: avatarUrl, size: 36)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(resolvedName ?? member.displayName ?? "Unknown")
-                    .font(Theme.Typography.bodyMedium)
-                    .foregroundColor(Theme.Colors.textPrimary)
-                Text(member.phoneNumber)
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.textTertiary)
+                HStack(spacing: Theme.Spacing.xs) {
+                    Text(resolvedName ?? member.displayName ?? "Unknown")
+                        .font(Theme.Typography.bodyMedium)
+                        .foregroundColor(Theme.Colors.textPrimary)
+
+                    if isGroupOwner {
+                        RoleBadge(text: "Owner", color: Theme.Colors.accentWarm)
+                    } else if member.role == .coOwner {
+                        RoleBadge(text: "Co-Owner", color: Theme.Colors.primary)
+                    }
+                }
+
+                if member.isPending {
+                    Text("Invited")
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.textTertiary)
+                }
             }
 
             Spacer()
 
-            Menu {
-                Button("Remove", role: .destructive) {
-                    Task { await onRemove() }
+            if isCurrentUserOwnerOrCoOwner && !isGroupOwner {
+                Menu {
+                    if member.role == .coOwner {
+                        Button("Demote to Member") { onRoleChange?(.member) }
+                    } else if member.isAccepted {
+                        Button("Promote to Co-Owner") { onRoleChange?(.coOwner) }
+                    }
+                    Button("Remove", role: .destructive) {
+                        Task { await onRemove?() }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.Colors.textTertiary)
                 }
-            } label: {
-                Image(systemName: "ellipsis.circle")
+            }
+
+            if member.userId != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11))
                     .foregroundColor(Theme.Colors.textTertiary)
             }
         }
         .padding(Theme.Spacing.sm)
+    }
+}
+
+// MARK: - Role Badge
+
+struct RoleBadge: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text)
+            .font(Theme.Typography.caption2)
+            .foregroundColor(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(color.opacity(0.15)))
     }
 }

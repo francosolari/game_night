@@ -10,6 +10,7 @@ struct User: Identifiable, Codable, Hashable {
     // Privacy settings
     var phoneVisible: Bool
     var discoverableByPhone: Bool
+    var gameLibraryPublic: Bool
     var marketingOptIn: Bool
     var contactsSynced: Bool
     var phoneVerified: Bool
@@ -26,6 +27,7 @@ struct User: Identifiable, Codable, Hashable {
         case bggUsername = "bgg_username"
         case phoneVisible = "phone_visible"
         case discoverableByPhone = "discoverable_by_phone"
+        case gameLibraryPublic = "game_library_public"
         case marketingOptIn = "marketing_opt_in"
         case contactsSynced = "contacts_synced"
         case phoneVerified = "phone_verified"
@@ -43,6 +45,7 @@ struct User: Identifiable, Codable, Hashable {
         bggUsername: String? = nil,
         phoneVisible: Bool = false,
         discoverableByPhone: Bool = true,
+        gameLibraryPublic: Bool = true,
         marketingOptIn: Bool = false,
         contactsSynced: Bool = false,
         phoneVerified: Bool = false,
@@ -58,6 +61,7 @@ struct User: Identifiable, Codable, Hashable {
         self.bggUsername = bggUsername
         self.phoneVisible = phoneVisible
         self.discoverableByPhone = discoverableByPhone
+        self.gameLibraryPublic = gameLibraryPublic
         self.marketingOptIn = marketingOptIn
         self.contactsSynced = contactsSynced
         self.phoneVerified = phoneVerified

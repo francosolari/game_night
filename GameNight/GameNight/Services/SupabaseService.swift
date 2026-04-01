@@ -892,6 +892,35 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return entries
     }
 
+    func fetchGameLibraryForUser(userId: UUID) async throws -> [GameLibraryEntry] {
+        let entries: [GameLibraryEntry] = try await client
+            .from("game_library")
+            .select("*, game:games(*)")
+            .eq("user_id", value: userId.uuidString)
+            .order("added_at", ascending: false)
+            .execute()
+            .value
+        return entries
+    }
+
+    func fetchWishlistForUser(userId: UUID) async throws -> [GameWishlistEntry] {
+        return try await client
+            .from("game_wishlist")
+            .select("*, game:games(*)")
+            .eq("user_id", value: userId.uuidString)
+            .order("added_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func updateGroupMemberRole(memberId: UUID, role: GroupMemberRole) async throws {
+        try await client
+            .from("group_members")
+            .update(["role": role.rawValue])
+            .eq("id", value: memberId.uuidString)
+            .execute()
+    }
+
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {
         let session = try await client.auth.session
         var entry: [String: AnyJSON] = [

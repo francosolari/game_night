@@ -222,6 +222,7 @@ struct InviteSummary {
 
     struct InviteUser: Identifiable {
         let id: UUID
+        var userId: UUID?
         var name: String
         var phoneNumber: String?
         var avatarUrl: String?

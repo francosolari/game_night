@@ -59,6 +59,11 @@ enum GroupMemberStatus: String, Codable {
     case declined
 }
 
+enum GroupMemberRole: String, Codable, Hashable {
+    case member
+    case coOwner = "co_owner"
+}
+
 struct GroupMember: Identifiable, Codable, Hashable {
     let id: UUID
     var groupId: UUID
@@ -69,6 +74,7 @@ struct GroupMember: Identifiable, Codable, Hashable {
     var sortOrder: Int
     var addedAt: Date
     var status: GroupMemberStatus
+    var role: GroupMemberRole
     var invitedBy: UUID?
 
     var isAccepted: Bool { status == .accepted }
@@ -84,12 +90,13 @@ struct GroupMember: Identifiable, Codable, Hashable {
         case sortOrder = "sort_order"
         case addedAt = "added_at"
         case status
+        case role
         case invitedBy = "invited_by"
     }
 
     init(id: UUID, groupId: UUID, userId: UUID? = nil, phoneNumber: String, displayName: String? = nil,
          tier: Int = 1, sortOrder: Int = 0, addedAt: Date = Date(),
-         status: GroupMemberStatus = .pending, invitedBy: UUID? = nil) {
+         status: GroupMemberStatus = .pending, role: GroupMemberRole = .member, invitedBy: UUID? = nil) {
         self.id = id
         self.groupId = groupId
         self.userId = userId
@@ -99,6 +106,7 @@ struct GroupMember: Identifiable, Codable, Hashable {
         self.sortOrder = sortOrder
         self.addedAt = addedAt
         self.status = status
+        self.role = role
         self.invitedBy = invitedBy
     }
 

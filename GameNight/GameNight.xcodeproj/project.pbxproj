@@ -45,6 +45,7 @@
 		2E0BD642D74DF24FD20D9A85 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491C5BC61EA3E94B1EA73171 /* PrivacySettingsView.swift */; };
 		2E3F99D3311239569EACBF93 /* InviteMessageCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3156D065E97CAE4F24885443 /* InviteMessageCard.swift */; };
 		300323D66DE2C2FD3D530C4B /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71F0E6BB5635FD30C2ADA877 /* ProfileView.swift */; };
+		30A4B22CF2E3BD093E27B467 /* GuestPublicProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC38F59DC411C994F0FD646 /* GuestPublicProfileView.swift */; };
 		322132BCAF44E71D02F9228E /* CommonComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC348B1DF846B0EA1FED19F6 /* CommonComponents.swift */; };
 		336282B3D2ADD8292116A592 /* DesignerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8FD5CA3969C4A60A9AEF48 /* DesignerDetailView.swift */; };
 		349E5742ECBCD05BAE8BCEBA /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF42D07B22BEA961ACC27216 /* HomeView.swift */; };
@@ -137,6 +138,7 @@
 		C5C23C7667D8666450441FA7 /* GameLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3FEEC34A1373C0210242FC /* GameLibraryViewModel.swift */; };
 		C7C5E2B1648C0A2488DE0E29 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB1A89107DC5915629A148C /* CalendarView.swift */; };
 		CBF6FBF83688B02AE33AF2D7 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 487DE2C3FE34F385AF85AEB8 /* FlowLayout.swift */; };
+		CCBFD708E38EA083B7A680F6 /* MemberPublicProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BE27B85181614D615F46AB9 /* MemberPublicProfileView.swift */; };
 		CE3591329288EDA893958F12 /* GameNightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04110B31ED9823F8D8CB1290 /* GameNightApp.swift */; };
 		CE4FDB177DFFB003A88F9AA9 /* EventDateLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBB6994E14D9CDD49FD2251B /* EventDateLabel.swift */; };
 		CEDCDEA3B706763399C908FC /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C8D2CD62321FDE27933183 /* HomeViewModel.swift */; };
@@ -321,6 +323,7 @@
 		97ECE09B7351E21C5F6D2EE8 /* CalendarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewModel.swift; sourceTree = "<group>"; };
 		9980167E08A72DABE640CA43 /* GroupInviteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupInviteCard.swift; sourceTree = "<group>"; };
 		9AB1A89107DC5915629A148C /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		9BE27B85181614D615F46AB9 /* MemberPublicProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemberPublicProfileView.swift; sourceTree = "<group>"; };
 		9CD8ECB4FD6B977AC4080015 /* InviteLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteLinkSheet.swift; sourceTree = "<group>"; };
 		A1533748CFDA944B1B50FCE3 /* powered_by_BGG_04_XL.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = powered_by_BGG_04_XL.png; sourceTree = "<group>"; };
 		A3EBA617F8648EB89DD27D6A /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
@@ -344,6 +347,7 @@
 		C851C421B2D167D35FFF7787 /* CreateEventDetailsStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEventDetailsStep.swift; sourceTree = "<group>"; };
 		C92C25088427ECFF4C3E7988 /* SupabaseServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseServiceTests.swift; sourceTree = "<group>"; };
 		CBB6994E14D9CDD49FD2251B /* EventDateLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDateLabel.swift; sourceTree = "<group>"; };
+		CBC38F59DC411C994F0FD646 /* GuestPublicProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestPublicProfileView.swift; sourceTree = "<group>"; };
 		CCAFB6B1DABFBC887A2DC003 /* HorizontalGameScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HorizontalGameScroll.swift; sourceTree = "<group>"; };
 		CCEA0C41E55640191654256D /* NewMessageSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewMessageSheet.swift; sourceTree = "<group>"; };
 		CE8FD5CA3969C4A60A9AEF48 /* DesignerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignerDetailView.swift; sourceTree = "<group>"; };
@@ -421,6 +425,7 @@
 				5438E24E75BD13B48ABCAD82 /* EventDetailView.swift */,
 				056DCF17A5CC08E893A25FFA /* GameVotingView.swift */,
 				3926C65D6513E68EE254B8FC /* GuestListTabsView.swift */,
+				CBC38F59DC411C994F0FD646 /* GuestPublicProfileView.swift */,
 				278A1FC48E581F583C994B89 /* PollGuestListView.swift */,
 				80EE92F65BC5F5527D0B68FE /* PollResultsDetailView.swift */,
 				724922A552EBBAAEEBA7605F /* RSVPSheet.swift */,
@@ -680,6 +685,7 @@
 				E1DF51217739522D1F3F21F6 /* GroupPlayHistoryView.swift */,
 				78DE09CCDB99795D271DDAD5 /* GroupStatsView.swift */,
 				C545563F575388D3D5C55CE1 /* GroupsView.swift */,
+				9BE27B85181614D615F46AB9 /* MemberPublicProfileView.swift */,
 			);
 			path = Groups;
 			sourceTree = "<group>";
@@ -1100,6 +1106,7 @@
 				AAEBF5B0D069816F69AEA013 /* GroupsView.swift in Sources */,
 				AAF2A54602E475E661783223 /* GroupsViewModel.swift in Sources */,
 				2A0BF2968F29063F5E0CF737 /* GuestListTabsView.swift in Sources */,
+				30A4B22CF2E3BD093E27B467 /* GuestPublicProfileView.swift in Sources */,
 				190119C668A74F1F6FE44FE1 /* HomeDataLoader.swift in Sources */,
 				A25F897E22AE83280EA23650 /* HomeDataProviding.swift in Sources */,
 				349E5742ECBCD05BAE8BCEBA /* HomeView.swift in Sources */,
@@ -1117,6 +1124,7 @@
 				BBA5890D083FC90163BB8F1C /* ListEventCard.swift in Sources */,
 				7124447E48FB168EA905F827 /* LocationPickerSheet.swift in Sources */,
 				88286AB6BCD7CFB53E204C68 /* LocationService.swift in Sources */,
+				CCBFD708E38EA083B7A680F6 /* MemberPublicProfileView.swift in Sources */,
 				8B8EDF0F8E17A21B6AF65773 /* MyContactsView.swift in Sources */,
 				DF8DC4FB886AD844A3631611 /* NewMessageSheet.swift in Sources */,
 				86F335C9B0C2AAAA722F9827 /* NotificationFeedView.swift in Sources */,

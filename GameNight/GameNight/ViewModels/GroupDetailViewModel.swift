@@ -30,6 +30,7 @@ final class GroupDetailViewModel: ObservableObject {
     @Published var isPostingMessage = false
     @Published var replyingTo: GroupMessage?
     @Published var mentionCandidates: [GroupMember] = []
+    @Published var memberUsers: [UUID: User] = [:]
     @Published var error: String?
 
     private let supabase = SupabaseService.shared
@@ -43,7 +44,17 @@ final class GroupDetailViewModel: ObservableObject {
         async let playsTask: () = loadPlays()
         async let eventsTask: () = loadLinkedEvents()
         async let messagesTask: () = loadMessages()
-        _ = await (playsTask, eventsTask, messagesTask)
+        async let profilesTask: () = loadMemberProfiles()
+        _ = await (playsTask, eventsTask, messagesTask, profilesTask)
+    }
+
+    func loadMemberProfiles() async {
+        for member in group.members {
+            guard let userId = member.userId, memberUsers[userId] == nil else { continue }
+            if let user = try? await supabase.fetchUserById(userId) {
+                memberUsers[userId] = user
+            }
+        }
     }
 
     func loadPlays() async {
@@ -149,6 +160,69 @@ final class GroupDetailViewModel: ObservableObject {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    func updateMemberRole(memberId: UUID, role: GroupMemberRole) async {
+        do {
+            try await supabase.updateGroupMemberRole(memberId: memberId, role: role)
+            if let index = group.members.firstIndex(where: { $0.id == memberId }) {
+                group.members[index].role = role
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    // MARK: - Head-to-Head
+
+    func headToHead(currentUserId: UUID, targetUserId: UUID) -> HeadToHeadStats {
+        var wins = 0, losses = 0, ties = 0
+
+        for play in plays where !play.isCooperative {
+            let participants = play.participants
+            guard let currentP = participants.first(where: { $0.userId == currentUserId }),
+                  let targetP = participants.first(where: { $0.userId == targetUserId }) else {
+                continue
+            }
+
+            if let cp = currentP.placement, let tp = targetP.placement {
+                if cp < tp { wins += 1 }
+                else if cp > tp { losses += 1 }
+                else { ties += 1 }
+            } else {
+                if currentP.isWinner && !targetP.isWinner { wins += 1 }
+                else if !currentP.isWinner && targetP.isWinner { losses += 1 }
+                else { ties += 1 }
+            }
+        }
+
+        return HeadToHeadStats(wins: wins, losses: losses, ties: ties)
+    }
+
+    func eventsTogether(currentUserId: UUID, targetUserId: UUID) -> [GameEvent] {
+        let eventIds = Set(plays.filter { play in
+            let userIds = Set(play.participants.compactMap(\.userId))
+            return userIds.contains(currentUserId) && userIds.contains(targetUserId)
+        }.compactMap(\.eventId))
+
+        return linkedEvents
+            .filter { eventIds.contains($0.id) }
+            .sorted { $0.effectiveStartDate > $1.effectiveStartDate }
+    }
+
+    func mostPlayedGame(for userId: UUID) -> (gameName: String, count: Int)? {
+        var counts: [String: Int] = [:]
+        for play in plays {
+            guard play.participants.contains(where: { $0.userId == userId }) else { continue }
+            let name = play.game?.name ?? "Unknown"
+            counts[name, default: 0] += 1
+        }
+        guard let top = counts.max(by: { $0.value < $1.value }) else { return nil }
+        return (top.key, top.value)
+    }
+
+    func playCount(for userId: UUID) -> Int {
+        plays.filter { $0.participants.contains(where: { $0.userId == userId }) }.count
     }
 
     func subscribeToChatUpdates() {
@@ -415,4 +489,14 @@ struct GroupStatsData {
             uniqueGames: uniqueGames
         )
     }
+}
+
+// MARK: - Head-to-Head Stats
+
+struct HeadToHeadStats {
+    let wins: Int
+    let losses: Int
+    let ties: Int
+    var totalGames: Int { wins + losses + ties }
+    var hasData: Bool { totalGames > 0 }
 }
