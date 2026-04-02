@@ -20,13 +20,10 @@ struct EventCalendarGridView: View {
             }
 
             // Day cells
+            let days = daysInMonth()
             LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
-                ForEach(daysInMonth(), id: \.self) { date in
-                    if let date {
-                        dayCellView(date: date)
-                    } else {
-                        Color.clear.frame(height: 44)
-                    }
+                ForEach(Array(days.enumerated()), id: \.offset) { _, entry in
+                    dayCellView(date: entry.date, isCurrentMonth: entry.isCurrentMonth)
                 }
             }
 
@@ -56,27 +53,35 @@ struct EventCalendarGridView: View {
         }
     }
 
-    private func dayCellView(date: Date) -> some View {
+    private func dayCellView(date: Date, isCurrentMonth: Bool) -> some View {
         let calendar = Calendar.current
         let isToday = calendar.isDateInToday(date)
         let isSelected = viewModel.selectedDate.map { calendar.isDate($0, inSameDayAs: date) } ?? false
-        let dayEvents = viewModel.events(for: date)
+        let dayEvents = isCurrentMonth ? viewModel.events(for: date) : []
 
         return Button {
             withAnimation(Theme.Animation.snappy) {
-                viewModel.selectedDate = isSelected ? nil : date
+                if isCurrentMonth {
+                    viewModel.selectedDate = isSelected ? nil : date
+                } else {
+                    viewModel.navigateToDate(date)
+                }
             }
         } label: {
             VStack(spacing: 2) {
                 Text("\(calendar.component(.day, from: date))")
                     .font(Theme.Typography.callout)
-                    .foregroundColor(isToday ? Theme.Colors.primary : Theme.Colors.textPrimary)
+                    .foregroundColor(
+                        !isCurrentMonth ? Theme.Colors.textTertiary.opacity(0.4)
+                        : isToday ? Theme.Colors.primary
+                        : Theme.Colors.textPrimary
+                    )
                     .frame(width: 32, height: 32)
                     .background {
-                        if isToday {
+                        if isCurrentMonth && isToday {
                             Circle().stroke(Theme.Colors.primary, lineWidth: 1.5)
                         }
-                        if isSelected {
+                        if isCurrentMonth && isSelected {
                             Circle().fill(Theme.Colors.primary.opacity(0.15))
                         }
                     }
@@ -100,7 +105,12 @@ struct EventCalendarGridView: View {
 
     // MARK: - Helpers
 
-    private func daysInMonth() -> [Date?] {
+    private struct CalendarDay: Equatable {
+        let date: Date
+        let isCurrentMonth: Bool
+    }
+
+    private func daysInMonth() -> [CalendarDay] {
         let calendar = Calendar.current
         let month = viewModel.currentMonth
 
@@ -109,13 +119,35 @@ struct EventCalendarGridView: View {
         else { return [] }
 
         let weekday = calendar.component(.weekday, from: firstDay)
-        let leadingBlanks = weekday - 1
+        let leadingCount = weekday - 1
 
-        var days: [Date?] = Array(repeating: nil, count: leadingBlanks)
+        var days: [CalendarDay] = []
 
+        // Fill leading days from previous month
+        if leadingCount > 0, let prevMonthEnd = calendar.date(byAdding: .day, value: -1, to: firstDay) {
+            for i in stride(from: leadingCount - 1, through: 0, by: -1) {
+                if let date = calendar.date(byAdding: .day, value: -i, to: prevMonthEnd) {
+                    days.append(CalendarDay(date: date, isCurrentMonth: false))
+                }
+            }
+        }
+
+        // Current month days
         for day in range {
             if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay) {
-                days.append(date)
+                days.append(CalendarDay(date: date, isCurrentMonth: true))
+            }
+        }
+
+        // Fill trailing days from next month to complete 6 rows (42 cells)
+        let totalCells = 42
+        if let lastDay = calendar.date(byAdding: .day, value: range.count - 1, to: firstDay) {
+            var nextDay = lastDay
+            while days.count < totalCells {
+                if let next = calendar.date(byAdding: .day, value: 1, to: nextDay) {
+                    days.append(CalendarDay(date: next, isCurrentMonth: false))
+                    nextDay = next
+                }
             }
         }
 

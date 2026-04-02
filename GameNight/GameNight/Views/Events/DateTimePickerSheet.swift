@@ -443,37 +443,39 @@ struct CalendarGridView: View {
                 let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
                 LazyVGrid(columns: columns, spacing: 1) {
-                    ForEach(0..<Self.totalCells, id: \.self) { index in
-                        if index < days.count, let day = days[index] {
-                            let isSelected = hasSelection && Calendar.current.isDate(day, inSameDayAs: selectedDate)
-                            let isToday = Calendar.current.isDateInToday(day)
-                            let isPast = !allowsPastDates && day < Calendar.current.startOfDay(for: Date()) && !isToday
+                    ForEach(Array(days.enumerated()), id: \.offset) { _, entry in
+                        let day = entry.date
+                        let isInMonth = entry.isCurrentMonth
+                        let isSelected = isInMonth && hasSelection && Calendar.current.isDate(day, inSameDayAs: selectedDate)
+                        let isToday = Calendar.current.isDateInToday(day)
+                        let isPast = !allowsPastDates && day < Calendar.current.startOfDay(for: Date()) && !isToday
 
-                            Button {
-                                withAnimation(Theme.Animation.snappy) {
-                                    selectedDate = day
-                                    hasSelection = true
-                                    onDateSelected?()
+                        Button {
+                            withAnimation(Theme.Animation.snappy) {
+                                selectedDate = day
+                                hasSelection = true
+                                onDateSelected?()
+                                if !isInMonth {
+                                    displayedMonth = day
                                 }
-                            } label: {
-                                Text("\(Calendar.current.component(.day, from: day))")
-                                    .font(.system(size: 14, weight: isSelected ? .bold : .regular))
-                                    .foregroundColor(
-                                        isSelected ? Theme.Colors.background
-                                        : isPast ? Theme.Colors.textTertiary.opacity(0.3)
-                                        : isToday ? Theme.Colors.primary
-                                        : Theme.Colors.textPrimary
-                                    )
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 32)
-                                    .background(
-                                        Circle().fill(isSelected ? Theme.Colors.primary : Color.clear)
-                                    )
                             }
-                            .disabled(isPast)
-                        } else {
-                            Color.clear.frame(height: 32)
+                        } label: {
+                            Text("\(Calendar.current.component(.day, from: day))")
+                                .font(.system(size: 14, weight: isSelected ? .bold : .regular))
+                                .foregroundColor(
+                                    isSelected ? Theme.Colors.background
+                                    : !isInMonth ? Theme.Colors.textTertiary.opacity(0.3)
+                                    : isPast ? Theme.Colors.textTertiary.opacity(0.3)
+                                    : isToday ? Theme.Colors.primary
+                                    : Theme.Colors.textPrimary
+                                )
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 32)
+                                .background(
+                                    Circle().fill(isSelected ? Theme.Colors.primary : Color.clear)
+                                )
                         }
+                        .disabled(isPast && isInMonth)
                     }
                 }
             }
@@ -497,22 +499,46 @@ struct CalendarGridView: View {
         }
     }
 
-    private func calendarDays(for month: Date) -> [Date?] {
+    private struct PickerCalendarDay {
+        let date: Date
+        let isCurrentMonth: Bool
+    }
+
+    private func calendarDays(for month: Date) -> [PickerCalendarDay] {
         let calendar = Calendar.current
         let range = calendar.range(of: .day, in: .month, for: month)!
         let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: month))!
-        let weekdayOfFirst = calendar.component(.weekday, from: firstDay) - 1
+        let leadingCount = calendar.component(.weekday, from: firstDay) - 1
 
-        var days: [Date?] = Array(repeating: nil, count: weekdayOfFirst)
-        for day in range {
-            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay) {
-                days.append(date)
+        var days: [PickerCalendarDay] = []
+
+        // Fill leading days from previous month
+        if leadingCount > 0, let prevMonthEnd = calendar.date(byAdding: .day, value: -1, to: firstDay) {
+            for i in stride(from: leadingCount - 1, through: 0, by: -1) {
+                if let date = calendar.date(byAdding: .day, value: -i, to: prevMonthEnd) {
+                    days.append(PickerCalendarDay(date: date, isCurrentMonth: false))
+                }
             }
         }
-        // Pad to exactly 42 cells (6 rows)
-        while days.count < Self.totalCells {
-            days.append(nil)
+
+        // Current month days
+        for day in range {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay) {
+                days.append(PickerCalendarDay(date: date, isCurrentMonth: true))
+            }
         }
+
+        // Fill trailing days from next month
+        if let lastDay = calendar.date(byAdding: .day, value: range.count - 1, to: firstDay) {
+            var nextDay = lastDay
+            while days.count < Self.totalCells {
+                if let next = calendar.date(byAdding: .day, value: 1, to: nextDay) {
+                    days.append(PickerCalendarDay(date: next, isCurrentMonth: false))
+                    nextDay = next
+                }
+            }
+        }
+
         return days
     }
 }
