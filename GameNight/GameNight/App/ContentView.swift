@@ -7,6 +7,25 @@ struct MainTabView: View {
     @State private var homeNavigationPath = NavigationPath()
     @State private var previousTab: AppState.Tab = .home
 
+    private func applyShortcut(type: String) {
+        print("[Shortcut] applyShortcut called with type: \(type)")
+        print("[Shortcut] Current selectedTab before: \(appState.selectedTab)")
+        switch type {
+        case "com.gamenight.createEvent":
+            appState.showCreateEvent = true
+            print("[Shortcut] Set appState.showCreateEvent = true")
+        case "com.gamenight.viewGroups":
+            appState.selectedTab = .groups
+            print("[Shortcut] Set selectedTab = .groups")
+        case "com.gamenight.gameLibrary":
+            appState.selectedTab = .games
+            print("[Shortcut] Set selectedTab = .games")
+        default:
+            print("[Shortcut] Unknown type: \(type)")
+        }
+        print("[Shortcut] Current selectedTab after: \(appState.selectedTab)")
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $appState.selectedTab) {
@@ -131,18 +150,19 @@ struct MainTabView: View {
                 homeNavigationPath.append(HomeDestination.inbox)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .homeScreenShortcutTriggered)) { note in
-            guard let type = note.userInfo?["type"] as? String else { return }
-            switch type {
-            case "com.gamenight.createEvent":
-                showCreateEvent = true
-            case "com.gamenight.viewGroups":
-                appState.selectedTab = .groups
-            case "com.gamenight.gameLibrary":
-                appState.selectedTab = .games
-            default:
-                break
+        .onAppear {
+            print("[Shortcut] MainTabView onAppear — pendingShortcutType: \(AppDelegate.pendingShortcutType ?? "nil")")
+            if let type = AppDelegate.pendingShortcutType {
+                AppDelegate.pendingShortcutType = nil
+                // Defer so SwiftUI has fully mounted before we push a state change.
+                DispatchQueue.main.async { applyShortcut(type: type) }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .homeScreenShortcutTriggered)) { note in
+            print("[Shortcut] onReceive homeScreenShortcutTriggered: \(note.userInfo ?? [:])")
+            guard let type = note.userInfo?["type"] as? String else { return }
+            AppDelegate.pendingShortcutType = nil
+            applyShortcut(type: type)
         }
     }
 }

@@ -8,6 +8,7 @@ final class EventViewModel: ObservableObject {
     @Published var invites: [Invite] = []
     @Published var myInvite: Invite?
     @Published var isLoading = false
+    @Published var isNotFound = false
     @Published var error: String?
     @Published var isSending = false
     @Published var isDeleting = false
@@ -400,25 +401,32 @@ final class EventViewModel: ObservableObject {
 
     func respondToInvite(status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async {
         guard let invite = myInvite else { return }
-        isSending = true
-        do {
-            try await supabase.respondToInvite(
-                inviteId: invite.id,
-                status: status,
-                timeVotes: timeVotes,
-                suggestedTimes: suggestedTimes
-            )
-            myInvite?.status = status
-            // Keep local poll votes in sync
-            myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
-            // Refresh event data without flashing loading state
-            if let eventId = event?.id {
-                await refreshEventData(eventId: eventId)
+
+        // Optimistic update — apply immediately so UI reflects change before network
+        let previousStatus = invite.status
+        let previousVotes = myPollVotes
+        myInvite?.status = status
+        myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
+
+        // Fire-and-forget — don't block the caller
+        Task {
+            do {
+                try await supabase.respondToInvite(
+                    inviteId: invite.id,
+                    status: status,
+                    timeVotes: timeVotes,
+                    suggestedTimes: suggestedTimes
+                )
+                if let eventId = event?.id {
+                    await refreshEventData(eventId: eventId)
+                }
+            } catch {
+                // Rollback on failure
+                myInvite?.status = previousStatus
+                myPollVotes = previousVotes
+                self.error = error.localizedDescription
             }
-        } catch {
-            self.error = error.localizedDescription
         }
-        isSending = false
     }
 
     func inviteContacts(_ contacts: [UserContact]) async {
