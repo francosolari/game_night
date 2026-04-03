@@ -105,6 +105,19 @@ class MockSupabaseService {
     }
 
     func createTestEvent(id: UUID, hostId: UUID) {
-        events[id] = GameEvent(id: id, hostId: hostId, title: "Test Event", status: .draft, games: [], timeOptions: [], allowTimeSuggestions: true, scheduleMode: .fixed, inviteStrategy: InviteStrategy(type: .allAtOnce), minPlayers: 2, createdAt: Date(), updatedAt: Date())
+        events[id] = GameEvent(
+            id: id,
+            hostId: hostId,
+            title: "Test Event",
+            status: .draft,
+            games: [],
+            timeOptions: [],
+            allowTimeSuggestions: true,
+            scheduleMode: .fixed,
+            inviteStrategy: InviteStrategy(type: .allAtOnce, tierSize: nil, autoPromote: true),
+            minPlayers: 2,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
     }
 }

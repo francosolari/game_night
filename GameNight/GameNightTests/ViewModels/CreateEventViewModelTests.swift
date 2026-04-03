@@ -181,6 +181,36 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(sut.createdEvent?.timeOptions.first?.startTime, sut.fixedStartTime)
     }
 
+    func testPublishedEditSaveResetsPollStateWhenChangingFromFixedToPoll() async {
+        let event = FixtureFactory.makeEvent()
+        let service = StubEventEditorService(currentUserId: event.hostId, fetchedEvent: event)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: service
+        )
+        sut.scheduleMode = .poll
+
+        await sut.saveChanges()
+
+        XCTAssertEqual(service.resetEventPollStateEventIds, [event.id])
+    }
+
+    func testPublishedEditSaveDoesNotResetPollStateWhenStayingFixed() async {
+        let event = FixtureFactory.makeEvent()
+        let service = StubEventEditorService(currentUserId: event.hostId, fetchedEvent: event)
+        let sut = CreateEventViewModel(
+            eventToEdit: event,
+            initialInvites: [],
+            supabase: service
+        )
+        sut.scheduleMode = .fixed
+
+        await sut.saveChanges()
+
+        XCTAssertTrue(service.resetEventPollStateEventIds.isEmpty)
+    }
+
     func testPublishedEditSaveDiffsInvites() async {
         let event = FixtureFactory.makeEvent()
         let existingTierOne = makeInvite(displayName: "Jordan", phoneNumber: "+15555550111", tier: 1, status: .pending)
@@ -964,6 +994,7 @@ private final class StubEventEditorService: EventEditingProviding {
     var updatedEvents: [GameEvent] = []
     var upsertedTimeOptions: [TimeOption] = []
     var upsertedEventGames: [EventGame] = []
+    var resetEventPollStateEventIds: [UUID] = []
     var createdInvites: [Invite] = []
     var updatedInvites: [Invite] = []
     var deletedInviteIds: [UUID] = []
@@ -1021,6 +1052,10 @@ private final class StubEventEditorService: EventEditingProviding {
     func deleteTimeOptions(ids: [UUID]) async throws {
         guard !ids.isEmpty else { return }
         storedEvent?.timeOptions.removeAll { ids.contains($0.id) }
+    }
+
+    func resetEventPollState(eventId: UUID) async throws {
+        resetEventPollStateEventIds.append(eventId)
     }
 
     func deleteEventGames(eventId: UUID) async throws {}
