@@ -501,7 +501,7 @@ struct EventHeroHeader: View {
     }
 
     private var isEventPast: Bool {
-        event.status == .completed || (event.timeOptions.first?.date ?? Date()) < Date()
+        event.hasEnded()
     }
 
     private var relativeTimeLabel: String {

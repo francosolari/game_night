@@ -178,4 +178,51 @@ final class GameEventDecodingTests: XCTestCase {
 
         XCTAssertEqual(event.preferredCoverImageURLString, "https://cdn.example.com/first.jpg")
     }
+
+    func testEffectiveEndDateUsesFixedTimeOptionEndWhenConfirmedTimeOptionIsNil() {
+        let start = Date(timeIntervalSince1970: 1_775_520_000) // 2026-04-03 20:00:00 UTC
+        let end = Date(timeIntervalSince1970: 1_775_530_800)   // 2026-04-03 23:00:00 UTC
+        let option = TimeOption(
+            id: UUID(),
+            eventId: UUID(),
+            date: start,
+            startTime: start,
+            endTime: end,
+            label: nil,
+            isSuggested: false,
+            suggestedBy: nil,
+            voteCount: 0,
+            maybeCount: 0
+        )
+        var event = FixtureFactory.makeEvent(timeOptions: [option])
+        event.confirmedTimeOptionId = nil
+        event.scheduleMode = .fixed
+
+        XCTAssertEqual(event.effectiveEndDate, end)
+    }
+
+    func testHasEndedWithoutEndTimeTurnsTrueAtStartOfFollowingDay() {
+        let start = Date(timeIntervalSince1970: 1_775_520_000) // 2026-04-03 20:00:00 UTC
+        let option = TimeOption(
+            id: UUID(),
+            eventId: UUID(),
+            date: start,
+            startTime: start,
+            endTime: nil,
+            label: nil,
+            isSuggested: false,
+            suggestedBy: nil,
+            voteCount: 0,
+            maybeCount: 0
+        )
+        var event = FixtureFactory.makeEvent(timeOptions: [option])
+        event.confirmedTimeOptionId = nil
+        event.scheduleMode = .fixed
+
+        let startOfNextDay = event.effectiveEndDate
+        let justBeforeNextDay = startOfNextDay.addingTimeInterval(-1)
+
+        XCTAssertFalse(event.hasEnded(asOf: justBeforeNextDay))
+        XCTAssertTrue(event.hasEnded(asOf: startOfNextDay))
+    }
 }
