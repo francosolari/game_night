@@ -54,9 +54,26 @@ struct GameEvent: Identifiable, Codable {
            let end = confirmed.endTime {
             return end
         }
+
+        if scheduleMode == .fixed,
+           let fixedOption = timeOptions.min(by: { $0.startTime < $1.startTime }),
+           let end = fixedOption.endTime {
+            return end
+        }
+
         // Fall back to midnight (start of the next day)
         let cal = Calendar.current
         return cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: effectiveStartDate)) ?? effectiveStartDate
+    }
+
+    /// Returns true once the event should be treated as over in the UI.
+    /// - Completed events are always ended.
+    /// - Otherwise, use `effectiveEndDate` as the cutoff.
+    func hasEnded(asOf now: Date = Date()) -> Bool {
+        if status == .completed {
+            return true
+        }
+        return now >= effectiveEndDate
     }
 
     enum CodingKeys: String, CodingKey {
