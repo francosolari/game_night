@@ -93,6 +93,12 @@ final class EventViewModel: ObservableObject {
             && event.confirmedTimeOptionId == nil
     }
 
+    var canEditPollVotesDirectly: Bool {
+        if isOwner { return true }
+        guard let status = myInvite?.status else { return false }
+        return status == .accepted || status == .maybe
+    }
+
     var canSeeActivityFeed: Bool {
         hasRSVPd || isOwner
     }
@@ -326,6 +332,10 @@ final class EventViewModel: ObservableObject {
 
     func voteOnTimeOption(optionId: UUID, voteType: TimeOptionVoteType) async {
         guard let eventId = event?.id, let invite = myInvite else { return }
+        guard invite.status != .pending else {
+            self.error = "RSVP first to vote on time options."
+            return
+        }
         do {
             // Re-submit all current votes with this one updated
             myPollVotes[optionId] = voteType
@@ -347,13 +357,6 @@ final class EventViewModel: ObservableObject {
         do {
             try await supabase.confirmTimeOption(eventId: eventId, timeOptionId: timeOptionId)
             event?.confirmedTimeOptionId = timeOptionId
-            // Notify invitees (fire-and-forget)
-            Task {
-                try? await supabase.invokeAuthenticatedFunction(
-                    "notify-poll-confirmed",
-                    body: ["event_id": eventId.uuidString, "type": "time"]
-                )
-            }
             // Refresh to show final state (poll ended, guest list restored)
             await refreshEventData(eventId: eventId)
             toast = ToastItem(style: .success, message: "Time confirmed!")
@@ -410,25 +413,24 @@ final class EventViewModel: ObservableObject {
         let previousVotes = myPollVotes
         myInvite?.status = status
         myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
+        isSending = true
+        defer { isSending = false }
 
-        // Fire-and-forget — don't block the caller
-        Task {
-            do {
-                try await supabase.respondToInvite(
-                    inviteId: invite.id,
-                    status: status,
-                    timeVotes: timeVotes,
-                    suggestedTimes: suggestedTimes
-                )
-                if let eventId = event?.id {
-                    await refreshEventData(eventId: eventId)
-                }
-            } catch {
-                // Rollback on failure
-                myInvite?.status = previousStatus
-                myPollVotes = previousVotes
-                self.error = error.localizedDescription
+        do {
+            try await supabase.respondToInvite(
+                inviteId: invite.id,
+                status: status,
+                timeVotes: timeVotes,
+                suggestedTimes: suggestedTimes
+            )
+            if let eventId = event?.id {
+                await refreshEventData(eventId: eventId)
             }
+        } catch {
+            // Rollback on failure
+            myInvite?.status = previousStatus
+            myPollVotes = previousVotes
+            self.error = error.localizedDescription
         }
     }
 

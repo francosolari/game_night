@@ -206,6 +206,21 @@ enum SMSStatus: String, Codable {
     case undelivered
 }
 
+enum PollRSVP {
+    /// Derives the invite RSVP status from poll votes.
+    /// - Returns: `nil` when no votes are selected yet.
+    static func derivedStatus(from votes: [UUID: TimeOptionVoteType]) -> InviteStatus? {
+        guard !votes.isEmpty else { return nil }
+        if votes.values.contains(.yes) {
+            return .accepted
+        }
+        if votes.values.contains(.maybe) {
+            return .maybe
+        }
+        return .declined
+    }
+}
+
 // MARK: - Invite Summary (for event detail view)
 struct InviteSummary {
     var total: Int
