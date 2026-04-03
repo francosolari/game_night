@@ -1,5 +1,14 @@
 import Foundation
 
+enum GroupEmojiSanitizer {
+    static func sanitized(_ raw: String?) -> String {
+        guard let raw else { return "🎲" }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value != "?", value != "�" else { return "🎲" }
+        return value
+    }
+}
+
 struct GameGroup: Identifiable, Codable {
     let id: UUID
     var ownerId: UUID

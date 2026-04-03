@@ -77,7 +77,7 @@ struct GroupInvitePreviewSheet: View {
                 Circle()
                     .fill(Theme.Gradients.primary)
                     .frame(width: 72, height: 72)
-                Text(preview.group.emoji)
+                Text(GroupEmojiSanitizer.sanitized(preview.group.emoji))
                     .font(.system(size: 36))
             }
 

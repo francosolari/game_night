@@ -54,7 +54,7 @@ struct GroupInviteCard: View {
                             )
                             .frame(height: 100)
                             .overlay(
-                                Text(group.emoji ?? "🎲")
+                                Text(GroupEmojiSanitizer.sanitized(group.emoji))
                                     .font(.system(size: 48))
                                     .opacity(0.3),
                                 alignment: .center
@@ -85,7 +85,7 @@ struct GroupInviteCard: View {
                                 Circle()
                                     .fill(Theme.Colors.primarySubtle)
                                     .frame(width: 32, height: 32)
-                                Text(group.emoji ?? "🎲")
+                                Text(GroupEmojiSanitizer.sanitized(group.emoji))
                                     .font(.system(size: 16))
                             }
 

@@ -11,7 +11,7 @@ struct GroupInviteMessageCard: View {
                 RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
                     .fill(Theme.Colors.primarySubtle)
                     .frame(width: 48, height: 48)
-                Text(metadata.groupEmoji ?? "🎲")
+                Text(GroupEmojiSanitizer.sanitized(metadata.groupEmoji))
                     .font(.system(size: 24))
             }
 
