@@ -209,11 +209,17 @@ final class ThemeManager: ObservableObject {
     }
 
     private init() {
+        systemColorScheme = Self.currentSystemColorScheme()
         if let saved = UserDefaults.standard.string(forKey: "themeMode"),
            let savedMode = ThemeMode(rawValue: saved) {
             self.mode = savedMode
         }
         rebuildPalette()
+    }
+
+    func updateSystemColorScheme(_ scheme: ColorScheme) {
+        guard systemColorScheme != scheme else { return }
+        systemColorScheme = scheme
     }
 
     private func rebuildPalette() {
@@ -225,6 +231,15 @@ final class ThemeManager: ObservableObject {
         }
         isDark = dark
         activePalette = dark ? DarkPalette() : LightPalette()
+    }
+
+    private static func currentSystemColorScheme() -> ColorScheme {
+        #if canImport(UIKit)
+        let style = UITraitCollection.current.userInterfaceStyle
+        return style == .dark ? .dark : .light
+        #else
+        return .light
+        #endif
     }
 }
 
