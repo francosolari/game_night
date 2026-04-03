@@ -131,6 +131,19 @@ struct MainTabView: View {
                 homeNavigationPath.append(HomeDestination.inbox)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .homeScreenShortcutTriggered)) { note in
+            guard let type = note.userInfo?["type"] as? String else { return }
+            switch type {
+            case "com.gamenight.createEvent":
+                showCreateEvent = true
+            case "com.gamenight.viewGroups":
+                appState.selectedTab = .groups
+            case "com.gamenight.gameLibrary":
+                appState.selectedTab = .games
+            default:
+                break
+            }
+        }
     }
 }
 

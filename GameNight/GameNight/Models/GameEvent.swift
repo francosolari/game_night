@@ -324,6 +324,19 @@ struct InviteStrategy: Codable {
         case allAtOnce = "all_at_once"
         case tiered
     }
+
+    init(type: InviteType, tierSize: Int?, autoPromote: Bool) {
+        self.type = type
+        self.tierSize = tierSize
+        self.autoPromote = autoPromote
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(InviteType.self, forKey: .type)
+        tierSize = try container.decodeIfPresent(Int.self, forKey: .tierSize)
+        autoPromote = try container.decodeIfPresent(Bool.self, forKey: .autoPromote) ?? true
+    }
 }
 
 // MARK: - Draft Invitee (stored as JSON in events.draft_invitees)
