@@ -133,6 +133,7 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.unreadNotificationCount = notifCount
                     self.unreadMessageCount = msgCount
+                    UIApplication.shared.applicationIconBadgeNumber = notifCount
                 }
             } catch {
                 print("Failed to refresh unread counts: \(error)")
