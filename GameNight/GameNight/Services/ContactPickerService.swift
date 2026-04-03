@@ -9,6 +9,14 @@ actor ContactPickerService {
 
     private let store = CNContactStore()
 
+    /// Local cache directory for contact thumbnail images.
+    private static let avatarCacheDir: URL = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let dir = caches.appendingPathComponent("contact-avatars", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
     // MARK: - Permission
 
     var authorizationStatus: CNAuthorizationStatus {
@@ -45,11 +53,19 @@ actor ContactPickerService {
 
             guard !name.isEmpty else { return }
 
+            let normalizedPhone = PhoneNumberFormatter.normalizeToE164(phone)
+
+            // Cache thumbnail to disk if available
+            var avatarUrl: String? = nil
+            if let imageData = contact.thumbnailImageData {
+                avatarUrl = Self.cacheContactThumbnail(imageData, phone: normalizedPhone)
+            }
+
             contacts.append(UserContact(
                 id: UUID(),
                 name: name,
-                phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
-                avatarUrl: nil,
+                phoneNumber: normalizedPhone,
+                avatarUrl: avatarUrl,
                 isAppUser: false
             ))
         }
@@ -79,11 +95,18 @@ actor ContactPickerService {
 
             guard !name.isEmpty else { return nil }
 
+            let normalizedPhone = PhoneNumberFormatter.normalizeToE164(phone)
+
+            var avatarUrl: String? = nil
+            if let imageData = contact.thumbnailImageData {
+                avatarUrl = Self.cacheContactThumbnail(imageData, phone: normalizedPhone)
+            }
+
             return UserContact(
                 id: UUID(),
                 name: name,
-                phoneNumber: PhoneNumberFormatter.normalizeToE164(phone),
-                avatarUrl: nil,
+                phoneNumber: normalizedPhone,
+                avatarUrl: avatarUrl,
                 isAppUser: false
             )
         }
@@ -145,5 +168,32 @@ actor ContactPickerService {
     /// Delegates to PhoneNumberFormatter for consistency.
     static func normalizePhone(_ raw: String) -> String {
         PhoneNumberFormatter.normalizeToE164(raw)
+    }
+
+    // MARK: - Thumbnail Cache
+
+    /// Saves contact thumbnail to disk cache and returns the file URL string.
+    /// Uses phone number hash as filename for stable lookup.
+    private static func cacheContactThumbnail(_ data: Data, phone: String) -> String? {
+        let key = phone.filter(\.isNumber)
+        guard !key.isEmpty else { return nil }
+        let fileURL = avatarCacheDir.appendingPathComponent("\(key).jpg")
+        do {
+            try data.write(to: fileURL, options: .atomic)
+            return fileURL.absoluteString
+        } catch {
+            return nil
+        }
+    }
+
+    /// Returns a cached thumbnail URL for a phone number, if available.
+    static func cachedAvatarUrl(for phone: String) -> String? {
+        let key = phone.filter(\.isNumber)
+        guard !key.isEmpty else { return nil }
+        let fileURL = avatarCacheDir.appendingPathComponent("\(key).jpg")
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            return fileURL.absoluteString
+        }
+        return nil
     }
 }

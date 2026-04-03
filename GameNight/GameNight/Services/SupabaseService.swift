@@ -1371,45 +1371,79 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchSavedContacts() async throws -> [SavedContact] {
         let session = try await client.auth.session
-        let contacts: [SavedContact] = try await client
-            .from("saved_contacts")
-            .select()
-            .eq("user_id", value: session.user.id.uuidString)
-            .order("name")
-            .execute()
-            .value
 
-        guard !contacts.isEmpty else { return contacts }
+        // Paginate to avoid PostgREST default 1000-row cap
+        let pageSize = 1000
+        var allContacts: [SavedContact] = []
+        var offset = 0
 
-        // Cross-reference with users table to determine who is on the app
-        // and resolve their Supabase user ID for DMs.
-        // saved_contacts stores E.164 ("+19546080345"), users stores digits-only ("19546080345").
-        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }
+        while true {
+            let page: [SavedContact] = try await client
+                .from("saved_contacts")
+                .select()
+                .eq("user_id", value: session.user.id.uuidString)
+                .order("name")
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute()
+                .value
 
-        struct PhoneCheck: Decodable { let id: UUID; let phone_number: String }
-        let results: [PhoneCheck] = try await client
-            .from("users")
-            .select("id,phone_number")
-            .in("phone_number", values: digitsOnly)
-            .execute()
-            .value
+            allContacts.append(contentsOf: page)
+            if page.count < pageSize { break }
+            offset += pageSize
+        }
 
-        let appUsersByPhone = Dictionary(
-            results.map { ($0.phone_number, $0.id) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        guard !allContacts.isEmpty else { return allContacts }
 
-        return contacts.map { contact in
+        // Cross-reference with users table (chunked to avoid URL length limits)
+        let digitsOnly = allContacts.map { $0.phoneNumber.filter(\.isNumber) }
+        let appUsersByPhone = try await fetchAppUserPhones(from: digitsOnly)
+
+        return allContacts.map { contact in
             var updated = contact
             let digits = contact.phoneNumber.filter(\.isNumber)
-            if let userId = appUsersByPhone[digits] {
+            if let info = appUsersByPhone[digits] {
                 updated.isAppUser = true
-                updated.appUserId = userId
+                updated.appUserId = info.id
+                // Use app user's profile avatar if contact doesn't have one
+                if updated.avatarUrl == nil {
+                    updated.avatarUrl = info.avatarUrl
+                }
             } else {
                 updated.isAppUser = false
             }
             return updated
         }
+    }
+
+    struct AppUserInfo {
+        let id: UUID
+        let avatarUrl: String?
+    }
+
+    /// Chunked lookup of which phone numbers belong to app users.
+    /// Returns phone → (userId, avatarUrl) mapping.
+    /// Splits into groups of 200 to avoid PostgREST URL length limits.
+    private func fetchAppUserPhones(from phoneDigits: [String]) async throws -> [String: AppUserInfo] {
+        guard !phoneDigits.isEmpty else { return [:] }
+        let chunkSize = 200
+        var result: [String: AppUserInfo] = [:]
+
+        struct PhoneCheck: Decodable { let id: UUID; let phone_number: String; let avatar_url: String? }
+
+        let unique = Array(Set(phoneDigits))
+        for chunkStart in stride(from: 0, to: unique.count, by: chunkSize) {
+            let chunk = Array(unique[chunkStart..<min(chunkStart + chunkSize, unique.count)])
+            let results: [PhoneCheck] = try await client
+                .from("users")
+                .select("id,phone_number,avatar_url")
+                .in("phone_number", values: chunk)
+                .execute()
+                .value
+            for r in results {
+                result[r.phone_number] = AppUserInfo(id: r.id, avatarUrl: r.avatar_url)
+            }
+        }
+        return result
     }
 
     func saveContacts(_ contacts: [UserContact]) async throws -> [SavedContact] {
@@ -1483,6 +1517,89 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
         return saved
+    }
+
+    /// Bulk-syncs device contacts to saved_contacts efficiently.
+    /// Fetches existing contacts once, deduplicates, and upserts only new/changed entries.
+    /// Returns the total number of contacts upserted.
+    func saveContactsBulk(
+        _ contacts: [UserContact],
+        onBatchComplete: @Sendable (Int) -> Void = { _ in }
+    ) async throws -> Int {
+        guard !contacts.isEmpty else { return 0 }
+        let session = try await client.auth.session
+
+        // Deduplicate by phone number (keep first occurrence)
+        var seen = Set<String>()
+        let uniqueContacts = contacts.filter { contact in
+            let key = contact.phoneNumber.filter(\.isNumber)
+            if seen.contains(key) { return false }
+            seen.insert(key)
+            return true
+        }
+
+        // Fetch ALL existing contacts once (paginated)
+        let pageSize = 1000
+        var existingContacts: [SavedContact] = []
+        var offset = 0
+        while true {
+            let page: [SavedContact] = try await client
+                .from("saved_contacts")
+                .select()
+                .eq("user_id", value: session.user.id.uuidString)
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute()
+                .value
+            existingContacts.append(contentsOf: page)
+            if page.count < pageSize { break }
+            offset += pageSize
+        }
+
+        let existingByPhone = Dictionary(
+            existingContacts.map { ($0.phoneNumber.filter(\.isNumber), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        // Check which contacts are app users (chunked)
+        let digitsOnly = uniqueContacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
+        let appUserMap = try await fetchAppUserPhones(from: digitsOnly)
+
+        // Filter to new or name-changed contacts only
+        let toUpsert = uniqueContacts.compactMap { contact -> SavedContact? in
+            let normalized = contact.phoneNumber.filter(\.isNumber)
+            let existing = existingByPhone[normalized]
+
+            if existing == nil || existing?.name != contact.name {
+                let appInfo = appUserMap[normalized]
+                return SavedContact(
+                    id: existing?.id ?? UUID(),
+                    userId: session.user.id,
+                    name: contact.name,
+                    phoneNumber: contact.phoneNumber,
+                    avatarUrl: contact.avatarUrl ?? appInfo?.avatarUrl,
+                    isAppUser: appInfo != nil,
+                    createdAt: existing?.createdAt
+                )
+            }
+            return nil
+        }
+
+        guard !toUpsert.isEmpty else { return 0 }
+
+        // Upsert in batches of 100
+        let batchSize = 100
+        var totalUpserted = 0
+        for batchStart in stride(from: 0, to: toUpsert.count, by: batchSize) {
+            let batch = Array(toUpsert[batchStart..<min(batchStart + batchSize, toUpsert.count)])
+            try await client
+                .from("saved_contacts")
+                .upsert(batch, onConflict: "user_id,phone_number")
+                .execute()
+            totalUpserted += batch.count
+            onBatchComplete(totalUpserted)
+        }
+
+        return totalUpserted
     }
 
     func autoSaveInviteContact(name: String, phoneNumber: String, isAppUser: Bool) async {
@@ -1879,6 +1996,67 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    /// Fetches avatar URLs for a list of user IDs.
+    func fetchUserAvatars(userIds: [UUID]) async throws -> [UUID: String] {
+        guard !userIds.isEmpty else { return [:] }
+        struct UserAvatar: Decodable { let id: UUID; let avatar_url: String? }
+
+        let chunkSize = 200
+        var result: [UUID: String] = [:]
+        let ids = userIds.map(\.uuidString)
+
+        for chunkStart in stride(from: 0, to: ids.count, by: chunkSize) {
+            let chunk = Array(ids[chunkStart..<min(chunkStart + chunkSize, ids.count)])
+            let users: [UserAvatar] = try await client
+                .from("users")
+                .select("id,avatar_url")
+                .in("id", values: chunk)
+                .execute()
+                .value
+            for u in users {
+                if let url = u.avatar_url { result[u.id] = url }
+            }
+        }
+        return result
+    }
+
+    /// Replaces all participants for a play (delete + re-insert).
+    func replacePlayParticipants(playId: UUID, participants: [PlayParticipant]) async throws {
+        try await client
+            .from("play_participants")
+            .delete()
+            .eq("play_id", value: playId.uuidString)
+            .execute()
+
+        if !participants.isEmpty {
+            try await client
+                .from("play_participants")
+                .insert(participants)
+                .execute()
+        }
+    }
+
+    /// Updates specific fields on a play (partial update).
+    func updatePlayFields(id: UUID, fields: [String: AnyJSON]) async throws {
+        try await client
+            .from("plays")
+            .update(fields)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Re-fetches a single play with full joins.
+    func fetchPlayById(_ id: UUID) async throws -> Play {
+        let play: Play = try await client
+            .from("plays")
+            .select(Self.playSelect)
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+        return play
     }
 
     // MARK: - Group Events

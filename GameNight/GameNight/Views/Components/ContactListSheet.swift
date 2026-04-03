@@ -7,6 +7,7 @@ struct ContactListSheet: View {
     @State private var searchText = ""
     @State private var savedContacts: [SavedContact] = []
     @State private var frequentContacts: [FrequentContact] = []
+    @State private var groupMemberContacts: [UserContact] = []
     @State private var currentUserId: UUID?
     @State private var currentUserPhone: String?
     @State private var isLoading = true
@@ -83,6 +84,14 @@ struct ContactListSheet: View {
             guard !seen.contains(normalizedPhone) else { continue }
             seen.insert(normalizedPhone)
             result.append(ic)
+        }
+
+        // Group members — people from user's groups
+        for gm in groupMemberContacts {
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(gm.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
+            result.append(gm)
         }
 
         // Sort by relevance: mutuals → app users → alphabetical
@@ -218,14 +227,10 @@ struct ContactListSheet: View {
         .sheet(isPresented: $showDevicePicker) {
             ContactPickerSheet { deviceContacts in
                 guard !deviceContacts.isEmpty else { return }
-                // Save to Supabase in background
+                // Refresh saved contacts from DB after bulk sync
                 Task {
-                    let supabase = SupabaseService.shared
-                    let saved = (try? await supabase.saveContacts(deviceContacts)) ?? []
-                    for s in saved {
-                        if !savedContacts.contains(where: { $0.phoneNumber == s.phoneNumber }) {
-                            savedContacts.append(s)
-                        }
+                    if let refreshed = try? await SupabaseService.shared.fetchSavedContacts() {
+                        savedContacts = refreshed
                     }
                 }
                 // Pre-select imported contacts in the list — user confirms with "Add (N)"
@@ -299,14 +304,37 @@ struct ContactListSheet: View {
         let supabase = SupabaseService.shared
         async let savedResult = supabase.fetchSavedContacts()
         async let frequentResult = supabase.fetchFrequentContacts()
+        async let groupsResult: [GameGroup]? = try? supabase.fetchGroups()
         async let currentUserResult = try? supabase.fetchCurrentUser()
 
         savedContacts = (try? await savedResult) ?? []
         frequentContacts = (try? await frequentResult) ?? []
-        if let currentUser = await currentUserResult {
+
+        let currentUser = await currentUserResult
+        if let currentUser {
             currentUserId = currentUser.id
             currentUserPhone = ContactPickerService.normalizePhone(currentUser.phoneNumber)
         }
+
+        // Extract group members as UserContacts
+        let groups = await groupsResult ?? []
+        var gmContacts: [UserContact] = []
+        for group in groups {
+            for member in group.members {
+                if let currentUserId, member.userId == currentUserId { continue }
+                gmContacts.append(UserContact(
+                    id: UUID(),
+                    name: member.displayName ?? member.phoneNumber,
+                    phoneNumber: member.phoneNumber,
+                    avatarUrl: nil,
+                    isAppUser: member.userId != nil,
+                    appUserId: member.userId,
+                    source: .appConnection
+                ))
+            }
+        }
+        groupMemberContacts = gmContacts
+
         isLoading = false
     }
 }

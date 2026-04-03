@@ -38,6 +38,28 @@ struct PlayDetailView: View {
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationTitle("Play Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if viewModel.isLogger {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            viewModel.showEditSheet = true
+                        } label: {
+                            Label("Edit Play", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Play", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 17))
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
+                }
+            }
+        }
         .confirmationDialog("Delete this play?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 Task {
@@ -47,9 +69,14 @@ struct PlayDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .sheet(isPresented: $viewModel.showEditSheet) {
+            EditPlaySheet(viewModel: viewModel)
+        }
         .toast($toast)
         .task {
-            await viewModel.loadLinkedEvent()
+            async let eventLoad: () = viewModel.loadLinkedEvent()
+            async let avatarLoad: () = viewModel.loadParticipantAvatars()
+            _ = await (eventLoad, avatarLoad)
         }
     }
 
@@ -158,15 +185,6 @@ struct PlayDetailView: View {
                 Text(viewModel.play.logger?.displayName ?? "Unknown")
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.textSecondary)
-            }
-
-            // Delete
-            if viewModel.isLogger {
-                Button("Delete Play", role: .destructive) {
-                    showDeleteConfirmation = true
-                }
-                .font(Theme.Typography.calloutMedium)
-                .foregroundColor(Theme.Colors.error)
             }
         }
     }
@@ -316,7 +334,38 @@ struct PlayDetailView: View {
 
     // MARK: - Helpers
 
+    private func avatarUrl(for participant: PlayParticipant) -> String? {
+        // App user avatar from DB
+        if let userId = participant.userId, let url = viewModel.participantAvatars[userId] {
+            return url
+        }
+        // Cached local contact photo
+        if let phone = participant.phoneNumber {
+            return ContactPickerService.cachedAvatarUrl(for: phone)
+        }
+        return nil
+    }
+
     private func participantRow(_ participant: PlayParticipant) -> some View {
+        Group {
+            if let userId = participant.userId {
+                NavigationLink {
+                    GuestPublicProfileView(
+                        userId: userId,
+                        name: participant.displayName,
+                        avatarUrl: avatarUrl(for: participant)
+                    )
+                } label: {
+                    participantRowContent(participant)
+                }
+                .buttonStyle(.plain)
+            } else {
+                participantRowContent(participant)
+            }
+        }
+    }
+
+    private func participantRowContent(_ participant: PlayParticipant) -> some View {
         HStack(spacing: Theme.Spacing.md) {
             if let placement = participant.placement {
                 Text("#\(placement)")
@@ -327,7 +376,7 @@ struct PlayDetailView: View {
                 Spacer().frame(width: 28)
             }
 
-            AvatarView(url: nil, size: 32)
+            AvatarView(url: avatarUrl(for: participant), size: 32)
 
             Text(participant.displayName)
                 .font(Theme.Typography.bodyMedium)
@@ -354,6 +403,12 @@ struct PlayDetailView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(Theme.Colors.primary.opacity(0.1)))
+            }
+
+            if participant.userId != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(Theme.Colors.textTertiary)
             }
         }
         .padding(.vertical, Theme.Spacing.xs)
@@ -449,4 +504,272 @@ struct PlayDetailView: View {
         formatter.dateFormat = "MMM d, yyyy"
         return formatter.string(from: viewModel.play.playedAt)
     }
+}
+
+// MARK: - Edit Play Sheet
+
+struct EditPlaySheet: View {
+    @ObservedObject var viewModel: PlayDetailViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var playedAt: Date
+    @State private var durationText: String
+    @State private var notes: String
+    @State private var isCooperative: Bool
+    @State private var cooperativeResult: Play.CooperativeResult?
+    @State private var participants: [EditableParticipant]
+    @State private var isSaving = false
+    @State private var toast: ToastItem?
+
+    init(viewModel: PlayDetailViewModel) {
+        self.viewModel = viewModel
+        let play = viewModel.play
+        _playedAt = State(initialValue: play.playedAt)
+        _durationText = State(initialValue: play.durationMinutes.map { "\($0)" } ?? "")
+        _notes = State(initialValue: play.notes ?? "")
+        _isCooperative = State(initialValue: play.isCooperative)
+        _cooperativeResult = State(initialValue: play.cooperativeResult)
+        _participants = State(initialValue: play.participants.map { p in
+            EditableParticipant(
+                id: p.id,
+                userId: p.userId,
+                phoneNumber: p.phoneNumber,
+                displayName: p.displayName,
+                placement: p.placement,
+                isWinner: p.isWinner,
+                score: p.score,
+                team: p.team
+            )
+        })
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: Theme.Spacing.xxl) {
+                    // Date
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        SectionHeader(title: "Date")
+                        DatePicker("", selection: $playedAt, displayedComponents: [.date])
+                            .datePickerStyle(.compact)
+                            .labelsHidden()
+                    }
+
+                    // Duration
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        SectionHeader(title: "Duration (minutes)")
+                        TextField("e.g. 60", text: $durationText)
+                            .keyboardType(.numberPad)
+                            .font(Theme.Typography.body)
+                            .padding(Theme.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                    .fill(Theme.Colors.fieldBackground)
+                            )
+                    }
+
+                    // Co-op toggle
+                    if isCooperative {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            SectionHeader(title: "Co-op Result")
+                            HStack(spacing: Theme.Spacing.md) {
+                                coopButton(result: .won, label: "Won", icon: "trophy.fill")
+                                coopButton(result: .lost, label: "Lost", icon: "xmark.circle.fill")
+                            }
+                        }
+                    }
+
+                    // Notes
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        SectionHeader(title: "Notes")
+                        TextField("Add notes...", text: $notes, axis: .vertical)
+                            .lineLimit(3...6)
+                            .font(Theme.Typography.body)
+                            .padding(Theme.Spacing.md)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                                    .fill(Theme.Colors.fieldBackground)
+                            )
+                    }
+
+                    // Participants
+                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        SectionHeader(title: "Players")
+
+                        ForEach($participants) { $participant in
+                            editParticipantRow(participant: $participant)
+                        }
+                    }
+
+                    // Save button
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if isSaving {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Save Changes")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle(isEnabled: !isSaving))
+                    .disabled(isSaving)
+                }
+                .padding(Theme.Spacing.xl)
+                .padding(.bottom, 40)
+            }
+            .background(Theme.Colors.background.ignoresSafeArea())
+            .navigationTitle("Edit Play")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(Theme.Colors.textSecondary)
+                }
+            }
+            .toast($toast)
+        }
+    }
+
+    private func coopButton(result: Play.CooperativeResult, label: String, icon: String) -> some View {
+        let isSelected = cooperativeResult == result
+        return Button {
+            cooperativeResult = result
+        } label: {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                Text(label)
+                    .font(Theme.Typography.calloutMedium)
+            }
+            .foregroundColor(isSelected ? .white : Theme.Colors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(Theme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                    .fill(isSelected
+                          ? (result == .won ? Theme.Colors.success : Theme.Colors.error)
+                          : Theme.Colors.cardBackground)
+            )
+        }
+    }
+
+    private func editParticipantRow(participant: Binding<EditableParticipant>) -> some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            HStack(spacing: Theme.Spacing.md) {
+                Text(participant.wrappedValue.displayName)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+
+                Spacer()
+
+                if !isCooperative {
+                    Toggle("Winner", isOn: participant.isWinner)
+                        .toggleStyle(.switch)
+                        .tint(Theme.Colors.accentWarm)
+                        .labelsHidden()
+
+                    if participant.wrappedValue.isWinner {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Theme.Colors.accentWarm)
+                    }
+                }
+            }
+
+            if !isCooperative {
+                HStack(spacing: Theme.Spacing.md) {
+                    HStack(spacing: 4) {
+                        Text("#")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        TextField("Place", text: Binding(
+                            get: { participant.wrappedValue.placement.map { "\($0)" } ?? "" },
+                            set: { participant.wrappedValue.placement = Int($0) }
+                        ))
+                        .keyboardType(.numberPad)
+                        .font(Theme.Typography.callout)
+                        .frame(width: 50)
+                    }
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .fill(Theme.Colors.fieldBackground)
+                    )
+
+                    HStack(spacing: 4) {
+                        Text("Pts")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                        TextField("Score", text: Binding(
+                            get: { participant.wrappedValue.score.map { "\($0)" } ?? "" },
+                            set: { participant.wrappedValue.score = Int($0) }
+                        ))
+                        .keyboardType(.numberPad)
+                        .font(Theme.Typography.callout)
+                        .frame(width: 60)
+                    }
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                            .fill(Theme.Colors.fieldBackground)
+                    )
+
+                    Spacer()
+                }
+            }
+        }
+        .padding(Theme.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                .fill(Theme.Colors.cardBackground)
+        )
+    }
+
+    private func save() async {
+        isSaving = true
+        let duration = Int(durationText)
+        let updatedParticipants = participants.map { p in
+            PlayParticipant(
+                id: p.id,
+                playId: viewModel.play.id,
+                userId: p.userId,
+                phoneNumber: p.phoneNumber,
+                displayName: p.displayName,
+                placement: p.placement,
+                isWinner: p.isWinner,
+                score: p.score,
+                team: p.team
+            )
+        }
+
+        let success = await viewModel.saveEdit(
+            playedAt: playedAt,
+            durationMinutes: duration,
+            notes: notes.isEmpty ? nil : notes,
+            isCooperative: isCooperative,
+            cooperativeResult: isCooperative ? cooperativeResult : nil,
+            participants: updatedParticipants
+        )
+
+        isSaving = false
+        if success {
+            dismiss()
+        } else {
+            toast = ToastItem(style: .error, message: "Failed to save changes")
+        }
+    }
+}
+
+// MARK: - Editable Participant
+
+struct EditableParticipant: Identifiable {
+    let id: UUID
+    var userId: UUID?
+    var phoneNumber: String?
+    var displayName: String
+    var placement: Int?
+    var isWinner: Bool
+    var score: Int?
+    var team: String?
 }
