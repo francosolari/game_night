@@ -123,9 +123,9 @@ struct PollVotingView: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             ForEach(timeOptions) { option in
-                HStack(spacing: Theme.Spacing.md) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                     // Date and time
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Text(option.displayDate)
                                 .font(Theme.Typography.bodyMedium)
@@ -144,13 +144,11 @@ struct PollVotingView: View {
                             .foregroundColor(Theme.Colors.textPrimary)
                     }
 
-                    Spacer()
-
                     // Vote buttons
                     HStack(spacing: Theme.Spacing.sm) {
                         TriStateVoteButton(
                             icon: "checkmark",
-                            label: "Yes",
+                            label: "Going",
                             color: Theme.Colors.success,
                             isSelected: votes[option.id] == .yes
                         ) {
@@ -168,7 +166,7 @@ struct PollVotingView: View {
 
                         TriStateVoteButton(
                             icon: "xmark",
-                            label: "No",
+                            label: "Can't",
                             color: Theme.Colors.error,
                             isSelected: votes[option.id] == .no
                         ) {
