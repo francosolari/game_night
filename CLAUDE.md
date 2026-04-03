@@ -2,13 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General Rules
+- When fixing bugs, make minimal targeted changes first. Do not refactor surrounding code or change approach without user approval. If a fix doesn't work on first attempt, pause and explain the root cause before trying a different approach.
+- Build sustainably and responsibly to production coding standards from a FAANG company expectation
+
 ## Guidelines
 - When working on Supabase backend, avoid SECURITY_DEFINER wherever possible
-- Build sustainably and responsibly to production coding standards from a FAANG company expectation
 - When doing UI Elements reference the BrandGuidelines and support light and dark mode
 - For interactive elements be sure to add toasts where necessary
 - When doing any RLS policies reference (`.agents/skills/supabase-audit-rls/`) to validate 
-- xcodegen and xcodebuild to verify iOS changes
+- Verify iOS changes with xcodegen and xcodebuild
+
 
 ## Project Overview
 
@@ -18,6 +22,9 @@ Game Night is a full-stack iOS app for scheduling game nights with friends. It c
 - **Web RSVP page** (`InviteWeb/`) — standalone HTML page for non-app users to RSVP
 
 ## Build & Run
+
+### Build Process
+- After any file creation or deletion in the Xcode project, always run `xcodegen` to regenerate the project file before attempting a build.
 
 ### iOS App
 The Xcode project is at `GameNight/GameNight.xcodeproj`. It uses XcodeGen (`project.yml`) for project generation.
@@ -40,7 +47,9 @@ Copy `GameNight/GameNight/App/Secrets.swift.example` to `Secrets.swift` and fill
 
 Root `.env` file (from `.env.example`) holds Supabase, Twilio, and R2 credentials for edge functions.
 
-### Supabase
+### Supabase & Database
+- When modifying Supabase RLS policies, always check for recursive policy references (e.g., table A's policy queries table B which queries table A). Test by running a simple SELECT as an authenticated user after applying migrations.
+
 ```bash
 # Start local Supabase
 supabase start
@@ -75,6 +84,13 @@ supabase functions deploy r2-delete
 - Auth flow: phone OTP via Supabase Auth + Twilio SMS
 - Tiered invite system: invites sent in waves, auto-promoted on decline
 - Supabase RealtimeChannelV2 for live event updates
+
+### SwiftUI Patterns
+- Avoid complex type expressions in single views; extract subviews to reduce type-checker load.
+- When working with ScrollView + tap gestures, use `.contentShape(Rectangle())` and avoid nested Button/onTapGesture conflicts.
+
+### Swift Code Conventions
+- When adding new enum cases (e.g., MessageType, notification types), always update ALL switch statements and Codable conformances across the codebase. Use Grep to find all references before declaring the change complete.
 
 ### Database Schema (Supabase)
 Core tables: `users`, `games`, `game_library`, `game_categories`, `groups`, `group_members`, `events`, `event_games`, `time_options`, `invites`, `consent_log`, `blocked_users`
