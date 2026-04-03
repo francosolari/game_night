@@ -5,8 +5,10 @@ struct TimePollDetailSheet: View {
     let voters: [UUID: [TimeOptionVoter]]
     let isHost: Bool
     let pollVotes: [UUID: TimeOptionVoteType]
+    let canVoteDirectly: Bool
     let initialOptionId: UUID
     let onVote: (UUID, TimeOptionVoteType) async -> Void
+    let onRequireRSVP: () -> Void
     let onConfirmTime: ((UUID) async -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -115,7 +117,12 @@ struct TimePollDetailSheet: View {
                         color: Theme.Colors.success,
                         isSelected: myVote == .yes
                     ) {
-                        Task { await onVote(option.id, .yes) }
+                        if canVoteDirectly {
+                            Task { await onVote(option.id, .yes) }
+                        } else {
+                            dismiss()
+                            onRequireRSVP()
+                        }
                     }
                     TimeVotePill(
                         label: "Maybe",
@@ -123,7 +130,12 @@ struct TimePollDetailSheet: View {
                         color: Theme.Colors.warning,
                         isSelected: myVote == .maybe
                     ) {
-                        Task { await onVote(option.id, .maybe) }
+                        if canVoteDirectly {
+                            Task { await onVote(option.id, .maybe) }
+                        } else {
+                            dismiss()
+                            onRequireRSVP()
+                        }
                     }
                     TimeVotePill(
                         label: "No",
@@ -131,7 +143,12 @@ struct TimePollDetailSheet: View {
                         color: Theme.Colors.error,
                         isSelected: myVote == .no
                     ) {
-                        Task { await onVote(option.id, .no) }
+                        if canVoteDirectly {
+                            Task { await onVote(option.id, .no) }
+                        } else {
+                            dismiss()
+                            onRequireRSVP()
+                        }
                     }
                 }
             }

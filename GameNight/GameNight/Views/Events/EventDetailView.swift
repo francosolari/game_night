@@ -75,14 +75,13 @@ struct EventDetailView: View {
                                     voters: viewModel.timeOptionVoters,
                                     isHost: viewModel.isOwner,
                                     pollVotes: pollVotes,
+                                    canVoteDirectly: viewModel.canEditPollVotesDirectly,
                                     onVote: { optionId, voteType in
-                                        guard viewModel.canEditPollVotesDirectly else {
-                                            viewModel.toast = ToastItem(style: .info, message: "RSVP first to vote on times.")
-                                            showRSVPSheet = true
-                                            return
-                                        }
                                         pollVotes[optionId] = voteType
                                         await viewModel.voteOnTimeOption(optionId: optionId, voteType: voteType)
+                                    },
+                                    onRequireRSVP: {
+                                        showRSVPSheet = true
                                     },
                                     onConfirmTime: viewModel.isOwner ? { timeOptionId in
                                         await viewModel.confirmTimeOption(timeOptionId: timeOptionId)

@@ -933,6 +933,7 @@ final class EventViewModelTests: XCTestCase {
         XCTAssertEqual(summary.waitlisted, 0)
         XCTAssertEqual(summary.acceptedUsers.first?.name, "Franco")
     }
+
 }
 
 final class EventEditSavePresentationTests: XCTestCase {

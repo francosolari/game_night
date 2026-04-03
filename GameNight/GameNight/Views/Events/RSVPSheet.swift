@@ -17,7 +17,7 @@ struct RSVPSheet: View {
 
     private var canSubmit: Bool {
         if isPollMode {
-            return PollRSVP.derivedStatus(from: pollVotes) != nil && !isSending
+            return PollRSVP.submissionStatus(from: pollVotes) != nil && !isSending
         }
         return selectedStatus != nil && !isSending
     }
@@ -41,8 +41,8 @@ struct RSVPSheet: View {
                                 votes: $pollVotes
                             )
 
-                            if let status = PollRSVP.derivedStatus(from: pollVotes) {
-                                Text("Current RSVP from your votes: \(status.rsvpDisplayLabel)")
+                            if PollRSVP.submissionStatus(from: pollVotes) != nil {
+                                Text("Votes saved as pending until the host confirms a time.")
                                     .font(Theme.Typography.caption)
                                     .foregroundColor(Theme.Colors.textSecondary)
                             } else {
@@ -120,8 +120,8 @@ struct RSVPSheet: View {
                         let status: InviteStatus
                         let votes: [TimeOptionVote]
                         if isPollMode {
-                            guard let derived = PollRSVP.derivedStatus(from: pollVotes) else { return }
-                            status = derived
+                            guard let submissionStatus = PollRSVP.submissionStatus(from: pollVotes) else { return }
+                            status = submissionStatus
                             votes = pollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
                         } else {
                             guard let selectedStatus else { return }

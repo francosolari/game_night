@@ -70,6 +70,17 @@ final class InviteStatusTests: XCTestCase {
         XCTAssertNil(PollRSVP.derivedStatus(from: [:]))
     }
 
+    func testPollRSVPSubmissionStatusIsPendingWhenVotesExist() {
+        let votes: [UUID: TimeOptionVoteType] = [
+            UUID(): .yes
+        ]
+        XCTAssertEqual(PollRSVP.submissionStatus(from: votes), .pending)
+    }
+
+    func testPollRSVPSubmissionStatusIsNilWhenNoVotesExist() {
+        XCTAssertNil(PollRSVP.submissionStatus(from: [:]))
+    }
+
     func testGroupEmojiSanitizerFallsBackForInvalidValues() {
         XCTAssertEqual(GroupEmojiSanitizer.sanitized(nil), "🎲")
         XCTAssertEqual(GroupEmojiSanitizer.sanitized(""), "🎲")

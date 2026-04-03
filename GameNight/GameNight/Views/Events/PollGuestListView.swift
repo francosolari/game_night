@@ -5,7 +5,9 @@ struct PollGuestListView: View {
     let voters: [UUID: [TimeOptionVoter]]
     let isHost: Bool
     let pollVotes: [UUID: TimeOptionVoteType]
+    let canVoteDirectly: Bool
     let onVote: (UUID, TimeOptionVoteType) async -> Void
+    let onRequireRSVP: () -> Void
     let onConfirmTime: ((UUID) async -> Void)?
 
     @State private var selectedOptionId: UUID?
@@ -59,8 +61,13 @@ struct PollGuestListView: View {
                     voters: voters,
                     isHost: isHost,
                     pollVotes: pollVotes,
+                    canVoteDirectly: canVoteDirectly,
                     initialOptionId: optionId,
                     onVote: onVote,
+                    onRequireRSVP: {
+                        selectedOptionId = nil
+                        onRequireRSVP()
+                    },
                     onConfirmTime: onConfirmTime
                 )
             }

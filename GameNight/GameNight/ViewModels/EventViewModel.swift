@@ -95,7 +95,9 @@ final class EventViewModel: ObservableObject {
 
     var canEditPollVotesDirectly: Bool {
         if isOwner { return true }
-        guard let status = myInvite?.status else { return false }
+        guard let invite = myInvite else { return false }
+        if !myPollVotes.isEmpty { return true }
+        let status = invite.status
         return status == .accepted || status == .maybe
     }
 
@@ -332,17 +334,14 @@ final class EventViewModel: ObservableObject {
 
     func voteOnTimeOption(optionId: UUID, voteType: TimeOptionVoteType) async {
         guard let eventId = event?.id, let invite = myInvite else { return }
-        guard invite.status != .pending else {
-            self.error = "RSVP first to vote on time options."
-            return
-        }
         do {
             // Re-submit all current votes with this one updated
             myPollVotes[optionId] = voteType
             let allVotes = myPollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
+            let statusToPersist: InviteStatus = event?.scheduleMode == .poll ? .pending : invite.status
             try await supabase.respondToInvite(
                 inviteId: invite.id,
-                status: invite.status,
+                status: statusToPersist,
                 timeVotes: allVotes,
                 suggestedTimes: nil
             )

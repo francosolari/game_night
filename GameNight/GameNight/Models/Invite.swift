@@ -219,6 +219,13 @@ enum PollRSVP {
         }
         return .declined
     }
+
+    /// RSVP status to persist while a poll is still open.
+    /// The final accepted/maybe/declined status is resolved when the host confirms a date.
+    static func submissionStatus(from votes: [UUID: TimeOptionVoteType]) -> InviteStatus? {
+        guard !votes.isEmpty else { return nil }
+        return .pending
+    }
 }
 
 // MARK: - Invite Summary (for event detail view)
