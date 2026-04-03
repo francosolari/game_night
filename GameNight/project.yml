@@ -54,6 +54,30 @@ targets:
     dependencies:
       - package: Supabase
 
+  GameNightNSE:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: GameNightNSE/Sources
+    info:
+      path: GameNightNSE/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+    entitlements:
+      path: GameNightNSE/GameNightNSE.entitlements
+      properties:
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cardboardwithme.app.NotificationServiceExtension
+        DEVELOPMENT_TEAM: "8AGP3ZJ77K"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        CODE_SIGN_ENTITLEMENTS: GameNightNSE/GameNightNSE.entitlements
+
   GameNightTests:
     type: bundle.unit-test
     platform: iOS
@@ -73,6 +97,7 @@ schemes:
     build:
       targets:
         GameNight: all
+        GameNightNSE: all
     test:
       targets:
         - GameNightTests

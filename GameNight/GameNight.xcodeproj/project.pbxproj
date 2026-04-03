@@ -35,6 +35,7 @@
 		160BF49B9AE94EDA37D53FFE /* GameVotingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DCF17A5CC08E893A25FFA /* GameVotingView.swift */; };
 		179E1C317484D4C3C93ACE75 /* powered_by_logo_02_MED.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0588B6B3F9D68470EFE31748 /* powered_by_logo_02_MED.jpg */; };
 		190119C668A74F1F6FE44FE1 /* HomeDataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7662709E90472C3F5A6F3D9 /* HomeDataLoader.swift */; };
+		1EC44BDDB21E0C40100023A3 /* EventNotFoundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0BC215E1DDD8E9B0845D18 /* EventNotFoundView.swift */; };
 		1F834BF50C8D07CCF689978E /* BrandGuide.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C135DC91A4CA9B6DFFBC537 /* BrandGuide.swift */; };
 		200C8E68E07D69CF159A0223 /* SearchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3493414C1EA4EA910807E03E /* SearchBar.swift */; };
 		222C8545BDCB2BF28EC20D1F /* PhotoPickerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756FA3B5A4CFD303D9587442 /* PhotoPickerButton.swift */; };
@@ -147,6 +148,7 @@
 		CF9609589BE5BD894650DB87 /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF66335DE47AC248FA2EC911 /* ConversationViewModel.swift */; };
 		D64C5C08692476E0E5786CB9 /* Secrets.swift.example in Resources */ = {isa = PBXBuildFile; fileRef = BFCE44DB7F63902750892756 /* Secrets.swift.example */; };
 		D7358196973474782DD6ABDD /* GroupPlayHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1DF51217739522D1F3F21F6 /* GroupPlayHistoryView.swift */; };
+		D84A244D5707D14196008CE1 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF42E6F3A46F3F230B0203C6 /* NotificationService.swift */; };
 		D8BA6CA0E91A2ABEAEF147C0 /* GameEventDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F38EB39579296EB1CC1BD9F /* GameEventDecodingTests.swift */; };
 		D94640388C537F8DD69FD0B5 /* GroupInviteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9980167E08A72DABE640CA43 /* GroupInviteCard.swift */; };
 		D9C1645B40A95FFB5E700395 /* PhoneNumberFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA929ACDD2447D825A52AFCF /* PhoneNumberFormatter.swift */; };
@@ -225,6 +227,7 @@
 		1BECB5EF6B1D940C57C5292A /* InboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxViewModel.swift; sourceTree = "<group>"; };
 		1C0328B731FA36656D48902F /* VerticalEventCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerticalEventCard.swift; sourceTree = "<group>"; };
 		1C135DC91A4CA9B6DFFBC537 /* BrandGuide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandGuide.swift; sourceTree = "<group>"; };
+		1F0BC215E1DDD8E9B0845D18 /* EventNotFoundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventNotFoundView.swift; sourceTree = "<group>"; };
 		1F239185B01071F4A9E3706E /* PlayLoggingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayLoggingSheet.swift; sourceTree = "<group>"; };
 		226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriStateVoteButton.swift; sourceTree = "<group>"; };
 		238430570524288B6F6B8142 /* GameExpansion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameExpansion.swift; sourceTree = "<group>"; };
@@ -327,6 +330,7 @@
 		9CD8ECB4FD6B977AC4080015 /* InviteLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteLinkSheet.swift; sourceTree = "<group>"; };
 		A1533748CFDA944B1B50FCE3 /* powered_by_BGG_04_XL.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = powered_by_BGG_04_XL.png; sourceTree = "<group>"; };
 		A3EBA617F8648EB89DD27D6A /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		A52FDC7F7A3AA667F78FB725 /* GameNightNSE.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = GameNightNSE.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTestHelpers.swift; sourceTree = "<group>"; };
 		ABF14C370F1450519DA68373 /* powered-by-bgg-rgb.svg */ = {isa = PBXFileReference; path = "powered-by-bgg-rgb.svg"; sourceTree = "<group>"; };
 		AC348B1DF846B0EA1FED19F6 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
@@ -370,6 +374,7 @@
 		DC3D86B22BD75AA9FD76C86A /* GenerativeEventCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerativeEventCover.swift; sourceTree = "<group>"; };
 		DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeOptionPicker.swift; sourceTree = "<group>"; };
 		DE9A5F9CD88A16183D2A05E0 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		DF42E6F3A46F3F230B0203C6 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		E1DF51217739522D1F3F21F6 /* GroupPlayHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupPlayHistoryView.swift; sourceTree = "<group>"; };
 		E3B8E4CC4D7BFC6FCB66627B /* TagFlowSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagFlowSection.swift; sourceTree = "<group>"; };
 		E3CF6DCAC2DD0381444E8466 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
@@ -423,6 +428,7 @@
 				3C687BB107656027493FF5F5 /* DateTimePickerSheet.swift */,
 				EB908E82EA559E0F90FC99D1 /* EventCoverPickerSheet.swift */,
 				5438E24E75BD13B48ABCAD82 /* EventDetailView.swift */,
+				1F0BC215E1DDD8E9B0845D18 /* EventNotFoundView.swift */,
 				056DCF17A5CC08E893A25FFA /* GameVotingView.swift */,
 				3926C65D6513E68EE254B8FC /* GuestListTabsView.swift */,
 				CBC38F59DC411C994F0FD646 /* GuestPublicProfileView.swift */,
@@ -451,6 +457,15 @@
 				A1D70900596CC2BD4900E93A /* Profile */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		0FF8589CBD06FFFC85983614 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				DF42E6F3A46F3F230B0203C6 /* NotificationService.swift */,
+			);
+			name = Sources;
+			path = GameNightNSE/Sources;
 			sourceTree = "<group>";
 		};
 		16CB36AC113DDE4667C45E35 /* Models */ = {
@@ -694,6 +709,7 @@
 			isa = PBXGroup;
 			children = (
 				741003CC770B3125DDDBE6B1 /* GameNight.app */,
+				A52FDC7F7A3AA667F78FB725 /* GameNightNSE.appex */,
 				31434809C693D97EB052C01B /* GameNightTests.xctest */,
 			);
 			name = Products;
@@ -865,6 +881,7 @@
 			children = (
 				48574BC30B49C47BE3D066D2 /* GameNight */,
 				FDAFFDEAE82B73E03EE10816 /* GameNightTests */,
+				0FF8589CBD06FFFC85983614 /* Sources */,
 				87EA7F5F5824EA3D8DE2565F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -911,6 +928,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1355528B0EA99B8974FABA16 /* GameNightNSE */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F1F41A5104739075E53AF3A /* Build configuration list for PBXNativeTarget "GameNightNSE" */;
+			buildPhases = (
+				128256B0B2160FD825A6C45F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GameNightNSE;
+			packageProductDependencies = (
+			);
+			productName = GameNightNSE;
+			productReference = A52FDC7F7A3AA667F78FB725 /* GameNightNSE.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		75CD55396B656CDC23C43D79 /* GameNight */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 53A235A7B29198BF51C1DB67 /* Build configuration list for PBXNativeTarget "GameNight" */;
@@ -958,6 +992,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					1355528B0EA99B8974FABA16 = {
+						DevelopmentTeam = 8AGP3ZJ77K;
+					};
 					75CD55396B656CDC23C43D79 = {
 						DevelopmentTeam = 8AGP3ZJ77K;
 					};
@@ -984,6 +1021,7 @@
 			projectRoot = "";
 			targets = (
 				75CD55396B656CDC23C43D79 /* GameNight */,
+				1355528B0EA99B8974FABA16 /* GameNightNSE */,
 				AA5A455E791E11F260F2BA8B /* GameNightTests */,
 			);
 		};
@@ -1070,6 +1108,7 @@
 				0B1B53A086B2D5C634FB2153 /* EventDetailView.swift in Sources */,
 				E4782D56AE4290B0E2B131C0 /* EventLocationLabel.swift in Sources */,
 				B13BAB49FBD99CAF5EE87A26 /* EventLocationPresentation.swift in Sources */,
+				1EC44BDDB21E0C40100023A3 /* EventNotFoundView.swift in Sources */,
 				EC928EA881FC49F3BC324924 /* EventViewModel.swift in Sources */,
 				52828E31ED83EE3FEC20F3BC /* EventVisibility.swift in Sources */,
 				AC1822A41E9E407C78AA5318 /* ExpandableGameGrid.swift in Sources */,
@@ -1173,6 +1212,14 @@
 				5856F38C7AADFFEC6311D458 /* VerticalEventCard.swift in Sources */,
 				9E72702398FD0A62ABC50C5B /* ViewModifiers.swift in Sources */,
 				AE7D5DFE9435450D6B8B8BFB /* VoterAvatarStack.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		128256B0B2160FD825A6C45F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D84A244D5707D14196008CE1 /* NotificationService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1327,6 +1374,25 @@
 			};
 			name = Debug;
 		};
+		200DA6ABDD48638FD1091282 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = GameNightNSE/GameNightNSE.entitlements;
+				DEVELOPMENT_TEAM = 8AGP3ZJ77K;
+				INFOPLIST_FILE = GameNightNSE/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.cardboardwithme.app.NotificationServiceExtension;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		6BA4C1C1E6255A809E39580E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1386,6 +1452,25 @@
 			};
 			name = Debug;
 		};
+		F078672A330B05BBECC7D439 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = GameNightNSE/GameNightNSE.entitlements;
+				DEVELOPMENT_TEAM = 8AGP3ZJ77K;
+				INFOPLIST_FILE = GameNightNSE/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.cardboardwithme.app.NotificationServiceExtension;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		FB18C039452B8902872FFB20 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1415,6 +1500,15 @@
 			buildConfigurations = (
 				BEA102E4C2F0F95CE2C4B343 /* Debug */,
 				8BE0CBFE87DB5D77DE22143E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4F1F41A5104739075E53AF3A /* Build configuration list for PBXNativeTarget "GameNightNSE" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F078672A330B05BBECC7D439 /* Debug */,
+				200DA6ABDD48638FD1091282 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

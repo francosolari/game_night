@@ -38,6 +38,8 @@ struct EventDetailView: View {
             ScrollView {
                 if viewModel.isLoading {
                     LoadingView()
+                } else if viewModel.isNotFound {
+                    EventNotFoundView()
                 } else if let event = viewModel.event {
                     VStack(spacing: 0) {
                         // 1. Hero cover with overlay (title, RSVP, location, host, date badge)

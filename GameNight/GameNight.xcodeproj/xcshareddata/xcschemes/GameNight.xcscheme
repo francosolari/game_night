@@ -21,6 +21,20 @@
                ReferencedContainer = "container:GameNight.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1355528B0EA99B8974FABA16"
+               BuildableName = "GameNightNSE.appex"
+               BlueprintName = "GameNightNSE"
+               ReferencedContainer = "container:GameNight.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

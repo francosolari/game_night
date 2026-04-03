@@ -163,6 +163,7 @@ final class EventViewModel: ObservableObject {
         }
 
         isLoading = true
+        isNotFound = false
         do {
             async let eventResult = supabase.fetchEvent(id: id)
             async let invitesResult = supabase.fetchInvites(eventId: id)
@@ -191,7 +192,9 @@ final class EventViewModel: ObservableObject {
             // Subscribe to realtime updates
             subscribeIfNeeded(eventId: id)
         } catch {
-            self.error = error.localizedDescription
+            // Any failure here means the event can't be shown — deleted, no access, or not found.
+            // Show a friendly not-found screen rather than a blank view.
+            self.isNotFound = true
         }
         isLoading = false
     }

@@ -14,9 +14,53 @@ final class PushNotificationManager: NSObject, ObservableObject, UNUserNotificat
         UNUserNotificationCenter.current().delegate = self
     }
 
+    // MARK: - Notification Categories
+
+    func registerNotificationCategories() {
+        let acceptAction = UNNotificationAction(
+            identifier: "INVITE_ACCEPT",
+            title: "Accept",
+            options: [.foreground]
+        )
+        let declineAction = UNNotificationAction(
+            identifier: "INVITE_DECLINE",
+            title: "Decline",
+            options: [.foreground, .destructive]
+        )
+
+        let categories: Set<UNNotificationCategory> = [
+            UNNotificationCategory(
+                identifier: "INVITE_ACTION",
+                actions: [acceptAction, declineAction],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "EVENT_UPDATE",
+                actions: [],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "GROUP_ACTION",
+                actions: [],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "DM_ACTION",
+                actions: [],
+                intentIdentifiers: [],
+                options: []
+            ),
+        ]
+        UNUserNotificationCenter.current().setNotificationCategories(categories)
+    }
+
     // MARK: - Permission
 
     func requestPermission() async -> Bool {
+        registerNotificationCategories()
         do {
             let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
             if granted {
@@ -64,16 +108,25 @@ final class PushNotificationManager: NSObject, ObservableObject, UNUserNotificat
         completionHandler([.banner, .badge, .sound])
     }
 
-    // Handle notification tap
+    // Handle notification tap or action button press
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
+        let actionId = response.actionIdentifier
 
-        Task { @MainActor in
-            handleNotificationTap(userInfo: userInfo)
+        // Accept/Decline buttons and default tap all open the relevant detail screen.
+        // Full in-app handling (updating RSVP status) happens once the view is presented.
+        let shouldNavigate = actionId == UNNotificationDefaultActionIdentifier
+            || actionId == "INVITE_ACCEPT"
+            || actionId == "INVITE_DECLINE"
+
+        if shouldNavigate {
+            Task { @MainActor in
+                handleNotificationTap(userInfo: userInfo)
+            }
         }
 
         completionHandler()

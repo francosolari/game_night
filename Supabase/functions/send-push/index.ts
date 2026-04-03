@@ -26,6 +26,13 @@ interface WebhookPayload {
   };
 }
 
+interface NotificationEnrichment {
+  subtitle?: string;
+  body?: string;
+  image_url?: string;
+  category?: string;
+}
+
 // Map notification type to preference field
 const TYPE_TO_PREFERENCE: Record<string, string> = {
   invite_received: "invites_enabled",
@@ -38,6 +45,176 @@ const TYPE_TO_PREFERENCE: Record<string, string> = {
   game_confirmed: "invites_enabled",
   event_cancelled: "invites_enabled",
 };
+
+// Pick best available image from event data
+function pickEventImageUrl(event: {
+  cover_image_url?: string | null;
+  event_games?: Array<{
+    is_primary?: boolean;
+    sort_order?: number;
+    game?: { image_url?: string | null; thumbnail_url?: string | null } | null;
+  }> | null;
+  host?: { avatar_url?: string | null } | null;
+}): string | undefined {
+  if (event.cover_image_url) return event.cover_image_url;
+  const games = event.event_games ?? [];
+  const sorted = [...games].sort((a, b) => {
+    if (a.is_primary && !b.is_primary) return -1;
+    if (!a.is_primary && b.is_primary) return 1;
+    return (a.sort_order ?? 99) - (b.sort_order ?? 99);
+  });
+  const primary = sorted[0];
+  if (primary?.game?.image_url) return primary.game.image_url;
+  if (primary?.game?.thumbnail_url) return primary.game.thumbnail_url;
+  if (event.host?.avatar_url) return event.host.avatar_url;
+  return undefined;
+}
+
+// Format an ISO date string into a human-readable string e.g. "Sat, Apr 12 at 7:00 PM"
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+    const time = d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC",
+    });
+    return `${date} at ${time}`;
+  } catch {
+    return iso;
+  }
+}
+
+// Build enrichment data for each notification type
+async function buildEnrichment(
+  supabase: ReturnType<typeof createServiceClient>,
+  notification: WebhookPayload["record"]
+): Promise<NotificationEnrichment> {
+  const type = notification.type;
+
+  // --- Event-based types ---
+  if (notification.event_id && type !== "group_invite" && type !== "dm_received") {
+    const { data: event } = await supabase
+      .from("events")
+      .select(`
+        title,
+        cover_image_url,
+        location,
+        confirmed_time_option_id,
+        host:users!host_id(display_name, avatar_url),
+        event_games(is_primary, sort_order, game:games(name, image_url, thumbnail_url)),
+        time_options(id, start_time),
+        confirmed_game:games!confirmed_game_id(name, image_url, thumbnail_url)
+      `)
+      .eq("id", notification.event_id)
+      .maybeSingle();
+
+    if (!event) return {};
+
+    const imageUrl = pickEventImageUrl(event as Parameters<typeof pickEventImageUrl>[0]);
+    const hostName = (event.host as { display_name?: string } | null)?.display_name;
+    const location = (event as { location?: string | null }).location;
+
+    switch (type) {
+      case "invite_received": {
+        const bodyParts = [
+          hostName ? `From ${hostName}` : null,
+          location || null,
+        ].filter(Boolean);
+        return {
+          subtitle: event.title,
+          body: bodyParts.length > 0 ? bodyParts.join(" · ") : undefined,
+          image_url: imageUrl,
+          category: "INVITE_ACTION",
+        };
+      }
+
+      case "rsvp_update":
+        return {
+          subtitle: event.title,
+          image_url: imageUrl,
+          category: "EVENT_UPDATE",
+        };
+
+      case "time_confirmed": {
+        const confirmedOptionId = (event as { confirmed_time_option_id?: string | null }).confirmed_time_option_id;
+        const timeOptions = (event as { time_options?: Array<{ id: string; start_time: string }> | null }).time_options ?? [];
+        const confirmedOption = timeOptions.find((t) => t.id === confirmedOptionId);
+        return {
+          subtitle: event.title,
+          body: confirmedOption ? formatDate(confirmedOption.start_time) : undefined,
+          image_url: imageUrl,
+          category: "EVENT_UPDATE",
+        };
+      }
+
+      case "game_confirmed": {
+        const confirmedGame = (event as { confirmed_game?: { name?: string; image_url?: string | null; thumbnail_url?: string | null } | null }).confirmed_game;
+        return {
+          subtitle: event.title,
+          body: confirmedGame?.name ? `${confirmedGame.name} is on the table!` : undefined,
+          image_url: confirmedGame?.image_url ?? confirmedGame?.thumbnail_url ?? imageUrl,
+          category: "EVENT_UPDATE",
+        };
+      }
+
+      case "bench_promoted":
+      case "event_cancelled":
+      case "text_blast":
+        return {
+          subtitle: event.title,
+          image_url: imageUrl,
+          category: type === "event_cancelled" ? "EVENT_UPDATE" : "EVENT_UPDATE",
+        };
+
+      default:
+        return { subtitle: event.title, image_url: imageUrl, category: "EVENT_UPDATE" };
+    }
+  }
+
+  // --- Group invite ---
+  if (type === "group_invite" && notification.group_id) {
+    const { data: group } = await supabase
+      .from("groups")
+      .select("name, emoji, owner:users!owner_id(display_name, avatar_url)")
+      .eq("id", notification.group_id)
+      .maybeSingle();
+
+    if (!group) return { category: "GROUP_ACTION" };
+    const ownerName = (group.owner as { display_name?: string } | null)?.display_name;
+    const ownerAvatar = (group.owner as { avatar_url?: string | null } | null)?.avatar_url;
+    return {
+      subtitle: ownerName ? `By ${ownerName}` : undefined,
+      image_url: ownerAvatar ?? undefined,
+      category: "GROUP_ACTION",
+    };
+  }
+
+  // --- DM received ---
+  if (type === "dm_received") {
+    const senderId = notification.metadata?.sender_id as string | undefined;
+    if (senderId) {
+      const { data: sender } = await supabase
+        .from("users")
+        .select("avatar_url")
+        .eq("id", senderId)
+        .maybeSingle();
+      return {
+        image_url: (sender as { avatar_url?: string | null } | null)?.avatar_url ?? undefined,
+        category: "DM_ACTION",
+      };
+    }
+    return { category: "DM_ACTION" };
+  }
+
+  return {};
+}
 
 // Generate JWT for APNs authentication
 async function generateAPNsJWT(): Promise<string> {
@@ -134,12 +311,15 @@ serve(async (req) => {
       );
     }
 
-    // Get unread count for badge
-    const { count: unreadCount } = await supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", notification.user_id)
-      .is("read_at", null);
+    // Fetch unread count for badge and enrichment data in parallel
+    const [{ count: unreadCount }, enrichment] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", notification.user_id)
+        .is("read_at", null),
+      buildEnrichment(supabase, notification),
+    ]);
 
     // Generate APNs JWT
     let jwt: string;
@@ -158,23 +338,27 @@ serve(async (req) => {
         ? "api.push.apple.com"
         : "api.sandbox.push.apple.com";
 
-    // Build APNs payload
+    // Build APNs payload — undefined values are dropped by JSON.stringify
     const apnsPayload = {
       aps: {
         alert: {
           title: notification.title,
-          body: notification.body || "",
+          subtitle: enrichment.subtitle,
+          body: enrichment.body ?? notification.body ?? "",
         },
-        badge: unreadCount || 0,
+        badge: unreadCount ?? 0,
         sound: "default",
         "mutable-content": 1,
+        category: enrichment.category,
       },
       // Custom data for navigation
       notification_type: notification.type,
-      event_id: notification.event_id,
-      invite_id: notification.invite_id,
-      group_id: notification.group_id,
-      conversation_id: notification.conversation_id,
+      event_id: notification.event_id ?? undefined,
+      invite_id: notification.invite_id ?? undefined,
+      group_id: notification.group_id ?? undefined,
+      conversation_id: notification.conversation_id ?? undefined,
+      // Downloaded by Notification Service Extension to attach as thumbnail
+      image_url: enrichment.image_url,
     };
 
     // Send to all registered devices
