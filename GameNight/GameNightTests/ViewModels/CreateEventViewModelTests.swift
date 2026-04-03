@@ -179,6 +179,7 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(service.upsertedTimeOptions.first?.startTime, sut.fixedStartTime)
         XCTAssertEqual(sut.createdEvent?.timeOptions.first?.date, sut.fixedDate)
         XCTAssertEqual(sut.createdEvent?.timeOptions.first?.startTime, sut.fixedStartTime)
+        XCTAssertEqual(service.resetEventRSVPsForScheduleChangeEventIds, [event.id])
     }
 
     func testPublishedEditSaveResetsPollStateWhenChangingFromFixedToPoll() async {
@@ -194,6 +195,7 @@ final class CreateEventViewModelTests: XCTestCase {
         await sut.saveChanges()
 
         XCTAssertEqual(service.resetEventPollStateEventIds, [event.id])
+        XCTAssertTrue(service.resetEventRSVPsForScheduleChangeEventIds.isEmpty)
     }
 
     func testPublishedEditSaveDoesNotResetPollStateWhenStayingFixed() async {
@@ -209,6 +211,7 @@ final class CreateEventViewModelTests: XCTestCase {
         await sut.saveChanges()
 
         XCTAssertTrue(service.resetEventPollStateEventIds.isEmpty)
+        XCTAssertTrue(service.resetEventRSVPsForScheduleChangeEventIds.isEmpty)
     }
 
     func testPublishedEditSaveDiffsInvites() async {
@@ -996,6 +999,7 @@ private final class StubEventEditorService: EventEditingProviding {
     var upsertedTimeOptions: [TimeOption] = []
     var upsertedEventGames: [EventGame] = []
     var resetEventPollStateEventIds: [UUID] = []
+    var resetEventRSVPsForScheduleChangeEventIds: [UUID] = []
     var createdInvites: [Invite] = []
     var updatedInvites: [Invite] = []
     var deletedInviteIds: [UUID] = []
@@ -1057,6 +1061,10 @@ private final class StubEventEditorService: EventEditingProviding {
 
     func resetEventPollState(eventId: UUID) async throws {
         resetEventPollStateEventIds.append(eventId)
+    }
+
+    func resetEventRSVPsForScheduleChange(eventId: UUID) async throws {
+        resetEventRSVPsForScheduleChangeEventIds.append(eventId)
     }
 
     func deleteEventGames(eventId: UUID) async throws {}
