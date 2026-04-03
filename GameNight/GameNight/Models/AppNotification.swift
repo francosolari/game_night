@@ -45,6 +45,19 @@ struct AppNotification: Identifiable, Codable {
 
     var isRead: Bool { readAt != nil }
 
+    var displayBody: String? {
+        guard
+            type == .timeConfirmed,
+            let body,
+            let startTimeUTC = metadata?["start_time_utc"],
+            let localizedTime = Self.localizedTimeString(fromUTCISO8601: startTimeUTC)
+        else {
+            return body
+        }
+
+        return Self.replacingTimeConfirmedBody(body, with: localizedTime)
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -92,6 +105,33 @@ struct AppNotification: Identifiable, Codable {
         try container.encodeIfPresent(conversationId, forKey: .conversationId)
         try container.encodeIfPresent(readAt, forKey: .readAt)
         try container.encode(createdAt, forKey: .createdAt)
+    }
+
+    private static func localizedTimeString(fromUTCISO8601 isoString: String) -> String? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString)
+        guard let date else { return nil }
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.locale = .current
+        displayFormatter.timeZone = .current
+        displayFormatter.dateFormat = "EEE, MMM d at h:mm a"
+        return displayFormatter.string(from: date)
+    }
+
+    private static func replacingTimeConfirmedBody(_ body: String, with localizedTime: String) -> String {
+        let marker = " is locked in for "
+        guard let range = body.range(of: marker) else {
+            return body
+        }
+
+        let prefix = body[..<range.upperBound]
+        let suffix = body[range.upperBound...]
+        if suffix.hasSuffix(".") {
+            return "\(prefix)\(localizedTime)."
+        }
+        return "\(prefix)\(localizedTime)"
     }
 }
 

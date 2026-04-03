@@ -36,17 +36,20 @@ private struct BetaUserPayload: Encodable {
     let phone: String
     let password: String
     let mode: String
+    let betaPassword: String
 
     enum CodingKeys: String, CodingKey {
         case phone
         case password
         case mode
+        case betaPassword = "betaPassword"
     }
 }
 
 private struct BetaUserProbePayload: Encodable {
     let phone: String
     let mode: String
+    let betaPassword: String
 }
 
 struct BetaUserProbeResponse: Decodable {
@@ -80,84 +83,31 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         )
     }
 
-    func probeBetaUser(phoneNumber: String) async throws -> BetaUserProbeResponse {
-        guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Beta shared secret or service role key not configured"]
-            )
-        }
-
-        var request = URLRequest(url: try betaEnsureUserURL())
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
-        request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
-        request.httpBody = try JSONEncoder().encode(BetaUserProbePayload(phone: phoneNumber, mode: "probe"))
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid beta ensure response"]
-            )
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw NSError(
-                domain: "SupabaseService",
-                code: httpResponse.statusCode,
-                userInfo: [NSLocalizedDescriptionKey: message]
-            )
-        }
-
-        return try JSONDecoder().decode(BetaUserProbeResponse.self, from: data)
+    func probeBetaUser(phoneNumber: String, betaPassword: String) async throws -> BetaUserProbeResponse {
+        try await client.functions.invoke(
+            "beta-ensure-user",
+            options: .init(body: BetaUserProbePayload(phone: phoneNumber, mode: "probe", betaPassword: betaPassword))
+        )
     }
 
-    func ensureBetaUser(phoneNumber: String, password: String) async throws {
-        guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Beta shared secret or service role key not configured"]
-            )
+    func ensureBetaUser(phoneNumber: String, password: String, betaPassword: String) async throws {
+        struct EnsureBetaUserResponse: Decodable {
+            let success: Bool
+            let userId: String?
         }
 
-        var request = URLRequest(url: try betaEnsureUserURL())
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
-        request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
-        request.httpBody = try JSONEncoder().encode(
-            BetaUserPayload(
-                phone: phoneNumber,
-                password: password,
-                mode: "ensure"
-            )
-        )
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid beta ensure response"]
-            )
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw NSError(
-                domain: "SupabaseService",
-                code: httpResponse.statusCode,
-                userInfo: [NSLocalizedDescriptionKey: message]
-            )
-        }
+        _ = try await client.functions.invoke(
+            "beta-ensure-user",
+            options: .init(
+                body: BetaUserPayload(
+                    phone: phoneNumber,
+                    password: password,
+                    mode: "ensure",
+                    betaPassword: betaPassword
+                )
+            ),
+            decoder: JSONDecoder()
+        ) as EnsureBetaUserResponse
     }
 
     // MARK: - Auth
@@ -286,26 +236,6 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             }
             throw err
         }
-    }
-
-    private func betaEnsureUserURL() throws -> URL {
-        guard var components = URLComponents(url: Secrets.supabaseURL, resolvingAgainstBaseURL: false) else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid Supabase URL"]
-            )
-        }
-        components.path = "/functions/v1/beta-ensure-user"
-        components.query = nil
-        guard let url = components.url else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Unable to build beta function URL"]
-            )
-        }
-        return url
     }
 
     // MARK: - Events

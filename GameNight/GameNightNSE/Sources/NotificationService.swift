@@ -4,6 +4,7 @@ final class NotificationService: UNNotificationServiceExtension {
 
     private var contentHandler: ((UNNotificationContent) -> Void)?
     private var bestAttemptContent: UNMutableNotificationContent?
+    private static let timeConfirmedPrefix = " is locked in for "
 
     // MARK: - UNNotificationServiceExtension
 
@@ -18,6 +19,8 @@ final class NotificationService: UNNotificationServiceExtension {
             return
         }
         self.bestAttemptContent = mutableContent
+
+        rewriteTimeConfirmedBodyIfNeeded(mutableContent, userInfo: request.content.userInfo)
 
         guard
             let imageURLString = request.content.userInfo["image_url"] as? String,
@@ -34,6 +37,48 @@ final class NotificationService: UNNotificationServiceExtension {
             }
             contentHandler(mutableContent)
         }
+    }
+
+    private func rewriteTimeConfirmedBodyIfNeeded(
+        _ content: UNMutableNotificationContent,
+        userInfo: [AnyHashable: Any]
+    ) {
+        guard
+            let notificationType = userInfo["notification_type"] as? String,
+            notificationType == "time_confirmed",
+            let startTimeUTC = userInfo["start_time_utc"] as? String,
+            let localizedTime = Self.localizedTimeString(fromUTCISO8601: startTimeUTC)
+        else {
+            return
+        }
+
+        let existingBody = content.body
+
+        if let range = existingBody.range(of: Self.timeConfirmedPrefix) {
+            let prefix = existingBody[..<range.upperBound]
+            let suffix = existingBody[range.upperBound...]
+            if suffix.hasSuffix(".") {
+                content.body = "\(prefix)\(localizedTime)."
+            } else {
+                content.body = "\(prefix)\(localizedTime)"
+            }
+            return
+        }
+
+        content.body = localizedTime
+    }
+
+    private static func localizedTimeString(fromUTCISO8601 isoString: String) -> String? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString)
+        guard let date else { return nil }
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.locale = .current
+        displayFormatter.timeZone = .current
+        displayFormatter.dateFormat = "EEE, MMM d at h:mm a"
+        return displayFormatter.string(from: date)
     }
 
     override func serviceExtensionTimeWillExpire() {
