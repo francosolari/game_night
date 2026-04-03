@@ -12,6 +12,7 @@ protocol EventEditingProviding: AnyObject {
     func upsertTimeOptions(_ timeOptions: [TimeOption]) async throws
     func deleteTimeOptions(eventId: UUID) async throws
     func deleteTimeOptions(ids: [UUID]) async throws
+    func resetEventPollState(eventId: UUID) async throws
     func createEventGames(eventId: UUID, games: [EventGame]) async throws
     func upsertEventGames(eventId: UUID, games: [EventGame]) async throws
     func deleteEventGames(eventId: UUID) async throws
@@ -1833,6 +1834,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .rpc("confirm_time_option", params: [
                 "p_event_id": eventId.uuidString,
                 "p_time_option_id": timeOptionId.uuidString
+            ])
+            .execute()
+    }
+
+    func resetEventPollState(eventId: UUID) async throws {
+        try await client
+            .rpc("reset_event_poll_state", params: [
+                "p_event_id": eventId.uuidString
             ])
             .execute()
     }

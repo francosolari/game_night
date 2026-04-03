@@ -728,7 +728,7 @@ final class CreateEventViewModel: ObservableObject {
             status: status,
             games: selectedGames,
             timeOptions: resolvedTimeOptions(),
-            confirmedTimeOptionId: existingEvent?.confirmedTimeOptionId,
+            confirmedTimeOptionId: scheduleMode == .poll ? nil : existingEvent?.confirmedTimeOptionId,
             allowTimeSuggestions: scheduleMode == .poll ? allowTimeSuggestions : false,
             scheduleMode: scheduleMode,
             inviteStrategy: inviteStrategy,
@@ -859,6 +859,10 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     private func syncTimeOptions(eventId: UUID) async throws {
+        if eventToEdit?.scheduleMode == .fixed && scheduleMode == .poll {
+            try await supabase.resetEventPollState(eventId: eventId)
+        }
+
         let existingIds = Set(eventToEdit?.timeOptions.map(\.id) ?? [])
         let currentOptions = resolvedTimeOptions(eventId: eventId)
         let currentIds = Set(currentOptions.map(\.id))
