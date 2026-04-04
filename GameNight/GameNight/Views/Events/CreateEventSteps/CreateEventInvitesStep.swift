@@ -22,31 +22,33 @@ struct CreateEventInvitesStep: View {
                         .font(Theme.Typography.label)
                         .foregroundColor(Theme.Colors.textTertiary)
 
-                    HStack(spacing: Theme.Spacing.sm) {
-                        ForEach(viewModel.topSuggestions) { contact in
-                            Button {
-                                viewModel.addFrequentContact(contact)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    AvatarView(url: contact.contactAvatarUrl, size: 24)
-                                    Text(contact.contactName.components(separatedBy: " ").first ?? contact.contactName)
-                                        .font(Theme.Typography.calloutMedium)
-                                        .foregroundColor(Theme.Colors.textPrimary)
-                                        .lineLimit(1)
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(Theme.Colors.primary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Theme.Spacing.sm) {
+                            ForEach(viewModel.topSuggestions) { contact in
+                                Button {
+                                    viewModel.addSuggestedContact(contact)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        AvatarView(url: contact.avatarUrl, size: 24)
+                                        Text(contact.name.components(separatedBy: " ").first ?? contact.name)
+                                            .font(Theme.Typography.calloutMedium)
+                                            .foregroundColor(Theme.Colors.textPrimary)
+                                            .lineLimit(1)
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(Theme.Colors.primary)
+                                    }
+                                    .padding(.horizontal, Theme.Spacing.md)
+                                    .padding(.vertical, Theme.Spacing.sm)
+                                    .background(
+                                        Capsule()
+                                            .fill(Theme.Colors.backgroundElevated)
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 1)
+                                            )
+                                    )
                                 }
-                                .padding(.horizontal, Theme.Spacing.md)
-                                .padding(.vertical, Theme.Spacing.sm)
-                                .background(
-                                    Capsule()
-                                        .fill(Theme.Colors.backgroundElevated)
-                                        .overlay(
-                                            Capsule()
-                                                .stroke(Theme.Colors.primary.opacity(0.2), lineWidth: 1)
-                                        )
-                                )
                             }
                         }
                     }

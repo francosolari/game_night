@@ -778,6 +778,134 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(sut.invitees.first?.phoneNumber, "+15555550111")
         XCTAssertEqual(sut.invitees.first?.id, inviteeId)
     }
+
+    func testLoadSuggestedContactsBuildsPrioritizedQuickContactsAndExcludesInvitedAndSelf() async {
+        let hostId = UUID()
+        let benId = UUID()
+        let selfFrequent = FrequentContact(
+            contactPhone: "+15555550999",
+            contactName: "Me",
+            contactUserId: hostId,
+            contactAvatarUrl: nil,
+            isAppUser: true,
+            mutualEventCount: 99
+        )
+        let zoe = FrequentContact(
+            contactPhone: "+15555550101",
+            contactName: "Zoe",
+            contactUserId: UUID(),
+            contactAvatarUrl: nil,
+            isAppUser: true,
+            mutualEventCount: 5
+        )
+        let adam = FrequentContact(
+            contactPhone: "+15555550102",
+            contactName: "Adam",
+            contactUserId: nil,
+            contactAvatarUrl: nil,
+            isAppUser: false,
+            mutualEventCount: 2
+        )
+        let ben = FrequentContact(
+            contactPhone: "+15555550103",
+            contactName: "Ben",
+            contactUserId: benId,
+            contactAvatarUrl: nil,
+            isAppUser: true,
+            mutualEventCount: 2
+        )
+
+        let savedDana = SavedContact(
+            id: UUID(),
+            userId: hostId,
+            name: "Dana",
+            phoneNumber: "+15555550104",
+            avatarUrl: nil,
+            isAppUser: true,
+            createdAt: nil,
+            appUserId: UUID()
+        )
+
+        let groupErin = GroupMember(
+            id: UUID(),
+            groupId: UUID(),
+            userId: UUID(),
+            phoneNumber: "+15555550105",
+            displayName: "Erin",
+            role: .member,
+            tier: 1,
+            status: .accepted,
+            invitedBy: nil,
+            addedAt: Date()
+        )
+        let group = GameGroup(
+            id: UUID(),
+            ownerId: hostId,
+            name: "Weeknight Crew",
+            emoji: "🎲",
+            description: nil,
+            members: [groupErin],
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
+        let service = StubEventEditorService(currentUserId: hostId)
+        service.frequentContacts = [selfFrequent, zoe, adam, ben]
+        service.savedContacts = [savedDana]
+        service.groups = [group]
+
+        let sut = CreateEventViewModel(supabase: service)
+        sut.configureCurrentUser(
+            User(
+                id: hostId,
+                phoneNumber: "+15555550999",
+                displayName: "Host",
+                avatarUrl: nil,
+                bio: nil,
+                bggUsername: nil,
+                phoneVisible: false,
+                discoverableByPhone: true,
+                marketingOptIn: false,
+                contactsSynced: false,
+                phoneVerified: true,
+                privacyAcceptedAt: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        )
+        sut.addInvitee(name: "Zoe", phoneNumber: zoe.contactPhone, tier: 1)
+
+        await sut.loadSuggestedContacts()
+
+        XCTAssertEqual(sut.topSuggestions.map(\.name), ["Ben", "Adam", "Dana", "Erin"])
+        XCTAssertEqual(sut.topSuggestions.first?.appUserId, benId)
+        XCTAssertFalse(sut.topSuggestions.contains(where: { $0.phoneNumber == "+15555550999" }))
+        XCTAssertFalse(sut.topSuggestions.contains(where: { $0.phoneNumber == zoe.contactPhone }))
+    }
+
+    func testAddSuggestedContactAddsInviteWithContactMetadata() {
+        let hostId = UUID()
+        let appUserId = UUID()
+        let sut = CreateEventViewModel(supabase: StubEventEditorService(currentUserId: hostId))
+
+        let suggested = UserContact(
+            id: appUserId,
+            name: "Riley",
+            phoneNumber: "+15555550188",
+            avatarUrl: nil,
+            isAppUser: true,
+            appUserId: appUserId,
+            source: .appConnection
+        )
+
+        sut.addSuggestedContact(suggested)
+
+        XCTAssertEqual(sut.invitees.count, 1)
+        XCTAssertEqual(sut.invitees.first?.name, "Riley")
+        XCTAssertEqual(sut.invitees.first?.phoneNumber, "+15555550188")
+        XCTAssertEqual(sut.invitees.first?.userId, appUserId)
+        XCTAssertEqual(sut.invitees.first?.source, .appConnection)
+    }
 }
 
 @MainActor
@@ -1008,6 +1136,9 @@ private final class StubEventEditorService: EventEditingProviding {
     var deletedInviteIds: [UUID] = []
     var expansionLinkCalls: [(baseGameId: UUID, expansionGameIds: [UUID])] = []
     var familyLinkCalls: [(gameId: UUID, families: [(bggFamilyId: Int, name: String)])] = []
+    var frequentContacts: [FrequentContact] = []
+    var savedContacts: [SavedContact] = []
+    var groups: [GameGroup] = []
 
     init(
         currentUserId: UUID,
@@ -1078,7 +1209,15 @@ private final class StubEventEditorService: EventEditingProviding {
     }
 
     func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact] {
-        []
+        frequentContacts
+    }
+
+    func fetchSavedContacts() async throws -> [SavedContact] {
+        savedContacts
+    }
+
+    func fetchGroups() async throws -> [GameGroup] {
+        groups
     }
 
     func upsertGame(_ game: Game) async throws -> Game {

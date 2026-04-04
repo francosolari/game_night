@@ -59,7 +59,7 @@ final class CreateEventViewModel: ObservableObject {
     @Published var manualGameName = ""
     @Published var libraryGames: [Game] = []
 
-    @Published var suggestedContacts: [FrequentContact] = []
+    @Published var suggestedContacts: [UserContact] = []
     @Published var isLoadingSuggestions = true
     @Published var collapsedGroups: Set<String> = []
     @Published private(set) var currentUserId: UUID?
@@ -470,7 +470,19 @@ final class CreateEventViewModel: ObservableObject {
     func loadSuggestedContacts() async {
         isLoadingSuggestions = true
         do {
-            suggestedContacts = try await supabase.fetchFrequentContacts(limit: 20)
+            async let frequentResult = supabase.fetchFrequentContacts(limit: 20)
+            async let savedResult = supabase.fetchSavedContacts()
+            async let groupsResult = supabase.fetchGroups()
+
+            let frequentContacts = (try? await frequentResult) ?? []
+            let savedContacts = (try? await savedResult) ?? []
+            let groups = (try? await groupsResult) ?? []
+
+            suggestedContacts = buildSuggestedContacts(
+                frequentContacts: frequentContacts,
+                savedContacts: savedContacts,
+                groups: groups
+            )
         } catch {
             // Non-critical
         }
@@ -492,13 +504,13 @@ final class CreateEventViewModel: ObservableObject {
         return libraryGames.filter { $0.name.lowercased().contains(query) }
     }
 
-    var topSuggestions: [FrequentContact] {
+    var topSuggestions: [UserContact] {
         suggestedContacts
             .filter { contact in
-                !invitees.contains(where: { $0.phoneNumber == contact.contactPhone })
-                    && !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId)
+                !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber })
+                    && !isCurrentUser(phoneNumber: contact.phoneNumber, userId: contact.appUserId)
             }
-            .prefix(3)
+            .prefix(8)
             .map { $0 }
     }
 
@@ -527,10 +539,16 @@ final class CreateEventViewModel: ObservableObject {
         addInvitee(name: contact.name, phoneNumber: contact.phoneNumber, tier: 1, userId: contact.appUserId, source: contact.source)
     }
 
-    func addFrequentContact(_ contact: FrequentContact) {
-        guard !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId) else { return }
-        guard !invitees.contains(where: { $0.phoneNumber == contact.contactPhone }) else { return }
-        addInvitee(name: contact.contactName, phoneNumber: contact.contactPhone, tier: 1, userId: contact.contactUserId, source: .appConnection)
+    func addSuggestedContact(_ contact: UserContact) {
+        guard !isCurrentUser(phoneNumber: contact.phoneNumber, userId: contact.appUserId) else { return }
+        guard !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber }) else { return }
+        addInvitee(
+            name: contact.name,
+            phoneNumber: contact.phoneNumber,
+            tier: 1,
+            userId: contact.appUserId,
+            source: contact.source
+        )
     }
 
     var tier1Invitees: [InviteeEntry] {
@@ -953,6 +971,93 @@ final class CreateEventViewModel: ObservableObject {
             var updated = option
             updated.eventId = eventId
             return updated
+        }
+    }
+
+    private func buildSuggestedContacts(
+        frequentContacts: [FrequentContact],
+        savedContacts: [SavedContact],
+        groups: [GameGroup]
+    ) -> [UserContact] {
+        let excludedPhones = invitedPhones.map { PhoneNumberFormatter.normalizedForComparison($0) }
+        var seen = Set(excludedPhones)
+
+        if let currentUserPhone {
+            seen.insert(PhoneNumberFormatter.normalizedForComparison(currentUserPhone))
+        }
+
+        let phonebookPhones = Set(savedContacts.map {
+            PhoneNumberFormatter.normalizedForComparison($0.phoneNumber)
+        })
+
+        let mutualEventCounts: [String: Int] = {
+            var map: [String: Int] = [:]
+            for frequent in frequentContacts {
+                let phone = PhoneNumberFormatter.normalizedForComparison(frequent.contactPhone)
+                map[phone] = frequent.mutualEventCount
+            }
+            return map
+        }()
+
+        var result: [UserContact] = []
+
+        for frequent in frequentContacts {
+            if let currentUserId, frequent.contactUserId == currentUserId {
+                continue
+            }
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(frequent.contactPhone)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
+            let isFromPhonebook = phonebookPhones.contains(normalizedPhone)
+            result.append(UserContact(
+                id: frequent.contactUserId ?? UUID(),
+                name: frequent.contactName,
+                phoneNumber: frequent.contactPhone,
+                avatarUrl: frequent.contactAvatarUrl,
+                isAppUser: frequent.isAppUser,
+                appUserId: frequent.contactUserId,
+                source: isFromPhonebook ? .phonebook : .appConnection
+            ))
+        }
+
+        for saved in savedContacts {
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(saved.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
+            result.append(saved.asUserContact)
+        }
+
+        for group in groups {
+            for member in group.members {
+                if let currentUserId, member.userId == currentUserId { continue }
+                let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(member.phoneNumber)
+                guard !seen.contains(normalizedPhone) else { continue }
+                seen.insert(normalizedPhone)
+                result.append(UserContact(
+                    id: member.userId ?? UUID(),
+                    name: member.displayName ?? member.phoneNumber,
+                    phoneNumber: member.phoneNumber,
+                    avatarUrl: nil,
+                    isAppUser: member.userId != nil,
+                    appUserId: member.userId,
+                    source: .appConnection
+                ))
+            }
+        }
+
+        return result.sorted { a, b in
+            let aPhone = PhoneNumberFormatter.normalizedForComparison(a.phoneNumber)
+            let bPhone = PhoneNumberFormatter.normalizedForComparison(b.phoneNumber)
+            let aMutuals = mutualEventCounts[aPhone] ?? 0
+            let bMutuals = mutualEventCounts[bPhone] ?? 0
+
+            if aMutuals != bMutuals {
+                return aMutuals > bMutuals
+            }
+            if a.isAppUser != b.isAppUser {
+                return a.isAppUser
+            }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
     }
 

@@ -23,6 +23,8 @@ protocol EventEditingProviding: AnyObject {
     func updateInvite(_ invite: Invite) async throws
     func deleteInvites(ids: [UUID]) async throws
     func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact]
+    func fetchSavedContacts() async throws -> [SavedContact]
+    func fetchGroups() async throws -> [GameGroup]
     func upsertGame(_ game: Game) async throws -> Game
     func updateGame(_ game: Game) async throws
     func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws
