@@ -92,10 +92,6 @@ struct RSVPSheet: View {
                                     }
                                 }
                             }
-
-                            Text("When the host picks a time, your RSVP will auto-update.")
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.Colors.textTertiary)
                         }
                     }
                 }
