@@ -361,11 +361,12 @@ struct HomeView: View {
             appState.preloadedHomeSnapshot = nil
             await viewModel.loadData(preloadedSnapshot: preloaded)
             await loadEventsNeedingPlayLog()
+            appState.registerRefreshHandler(for: .home) {
+                await viewModel.loadData()
+            }
         }
         .sheet(item: $draftToResume) { draft in
-            CreateEventView(eventToEdit: draft) { _ in
-                Task { await viewModel.loadData() }
-            }
+            CreateEventView(eventToEdit: draft) { _ in }
         }
         .sheet(item: $playLogEvent) { event in
             PlayLoggingSheet(event: event)

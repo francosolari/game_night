@@ -23,6 +23,8 @@ protocol EventEditingProviding: AnyObject {
     func updateInvite(_ invite: Invite) async throws
     func deleteInvites(ids: [UUID]) async throws
     func fetchFrequentContacts(limit: Int) async throws -> [FrequentContact]
+    func fetchSavedContacts() async throws -> [SavedContact]
+    func fetchGroups() async throws -> [GameGroup]
     func upsertGame(_ game: Game) async throws -> Game
     func updateGame(_ game: Game) async throws
     func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws
@@ -75,6 +77,16 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*), groups(id, name, emoji)"
 
     let client: SupabaseClient
+    private struct FrequentContactsCacheEntry: Codable {
+        let fetchedAt: Date
+        let contacts: [FrequentContact]
+    }
+    private enum FrequentContactsCacheStorage {
+        static let keyPrefix = "frequent_contacts_cache"
+    }
+    private var frequentContactsCache: [UUID: FrequentContactsCacheEntry] = [:]
+    private var frequentContactsInFlight: [UUID: Task<[FrequentContact], Error>] = [:]
+    private let frequentContactsCacheTTL: TimeInterval = 24 * 60 * 60
 
     private init() {
         self.client = SupabaseClient(
@@ -854,6 +866,19 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func libraryEntryId(gameId: UUID) async throws -> UUID? {
+        let session = try await client.auth.session
+        let entries: [GameLibraryEntry] = try await client
+            .from("game_library")
+            .select("id")
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("game_id", value: gameId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return entries.first?.id
+    }
+
     // MARK: - Wishlist
 
     func fetchWishlist() async throws -> [GameWishlistEntry] {
@@ -1533,15 +1558,76 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchFrequentContacts(limit: Int = 20) async throws -> [FrequentContact] {
+        guard limit > 0 else { return [] }
         let session = try await client.auth.session
-        let contacts: [FrequentContact] = try await client
-            .rpc("get_frequent_contacts", params: [
-                "requesting_user_id": session.user.id.uuidString,
-                "max_results": "\(limit)"
-            ])
-            .execute()
-            .value
-        return contacts
+        let userId = session.user.id
+        let now = Date()
+
+        if let cached = frequentContactsCache[userId],
+           now.timeIntervalSince(cached.fetchedAt) < frequentContactsCacheTTL,
+           cached.contacts.count >= limit {
+            return Array(cached.contacts.prefix(limit))
+        }
+
+        if let persisted = loadPersistedFrequentContacts(userId: userId),
+           now.timeIntervalSince(persisted.fetchedAt) < frequentContactsCacheTTL,
+           persisted.contacts.count >= limit {
+            frequentContactsCache[userId] = persisted
+            return Array(persisted.contacts.prefix(limit))
+        }
+
+        if let inFlight = frequentContactsInFlight[userId] {
+            let contacts = try await inFlight.value
+            return Array(contacts.prefix(limit))
+        }
+
+        let task = Task<[FrequentContact], Error> { [client] in
+            try await client
+                .rpc("get_frequent_contacts", params: [
+                    "requesting_user_id": userId.uuidString,
+                    "max_results": "\(max(limit, 20))"
+                ])
+                .execute()
+                .value
+        }
+        frequentContactsInFlight[userId] = task
+
+        do {
+            let contacts = try await task.value
+            let entry = FrequentContactsCacheEntry(fetchedAt: now, contacts: contacts)
+            frequentContactsCache[userId] = entry
+            persistFrequentContacts(entry, userId: userId)
+            frequentContactsInFlight[userId] = nil
+            return Array(contacts.prefix(limit))
+        } catch {
+            frequentContactsInFlight[userId] = nil
+            throw error
+        }
+    }
+
+    func clearFrequentContactsCache() {
+        frequentContactsCache.removeAll()
+        frequentContactsInFlight.removeAll()
+        let keys = UserDefaults.standard.dictionaryRepresentation().keys
+        for key in keys where key.hasPrefix(FrequentContactsCacheStorage.keyPrefix) {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private func persistFrequentContacts(_ entry: FrequentContactsCacheEntry, userId: UUID) {
+        guard let data = try? JSONEncoder().encode(entry) else { return }
+        UserDefaults.standard.set(data, forKey: frequentContactsCacheKey(for: userId))
+    }
+
+    private func loadPersistedFrequentContacts(userId: UUID) -> FrequentContactsCacheEntry? {
+        guard let data = UserDefaults.standard.data(forKey: frequentContactsCacheKey(for: userId)) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(FrequentContactsCacheEntry.self, from: data)
+    }
+
+    private func frequentContactsCacheKey(for userId: UUID) -> String {
+        "\(FrequentContactsCacheStorage.keyPrefix).\(userId.uuidString)"
     }
 
     // MARK: - Blocking

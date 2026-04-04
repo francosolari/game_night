@@ -17,6 +17,13 @@ final class AppState: ObservableObject {
     @Published var preloadedHomeSnapshot: HomeDataLoadSnapshot?
     @Published var navigateToCalendar = false
 
+    enum RefreshArea: Hashable {
+        case home
+        case groups
+    }
+
+    typealias RefreshHandler = @MainActor () async -> Void
+
     /// Maps digits-only phone number → the current user's contact name for that person.
     /// Used to show contact names instead of app display names for people in your address book.
     var contactNameMap: [String: String] = [:]
@@ -31,6 +38,7 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var notificationChannel: RealtimeChannelV2?
+    private var refreshHandlers: [RefreshArea: RefreshHandler] = [:]
 
     init() {}
 
@@ -51,6 +59,9 @@ final class AppState: ObservableObject {
             refreshContactNames()
             startNotificationSubscription()
             refreshUnreadCounts()
+            Task {
+                _ = try? await SupabaseService.shared.fetchFrequentContacts(limit: 200)
+            }
 
             // 2. Preload Home Data while splash is visible
             let supabase = SupabaseService.shared
@@ -120,7 +131,7 @@ final class AppState: ObservableObject {
         let existingEventIds = Set(upcomingEvents.map(\.id))
         let acceptedInviteEventIds = Set(
             base.myInvites
-                .filter { $0.status == .accepted || $0.status == .maybe }
+                .filter { $0.status == .accepted || $0.status == .maybe || $0.status == .voted }
                 .map(\.eventId)
         )
         let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
@@ -184,11 +195,24 @@ final class AppState: ObservableObject {
         await PushNotificationManager.shared.unregisterCurrentToken()
         stopNotificationSubscription()
         try? await SupabaseService.shared.client.auth.signOut()
+        SupabaseService.shared.clearFrequentContactsCache()
         isAuthenticated = false
         currentUser = nil
         contactNameMap = [:]
         unreadNotificationCount = 0
         unreadMessageCount = 0
+        refreshHandlers = [:]
+    }
+
+    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) {
+        refreshHandlers[area] = handler
+    }
+
+    func refresh(_ areas: [RefreshArea]) async {
+        for area in areas {
+            guard let handler = refreshHandlers[area] else { continue }
+            await handler()
+        }
     }
 
     // MARK: - Unread Counts

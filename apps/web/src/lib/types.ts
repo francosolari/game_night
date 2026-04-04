@@ -389,3 +389,70 @@ export function formatPlayerRanges(values?: number[] | null): string | null {
   ranges.push(start === end ? `${start}` : `${start}–${end}`);
   return ranges.join(", ");
 }
+
+// ─── Notification Types ───
+
+export type NotificationType =
+  | "invite_received"
+  | "rsvp_update"
+  | "group_invite"
+  | "time_confirmed"
+  | "bench_promoted"
+  | "dm_received"
+  | "text_blast"
+  | "game_confirmed"
+  | "event_cancelled";
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body?: string | null;
+  metadata?: Record<string, any> | null;
+  event_id?: string | null;
+  invite_id?: string | null;
+  group_id?: string | null;
+  conversation_id?: string | null;
+  read_at?: string | null;
+  created_at: string;
+  event?: GameEvent | null;
+}
+
+// ─── Direct Messaging Types ───
+
+export interface ConversationSummary {
+  conversation_id: string;
+  other_user_id: string;
+  other_display_name: string | null;
+  other_avatar_url: string | null;
+  last_message_content: string | null;
+  last_message_type: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string | null;
+  message_type: string;
+  metadata?: MessageMetadata | null;
+  created_at: string;
+  sender?: {
+    id: string;
+    display_name: string;
+    avatar_url?: string | null;
+  } | null;
+}
+
+export interface MessageMetadata {
+  event_id?: string | null;
+  invite_id?: string | null;
+  event_title?: string | null;
+  cover_image_url?: string | null;
+  host_name?: string | null;
+  time_label?: string | null;
+  invite_token?: string | null;
+}

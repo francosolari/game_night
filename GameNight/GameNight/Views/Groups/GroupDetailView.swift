@@ -111,6 +111,7 @@ struct GroupDetailView: View {
                 onSelect: { contacts in
                     Task {
                         await viewModel.addMembers(contacts: contacts)
+                        await appState.refresh([.home, .groups])
                         toast = ToastItem(style: .success, message: "Added \(contacts.count) member\(contacts.count == 1 ? "" : "s")")
                     }
                 }
@@ -121,7 +122,10 @@ struct GroupDetailView: View {
         }
         .onChange(of: showPlayLogging) { _, isPresented in
             if !isPresented {
-                Task { await viewModel.loadPlays() }
+                Task {
+                    await viewModel.loadPlays()
+                    await appState.refresh([.home, .groups])
+                }
             }
         }
         .toast($toast)
@@ -151,6 +155,7 @@ struct GroupDetailView: View {
                 Task {
                     do {
                         try await SupabaseService.shared.deleteGroup(id: viewModel.group.id)
+                        await appState.refresh([.home, .groups])
                         dismiss()
                     } catch {
                         toast = ToastItem(style: .error, message: "Failed to delete group")

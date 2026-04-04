@@ -79,12 +79,14 @@ struct EventDetailView: View {
                                     onVote: { optionId, voteType in
                                         pollVotes[optionId] = voteType
                                         await viewModel.voteOnTimeOption(optionId: optionId, voteType: voteType)
+                                        await refreshSharedData()
                                     },
                                     onRequireRSVP: {
                                         showRSVPSheet = true
                                     },
                                     onConfirmTime: viewModel.isOwner ? { timeOptionId in
                                         await viewModel.confirmTimeOption(timeOptionId: timeOptionId)
+                                        await refreshSharedData()
                                     } : nil
                                 )
                             } else {
@@ -230,6 +232,7 @@ struct EventDetailView: View {
             Button("Delete Event", role: .destructive) {
                 Task {
                     if await viewModel.deleteEvent() {
+                        await refreshSharedData()
                         dismiss()
                     }
                 }
@@ -244,10 +247,10 @@ struct EventDetailView: View {
             Text(viewModel.error ?? "Please try again.")
         }
         .sheet(isPresented: $showCreateGroupFromEvent) {
-            CreateGroupFromAttendeesSheet(invites: viewModel.invites, onResult: { resultToast in
-                viewModel.toast = resultToast
-            })
-        }
+                CreateGroupFromAttendeesSheet(invites: viewModel.invites, onResult: { resultToast in
+                    viewModel.toast = resultToast
+                })
+            }
         .sheet(isPresented: $showRSVPSheet) {
             if let event = viewModel.event {
                 RSVPSheet(
@@ -261,6 +264,7 @@ struct EventDetailView: View {
                             timeVotes: votes,
                             suggestedTimes: nil
                         )
+                        await refreshSharedData()
                         let message = status == .accepted ? "You're going!" : status == .maybe ? "Maybe next time!" : "RSVP updated"
                         viewModel.toast = ToastItem(style: .success, message: message)
                     }
@@ -378,9 +382,11 @@ struct EventDetailView: View {
                     voterDetails: viewModel.gameVoterDetails,
                     onVote: { gameId, voteType in
                         await viewModel.voteForGame(gameId: gameId, voteType: voteType)
+                        await refreshSharedData()
                     },
                     onConfirm: viewModel.isOwner ? { gameId in
                         await viewModel.confirmGame(gameId: gameId)
+                        await refreshSharedData()
                     } : nil
                 )
             }
@@ -429,6 +435,7 @@ struct EventDetailView: View {
 
     private func handleInviteContacts(_ contacts: [UserContact]) async {
         await viewModel.inviteContacts(contacts)
+        await refreshSharedData()
         // Check if any app-connection contacts were invited — show their links
         let appConnectionContacts = contacts.filter { $0.source == .appConnection && $0.isAppUser }
         if !appConnectionContacts.isEmpty {
@@ -443,6 +450,10 @@ struct EventDetailView: View {
         }
         let count = contacts.count
         viewModel.toast = ToastItem(style: .success, message: "\(count) invite\(count == 1 ? "" : "s") sent!")
+    }
+
+    private func refreshSharedData() async {
+        await appState.refresh([.home, .groups])
     }
 
 }
@@ -1066,6 +1077,9 @@ struct InviteListSheet: View {
                 VStack(spacing: Theme.Spacing.xxl) {
                     if !summary.acceptedUsers.isEmpty {
                         InviteSection(title: "Going", users: summary.acceptedUsers, color: Theme.Colors.success)
+                    }
+                    if !summary.votedUsers.isEmpty {
+                        InviteSection(title: "Voted", users: summary.votedUsers, color: Theme.Colors.accent)
                     }
                     if !summary.pendingUsers.isEmpty {
                         InviteSection(title: "Pending", users: summary.pendingUsers, color: Theme.Colors.warning)

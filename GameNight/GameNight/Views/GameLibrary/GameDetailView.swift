@@ -27,6 +27,10 @@ struct GameDetailView: View {
         return viewModel.game
     }
 
+    private var canShowLibraryActions: Bool {
+        !isEditingManualGame && displayedGame.bggId != nil
+    }
+
     private var gameInitials: String {
         let parts = displayedGame.name
             .split(separator: " ")
@@ -164,6 +168,10 @@ struct GameDetailView: View {
                         }
 
                         titleMetadata
+
+                        if canShowLibraryActions {
+                            libraryActionsRow
+                        }
                     }
 
                     // 3. Info rows
@@ -301,6 +309,59 @@ struct GameDetailView: View {
         }
         .task {
             await viewModel.loadRelatedData()
+        }
+    }
+
+    @ViewBuilder
+    private var libraryActionsRow: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Button {
+                    Task { await viewModel.toggleCollection() }
+                } label: {
+                    Label(
+                        viewModel.isInCollection ? "In Collection" : "Add to Collection",
+                        systemImage: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle"
+                    )
+                    .font(Theme.Typography.calloutMedium)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .background(
+                        Capsule()
+                            .fill(viewModel.isInCollection ? Theme.Colors.primary.opacity(0.16) : Theme.Colors.backgroundElevated)
+                    )
+                    .foregroundColor(viewModel.isInCollection ? Theme.Colors.primary : Theme.Colors.textPrimary)
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSavingCollection || viewModel.isLoading)
+
+                Button {
+                    Task { await viewModel.toggleWishlist() }
+                } label: {
+                    Label(
+                        viewModel.isInWishlist ? "Wishlisted" : "Add to Wishlist",
+                        systemImage: viewModel.isInWishlist ? "heart.fill" : "heart"
+                    )
+                    .font(Theme.Typography.calloutMedium)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .background(
+                        Capsule()
+                            .fill(viewModel.isInWishlist ? Theme.Colors.primary.opacity(0.16) : Theme.Colors.backgroundElevated)
+                    )
+                    .foregroundColor(viewModel.isInWishlist ? Theme.Colors.primary : Theme.Colors.textPrimary)
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSavingWishlist || viewModel.isLoading)
+
+                Spacer()
+            }
+
+            if let actionError = viewModel.actionError, !actionError.isEmpty {
+                Text(actionError)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.error)
+            }
         }
     }
 

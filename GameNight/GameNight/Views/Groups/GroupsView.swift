@@ -178,11 +178,15 @@ struct GroupsView: View {
                     toast = resultToast
                 })
             }
-            .toast($toast)
+        .toast($toast)
         }
         .task {
             await viewModel.loadGroups()
             await viewModel.loadDashboardData()
+            appState.registerRefreshHandler(for: .groups) {
+                await viewModel.loadGroups()
+                await viewModel.loadDashboardData()
+            }
         }
     }
 }
@@ -326,6 +330,7 @@ struct RecentPlayRow: View {
 // MARK: - Create Group Sheet
 struct CreateGroupSheet: View {
     @ObservedObject var viewModel: GroupsViewModel
+    @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     @State private var name = ""
     @State private var emoji = "🎲"
@@ -410,17 +415,18 @@ struct CreateGroupSheet: View {
                             guard !isCreating else { return }
                             isCreating = true
                             viewModel.error = nil
-                            Task {
-                                if let group = await viewModel.createGroup(
-                                    name: name,
-                                    emoji: emoji,
-                                    description: description.isEmpty ? nil : description
-                                ) {
-                                    createdGroup = group
-                                    withAnimation { step = 2 }
-                                } else {
-                                    onResult?(ToastItem(style: .error, message: viewModel.error ?? "Couldn't create group"))
-                                    dismiss()
+                        Task {
+                            if let group = await viewModel.createGroup(
+                                name: name,
+                                emoji: emoji,
+                                description: description.isEmpty ? nil : description
+                            ) {
+                                createdGroup = group
+                                await appState.refresh([.home, .groups])
+                                withAnimation { step = 2 }
+                            } else {
+                                onResult?(ToastItem(style: .error, message: viewModel.error ?? "Couldn't create group"))
+                                dismiss()
                                 }
                                 isCreating = false
                             }
@@ -445,6 +451,7 @@ struct CreateGroupSheet: View {
                     onSelect: { contacts in
                         Task {
                             await viewModel.addMembers(to: group.id, contacts: contacts)
+                            await appState.refresh([.home, .groups])
                             onResult?(ToastItem(style: .success, message: "\(group.emoji ?? "🎲") \(group.name) created with \(contacts.count) members"))
                         }
                         dismiss()
