@@ -1401,7 +1401,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.entitlements;
+				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.Debug.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8AGP3ZJ77K;
@@ -1480,7 +1480,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.entitlements;
+				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.Release.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8AGP3ZJ77K;
