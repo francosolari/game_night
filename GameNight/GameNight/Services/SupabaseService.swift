@@ -241,8 +241,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     // MARK: - Events
 
     func fetchUpcomingEvents() async throws -> [GameEvent] {
-        let session = try await client.auth.session
-        let userId = session.user.id.uuidString
+        let userId = try await homeUserId()
 
         let activeStatuses = "status.eq.published,status.eq.confirmed,status.eq.completed"
 
@@ -266,41 +265,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
 
-        // Also fetch events the user is invited to (accepted/maybe/pending)
-        struct InviteRef: Decodable {
-            let eventId: UUID
-            enum CodingKeys: String, CodingKey { case eventId = "event_id" }
-        }
-        async let myInviteRefsTask: [InviteRef] = client
-            .from("invites")
-            .select("event_id")
-            .eq("user_id", value: userId)
-            .in("status", values: ["accepted", "maybe", "pending"])
-            .execute()
-            .value
-
-        let (publicEvents, hostedEvents, myInviteRefs) = try await (publicEventsTask, hostedEventsTask, myInviteRefsTask)
-        let invitedEventIds = Set(myInviteRefs.map(\.eventId))
+        let (publicEvents, hostedEvents) = try await (publicEventsTask, hostedEventsTask)
 
         var mergedById = Dictionary(uniqueKeysWithValues: publicEvents.map { ($0.id, $0) })
         for event in hostedEvents {
             mergedById[event.id] = event
-        }
-
-        // Fetch invited events that aren't already in the merged set
-        let missingIds = invitedEventIds.subtracting(Set(mergedById.keys))
-        if !missingIds.isEmpty {
-            let invitedEvents: [GameEvent] = try await client
-                .from("events")
-                .select(Self.eventSelect)
-                .in("id", values: missingIds.map(\.uuidString))
-                .or(activeStatuses)
-                .is("deleted_at", value: nil)
-                .execute()
-                .value
-            for event in invitedEvents {
-                mergedById[event.id] = event
-            }
         }
 
         return mergedById.values.sorted { $0.createdAt > $1.createdAt }
@@ -335,11 +304,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchDrafts() async throws -> [GameEvent] {
-        let session = try await client.auth.session
+        let userId = try await homeUserId()
         let events: [GameEvent] = try await client
             .from("events")
             .select(Self.eventSelect)
-            .eq("host_id", value: session.user.id.uuidString)
+            .eq("host_id", value: userId)
             .eq("status", value: "draft")
             .is("deleted_at", value: nil)
             .order("updated_at", ascending: false)
@@ -570,17 +539,25 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchMyInvites() async throws -> [Invite] {
-        let session = try await client.auth.session
+        let userId = try await homeUserId()
 
         let invites: [Invite] = try await client
             .from("invites")
             .select("*, event:events(\(Self.eventSelect))")
-            .eq("user_id", value: session.user.id.uuidString)
+            .eq("user_id", value: userId)
             .execute()
             .value
 
         print("📨 [SupabaseService] fetchMyInvites assigned: \(invites.count)")
         return invites
+    }
+
+    private func homeUserId() async throws -> String {
+        if let currentUserId = client.auth.currentSession?.user.id.uuidString {
+            return currentUserId
+        }
+        let session = try await client.auth.session
+        return session.user.id.uuidString
     }
 
     func fetchInvite(id: UUID) async throws -> Invite {

@@ -59,8 +59,9 @@ final class AppState: ObservableObject {
                 fetchMyInvites: { try await supabase.fetchMyInvites() },
                 fetchDrafts: { try await supabase.fetchDrafts() }
             )
-            self.preloadedHomeSnapshot = snapshot
-            preloadImages(for: snapshot)
+            let hydratedSnapshot = await hydrateHomeSnapshot(snapshot, supabase: supabase)
+            self.preloadedHomeSnapshot = hydratedSnapshot
+            preloadImages(for: hydratedSnapshot)
         } else {
             self.isAuthenticated = false
         }
@@ -90,6 +91,73 @@ final class AppState: ObservableObject {
             // Trigger a data task to fill the system cache
             URLSession.shared.dataTask(with: url).resume()
         }
+    }
+
+    private func hydrateHomeSnapshot(
+        _ base: HomeDataLoadSnapshot,
+        supabase: SupabaseService
+    ) async -> HomeDataLoadSnapshot {
+        await supabase.completePastEvents()
+
+        var upcomingEvents = base.upcomingEvents
+
+        let pendingInvites = base.myInvites.filter { $0.status == .pending }
+        var awaitingResponseEvents: [(event: GameEvent, invite: Invite)] = []
+        if !pendingInvites.isEmpty {
+            let pendingIds = Set(pendingInvites.map(\.eventId))
+            if let fetched = try? await supabase.fetchEvents(ids: Array(pendingIds)) {
+                let eventsById = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
+                awaitingResponseEvents = pendingInvites.compactMap { invite in
+                    guard let event = eventsById[invite.eventId] else { return nil }
+                    return (event, invite)
+                }
+                awaitingResponseEvents.sort { a, b in
+                    a.event.effectiveStartDate < b.event.effectiveStartDate
+                }
+            }
+        }
+
+        let existingEventIds = Set(upcomingEvents.map(\.id))
+        let acceptedInviteEventIds = Set(
+            base.myInvites
+                .filter { $0.status == .accepted || $0.status == .maybe }
+                .map(\.eventId)
+        )
+        let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
+        if !missingInviteEventIds.isEmpty,
+           let inviteEvents = try? await supabase.fetchEvents(ids: Array(missingInviteEventIds)) {
+            upcomingEvents = mergeAndSortUpcomingEvents(upcomingEvents, with: inviteEvents)
+        } else {
+            upcomingEvents = sortByEventDate(upcomingEvents)
+        }
+
+        let inviteCounts = (try? await supabase.fetchAcceptedInviteCounts(eventIds: upcomingEvents.map(\.id))) ?? [:]
+
+        try? await supabase.expireStaleGroupInvites()
+        let pendingGroupInvites = (try? await supabase.fetchMyPendingGroupInvites()) ?? []
+
+        return HomeDataLoadSnapshot(
+            upcomingEvents: upcomingEvents,
+            myInvites: base.myInvites,
+            drafts: base.drafts,
+            awaitingResponseEvents: awaitingResponseEvents,
+            pendingGroupInvites: pendingGroupInvites,
+            inviteCounts: inviteCounts,
+            isHydratedForHome: true,
+            errorMessage: base.errorMessage
+        )
+    }
+
+    private func mergeAndSortUpcomingEvents(_ base: [GameEvent], with additional: [GameEvent]) -> [GameEvent] {
+        var mergedById = Dictionary(uniqueKeysWithValues: base.map { ($0.id, $0) })
+        for event in additional {
+            mergedById[event.id] = event
+        }
+        return sortByEventDate(Array(mergedById.values))
+    }
+
+    private func sortByEventDate(_ events: [GameEvent]) -> [GameEvent] {
+        events.sorted { $0.effectiveStartDate < $1.effectiveStartDate }
     }
 
     /// Loads device contacts into the contactNameMap (fire-and-forget; silently fails if no permission).

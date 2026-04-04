@@ -4,6 +4,10 @@ struct HomeDataLoadSnapshot {
     let upcomingEvents: [GameEvent]
     let myInvites: [Invite]
     let drafts: [GameEvent]
+    let awaitingResponseEvents: [(event: GameEvent, invite: Invite)]
+    let pendingGroupInvites: [(group: GameGroup, member: GroupMember)]
+    let inviteCounts: [UUID: Int]
+    let isHydratedForHome: Bool
     let errorMessage: String?
 }
 
@@ -30,6 +34,10 @@ enum HomeDataLoader {
             upcomingEvents: events.value ?? [],
             myInvites: invites.value ?? [],
             drafts: drafts.value ?? [],
+            awaitingResponseEvents: [],
+            pendingGroupInvites: [],
+            inviteCounts: [:],
+            isHydratedForHome: false,
             errorMessage: failures.isEmpty ? nil : failures.joined(separator: "\n")
         )
     }
