@@ -302,6 +302,40 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertEqual(service.createdInvites.map(\.displayName), ["Casey"])
     }
 
+    func testCreateEventReturnsBeforeInviteCreationCompletes() async {
+        let hostId = UUID()
+        let service = StubEventEditorService(currentUserId: hostId)
+        var inviteGate: CheckedContinuation<Void, Never>?
+        service.onCreateInvites = {
+            await withCheckedContinuation { continuation in
+                inviteGate = continuation
+            }
+        }
+
+        let sut = CreateEventViewModel(supabase: service)
+        sut.title = "Friday Game Night"
+        sut.invitees = [
+            InviteeEntry(
+                id: UUID(),
+                name: "Jordan",
+                phoneNumber: "+15555550111",
+                userId: nil,
+                tier: 1
+            )
+        ]
+
+        let returned = expectation(description: "createEvent should return quickly")
+        Task {
+            await sut.createEvent()
+            returned.fulfill()
+        }
+
+        await fulfillment(of: [returned], timeout: 0.2)
+        XCTAssertNotNil(sut.createdEvent)
+
+        inviteGate?.resume()
+    }
+
     func testUpdateTimeOptionByIdUpdatesMatchingOptionAndResortsByDate() {
         let original = FixtureFactory.makeTimeOption(id: UUID())
         var later = FixtureFactory.makeTimeOption(id: UUID())
@@ -832,9 +866,9 @@ final class CreateEventViewModelTests: XCTestCase {
             userId: UUID(),
             phoneNumber: "+15555550105",
             displayName: "Erin",
-            role: .member,
             tier: 1,
             status: .accepted,
+            role: .member,
             invitedBy: nil,
             addedAt: Date()
         )
@@ -1139,6 +1173,7 @@ private final class StubEventEditorService: EventEditingProviding {
     var frequentContacts: [FrequentContact] = []
     var savedContacts: [SavedContact] = []
     var groups: [GameGroup] = []
+    var onCreateInvites: (() async -> Void)?
 
     init(
         currentUserId: UUID,
@@ -1254,6 +1289,9 @@ private final class StubEventEditorService: EventEditingProviding {
     }
 
     func createInvites(_ invites: [Invite]) async throws {
+        if let onCreateInvites {
+            await onCreateInvites()
+        }
         createdInvites.append(contentsOf: invites)
         existingInvites.append(contentsOf: invites)
     }

@@ -698,9 +698,17 @@ final class CreateEventViewModel: ObservableObject {
                 try await supabase.updateEvent(event)
                 try await syncEventGames(eventId: event.id)
                 try await syncTimeOptions(eventId: event.id)
-                try await syncInviteRecords(eventId: event.id, hostId: hostId)
-
                 createdEvent = try await supabase.fetchEvent(id: event.id)
+
+                // Keep save responsive: finish core event updates first, then sync invites in background.
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        try await self.syncInviteRecords(eventId: event.id, hostId: hostId)
+                    } catch {
+                        print("CreateEventViewModel: background invite sync failed for edit \(event.id): \(error)")
+                    }
+                }
             } catch {
                 self.error = error.localizedDescription
             }
@@ -719,10 +727,19 @@ final class CreateEventViewModel: ObservableObject {
 
             try await supabase.createEventGames(eventId: created.id, games: selectedGames)
             try await supabase.createTimeOptions(resolvedTimeOptions(eventId: created.id))
-            try await createInviteRecords(eventId: created.id, hostId: hostId)
 
             createdEvent = created
             clearLocalCoverPreviewStateIfNeeded()
+
+            // Keep save responsive: send invites in background after event shell is persisted.
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try await self.createInviteRecords(eventId: created.id, hostId: hostId)
+                } catch {
+                    print("CreateEventViewModel: background invite creation failed for event \(created.id): \(error)")
+                }
+            }
         } catch {
             self.error = error.localizedDescription
         }
