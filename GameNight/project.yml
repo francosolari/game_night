@@ -31,12 +31,14 @@ targets:
               - gamenight
         NSContactsUsageDescription: "CardboardWithMe uses your contacts to help you invite friends to game nights. Only the contacts you select are stored."
         NSCalendarsFullAccessUsageDescription: "CardboardWithMe can add game night events to your calendar so you never miss a session."
-        CFBundleDisplayName: CWM
-        CFBundleName: CardboardWithMe
+        CFBundleDisplayName: CardboardWithMe
+        CFBundleName: CWM
+        CFBundleSpotlightAlternateNames:
+          - CWM
+          - GameNight
     entitlements:
       path: GameNight/GameNight.entitlements
       properties:
-        aps-environment: development
         com.apple.developer.associated-domains:
           - applinks:cardboardwithme.com
     settings:
@@ -50,6 +52,28 @@ targets:
         CODE_SIGN_ENTITLEMENTS: GameNight/GameNight.entitlements
     dependencies:
       - package: Supabase
+
+  GameNightNSE:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: GameNightNSE/Sources
+    info:
+      path: GameNightNSE/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+    entitlements:
+      path: GameNightNSE/GameNightNSE.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cardboardwithme.app.NotificationServiceExtension
+        DEVELOPMENT_TEAM: "8AGP3ZJ77K"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        CODE_SIGN_ENTITLEMENTS: GameNightNSE/GameNightNSE.entitlements
 
   GameNightTests:
     type: bundle.unit-test
@@ -70,6 +94,7 @@ schemes:
     build:
       targets:
         GameNight: all
+        GameNightNSE: all
     test:
       targets:
         - GameNightTests

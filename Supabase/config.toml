@@ -23,3 +23,6 @@ enabled = true
 account_sid = "env(TWILIO_ACCOUNT_SID)"
 auth_token = "env(TWILIO_AUTH_TOKEN)"
 message_service_sid = "env(TWILIO_MESSAGING_SERVICE_SID)"
+
+[functions.beta-ensure-user]
+verify_jwt = false

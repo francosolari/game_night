@@ -4,10 +4,16 @@ struct HomeDataLoadSnapshot {
     let upcomingEvents: [GameEvent]
     let myInvites: [Invite]
     let drafts: [GameEvent]
+    let awaitingResponseEvents: [(event: GameEvent, invite: Invite)]
+    let pendingGroupInvites: [(group: GameGroup, member: GroupMember)]
+    let inviteCounts: [UUID: Int]
+    let isHydratedForHome: Bool
     let errorMessage: String?
 }
 
 enum HomeDataLoader {
+    private static let transientRetryDelayNanoseconds: UInt64 = 250_000_000
+
     static func load(
         fetchUpcomingEvents: @escaping @Sendable () async throws -> [GameEvent],
         fetchMyInvites: @escaping @Sendable () async throws -> [Invite],
@@ -28,6 +34,10 @@ enum HomeDataLoader {
             upcomingEvents: events.value ?? [],
             myInvites: invites.value ?? [],
             drafts: drafts.value ?? [],
+            awaitingResponseEvents: [],
+            pendingGroupInvites: [],
+            inviteCounts: [:],
+            isHydratedForHome: false,
             errorMessage: failures.isEmpty ? nil : failures.joined(separator: "\n")
         )
     }
@@ -42,9 +52,31 @@ enum HomeDataLoader {
             // Task cancelled (e.g. SwiftUI .refreshable releasing) — not a real failure
             return CapturedResult(value: nil, errorDescription: nil)
         } catch {
-            let detail = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
-            return CapturedResult(value: nil, errorDescription: "\(label): \(detail)")
+            if shouldRetryAfter(error) {
+                do {
+                    try await Task.sleep(nanoseconds: transientRetryDelayNanoseconds)
+                    return CapturedResult(value: try await operation(), errorDescription: nil)
+                } catch is CancellationError {
+                    return CapturedResult(value: nil, errorDescription: nil)
+                } catch {
+                    return CapturedResult(value: nil, errorDescription: buildErrorDescription(label: label, error: error))
+                }
+            }
+            return CapturedResult(value: nil, errorDescription: buildErrorDescription(label: label, error: error))
         }
+    }
+
+    private static func shouldRetryAfter(_ error: Error) -> Bool {
+        if error is URLError {
+            return true
+        }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain
+    }
+
+    private static func buildErrorDescription(label: String, error: Error) -> String {
+        let detail = error.localizedDescription.isEmpty ? String(describing: error) : error.localizedDescription
+        return "\(label): \(detail)"
     }
 }
 

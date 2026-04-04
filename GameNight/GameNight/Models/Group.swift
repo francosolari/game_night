@@ -1,5 +1,14 @@
 import Foundation
 
+enum GroupEmojiSanitizer {
+    static func sanitized(_ raw: String?) -> String {
+        guard let raw else { return "🎲" }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value != "?", value != "�" else { return "🎲" }
+        return value
+    }
+}
+
 struct GameGroup: Identifiable, Codable {
     let id: UUID
     var ownerId: UUID
@@ -59,6 +68,11 @@ enum GroupMemberStatus: String, Codable {
     case declined
 }
 
+enum GroupMemberRole: String, Codable, Hashable {
+    case member
+    case coOwner = "co_owner"
+}
+
 struct GroupMember: Identifiable, Codable, Hashable {
     let id: UUID
     var groupId: UUID
@@ -69,6 +83,7 @@ struct GroupMember: Identifiable, Codable, Hashable {
     var sortOrder: Int
     var addedAt: Date
     var status: GroupMemberStatus
+    var role: GroupMemberRole
     var invitedBy: UUID?
 
     var isAccepted: Bool { status == .accepted }
@@ -84,12 +99,13 @@ struct GroupMember: Identifiable, Codable, Hashable {
         case sortOrder = "sort_order"
         case addedAt = "added_at"
         case status
+        case role
         case invitedBy = "invited_by"
     }
 
     init(id: UUID, groupId: UUID, userId: UUID? = nil, phoneNumber: String, displayName: String? = nil,
          tier: Int = 1, sortOrder: Int = 0, addedAt: Date = Date(),
-         status: GroupMemberStatus = .pending, invitedBy: UUID? = nil) {
+         status: GroupMemberStatus = .pending, role: GroupMemberRole = .member, invitedBy: UUID? = nil) {
         self.id = id
         self.groupId = groupId
         self.userId = userId
@@ -99,6 +115,7 @@ struct GroupMember: Identifiable, Codable, Hashable {
         self.sortOrder = sortOrder
         self.addedAt = addedAt
         self.status = status
+        self.role = role
         self.invitedBy = invitedBy
     }
 
@@ -112,4 +129,54 @@ struct GroupMember: Identifiable, Codable, Hashable {
         sortOrder: 0,
         addedAt: Date()
     )
+}
+
+// MARK: - Group Invite Preview (from RPC)
+
+struct GroupInvitePreview: Codable {
+    let group: GroupPreviewInfo
+    let owner: GroupMemberPreview
+    let members: [GroupMemberPreview]
+
+    /// Total count including the owner
+    var totalMemberCount: Int { members.count + 1 }
+}
+
+struct GroupPreviewInfo: Codable {
+    let id: UUID
+    let name: String
+    let emoji: String
+    let description: String?
+    let ownerId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, emoji, description
+        case ownerId = "owner_id"
+    }
+}
+
+struct GroupMemberPreview: Codable, Identifiable {
+    let id: UUID
+    let displayName: String
+    let avatarUrl: String?
+    let topGames: [GamePreviewInfo]
+
+    var userId: UUID? { nil }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+        case topGames = "top_games"
+    }
+}
+
+struct GamePreviewInfo: Codable {
+    let name: String
+    let thumbnailUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case thumbnailUrl = "thumbnail_url"
+    }
 }

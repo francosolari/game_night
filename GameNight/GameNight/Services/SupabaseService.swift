@@ -12,6 +12,8 @@ protocol EventEditingProviding: AnyObject {
     func upsertTimeOptions(_ timeOptions: [TimeOption]) async throws
     func deleteTimeOptions(eventId: UUID) async throws
     func deleteTimeOptions(ids: [UUID]) async throws
+    func resetEventPollState(eventId: UUID) async throws
+    func resetEventRSVPsForScheduleChange(eventId: UUID) async throws
     func createEventGames(eventId: UUID, games: [EventGame]) async throws
     func upsertEventGames(eventId: UUID, games: [EventGame]) async throws
     func deleteEventGames(eventId: UUID) async throws
@@ -34,17 +36,20 @@ private struct BetaUserPayload: Encodable {
     let phone: String
     let password: String
     let mode: String
+    let betaPassword: String
 
     enum CodingKeys: String, CodingKey {
         case phone
         case password
         case mode
+        case betaPassword = "betaPassword"
     }
 }
 
 private struct BetaUserProbePayload: Encodable {
     let phone: String
     let mode: String
+    let betaPassword: String
 }
 
 struct BetaUserProbeResponse: Decodable {
@@ -78,84 +83,31 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         )
     }
 
-    func probeBetaUser(phoneNumber: String) async throws -> BetaUserProbeResponse {
-        guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Beta shared secret or service role key not configured"]
-            )
-        }
-
-        var request = URLRequest(url: try betaEnsureUserURL())
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
-        request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
-        request.httpBody = try JSONEncoder().encode(BetaUserProbePayload(phone: phoneNumber, mode: "probe"))
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid beta ensure response"]
-            )
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw NSError(
-                domain: "SupabaseService",
-                code: httpResponse.statusCode,
-                userInfo: [NSLocalizedDescriptionKey: message]
-            )
-        }
-
-        return try JSONDecoder().decode(BetaUserProbeResponse.self, from: data)
+    func probeBetaUser(phoneNumber: String, betaPassword: String) async throws -> BetaUserProbeResponse {
+        try await client.functions.invoke(
+            "beta-ensure-user",
+            options: .init(body: BetaUserProbePayload(phone: phoneNumber, mode: "probe", betaPassword: betaPassword))
+        )
     }
 
-    func ensureBetaUser(phoneNumber: String, password: String) async throws {
-        guard !Secrets.betaSharedSecret.isEmpty, !Secrets.supabaseServiceRoleKey.isEmpty else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Beta shared secret or service role key not configured"]
-            )
+    func ensureBetaUser(phoneNumber: String, password: String, betaPassword: String) async throws {
+        struct EnsureBetaUserResponse: Decodable {
+            let success: Bool
+            let userId: String?
         }
 
-        var request = URLRequest(url: try betaEnsureUserURL())
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(Secrets.supabaseServiceRoleKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(Secrets.supabaseServiceRoleKey)", forHTTPHeaderField: "Authorization")
-        request.setValue(Secrets.betaSharedSecret, forHTTPHeaderField: "x-beta-secret")
-        request.httpBody = try JSONEncoder().encode(
-            BetaUserPayload(
-                phone: phoneNumber,
-                password: password,
-                mode: "ensure"
-            )
-        )
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid beta ensure response"]
-            )
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode)
-            throw NSError(
-                domain: "SupabaseService",
-                code: httpResponse.statusCode,
-                userInfo: [NSLocalizedDescriptionKey: message]
-            )
-        }
+        _ = try await client.functions.invoke(
+            "beta-ensure-user",
+            options: .init(
+                body: BetaUserPayload(
+                    phone: phoneNumber,
+                    password: password,
+                    mode: "ensure",
+                    betaPassword: betaPassword
+                )
+            ),
+            decoder: JSONDecoder()
+        ) as EnsureBetaUserResponse
     }
 
     // MARK: - Auth
@@ -286,50 +238,34 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         }
     }
 
-    private func betaEnsureUserURL() throws -> URL {
-        guard var components = URLComponents(url: Secrets.supabaseURL, resolvingAgainstBaseURL: false) else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid Supabase URL"]
-            )
-        }
-        components.path = "/functions/v1/beta-ensure-user"
-        components.query = nil
-        guard let url = components.url else {
-            throw NSError(
-                domain: "SupabaseService",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Unable to build beta function URL"]
-            )
-        }
-        return url
-    }
-
     // MARK: - Events
 
     func fetchUpcomingEvents() async throws -> [GameEvent] {
-        let session = try await client.auth.session
+        let userId = try await homeUserId()
 
-        let publicEvents: [GameEvent] = try await client
+        let activeStatuses = "status.eq.published,status.eq.confirmed,status.eq.completed"
+
+        async let publicEventsTask: [GameEvent] = client
             .from("events")
             .select(Self.eventSelect)
             .eq("visibility", value: EventVisibility.public.rawValue)
-            .or("status.eq.published,status.eq.confirmed")
+            .or(activeStatuses)
             .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
             .execute()
             .value
 
-        let hostedEvents: [GameEvent] = try await client
+        async let hostedEventsTask: [GameEvent] = client
             .from("events")
             .select(Self.eventSelect)
-            .eq("host_id", value: session.user.id.uuidString)
-            .or("status.eq.published,status.eq.confirmed")
+            .eq("host_id", value: userId)
+            .or(activeStatuses)
             .is("deleted_at", value: nil)
             .order("created_at", ascending: false)
             .execute()
             .value
+
+        let (publicEvents, hostedEvents) = try await (publicEventsTask, hostedEventsTask)
 
         var mergedById = Dictionary(uniqueKeysWithValues: publicEvents.map { ($0.id, $0) })
         for event in hostedEvents {
@@ -368,11 +304,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchDrafts() async throws -> [GameEvent] {
-        let session = try await client.auth.session
+        let userId = try await homeUserId()
         let events: [GameEvent] = try await client
             .from("events")
             .select(Self.eventSelect)
-            .eq("host_id", value: session.user.id.uuidString)
+            .eq("host_id", value: userId)
             .eq("status", value: "draft")
             .is("deleted_at", value: nil)
             .order("updated_at", ascending: false)
@@ -603,17 +539,25 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchMyInvites() async throws -> [Invite] {
-        let session = try await client.auth.session
+        let userId = try await homeUserId()
 
         let invites: [Invite] = try await client
             .from("invites")
             .select("*, event:events(\(Self.eventSelect))")
-            .eq("user_id", value: session.user.id.uuidString)
+            .eq("user_id", value: userId)
             .execute()
             .value
 
         print("📨 [SupabaseService] fetchMyInvites assigned: \(invites.count)")
         return invites
+    }
+
+    private func homeUserId() async throws -> String {
+        if let currentUserId = client.auth.currentSession?.user.id.uuidString {
+            return currentUserId
+        }
+        let session = try await client.auth.session
+        return session.user.id.uuidString
     }
 
     func fetchInvite(id: UUID) async throws -> Invite {
@@ -809,6 +753,42 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Games
 
+    func fetchGame(id: UUID) async throws -> Game? {
+        let games: [Game] = try await client
+            .from("games")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return games.first
+    }
+
+    /// Search the cached BGG games table by name (local-first, no BGG API call).
+    func searchCachedGames(query: String) async throws -> [Game] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.isEmpty else { return [] }
+
+        struct SearchGamesFuzzyParams: Encodable {
+            let searchQuery: String
+            let resultLimit: Int
+
+            enum CodingKeys: String, CodingKey {
+                case searchQuery = "search_query"
+                case resultLimit = "result_limit"
+            }
+        }
+
+        let games: [Game] = try await client
+            .rpc("search_games_fuzzy", params: SearchGamesFuzzyParams(
+                searchQuery: normalizedQuery,
+                resultLimit: 100
+            ))
+            .execute()
+            .value
+        return games
+    }
+
     func fetchGameLibrary() async throws -> [GameLibraryEntry] {
         let session = try await client.auth.session
         let entries: [GameLibraryEntry] = try await client
@@ -819,6 +799,35 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
         return entries
+    }
+
+    func fetchGameLibraryForUser(userId: UUID) async throws -> [GameLibraryEntry] {
+        let entries: [GameLibraryEntry] = try await client
+            .from("game_library")
+            .select("*, game:games(*)")
+            .eq("user_id", value: userId.uuidString)
+            .order("added_at", ascending: false)
+            .execute()
+            .value
+        return entries
+    }
+
+    func fetchWishlistForUser(userId: UUID) async throws -> [GameWishlistEntry] {
+        return try await client
+            .from("game_wishlist")
+            .select("*, game:games(*)")
+            .eq("user_id", value: userId.uuidString)
+            .order("added_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func updateGroupMemberRole(memberId: UUID, role: GroupMemberRole) async throws {
+        try await client
+            .from("group_members")
+            .update(["role": role.rawValue])
+            .eq("id", value: memberId.uuidString)
+            .execute()
     }
 
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {
@@ -841,6 +850,60 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         try await client
             .from("game_library")
             .delete()
+            .eq("id", value: entryId.uuidString)
+            .execute()
+    }
+
+    // MARK: - Wishlist
+
+    func fetchWishlist() async throws -> [GameWishlistEntry] {
+        let session = try await client.auth.session
+        return try await client
+            .from("game_wishlist")
+            .select("*, game:games(*)")
+            .eq("user_id", value: session.user.id.uuidString)
+            .order("added_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func addToWishlist(gameId: UUID) async throws {
+        let session = try await client.auth.session
+        let entry: [String: AnyJSON] = [
+            "user_id": .string(session.user.id.uuidString),
+            "game_id": .string(gameId.uuidString),
+        ]
+        try await client
+            .from("game_wishlist")
+            .insert(entry)
+            .execute()
+    }
+
+    func removeFromWishlist(entryId: UUID) async throws {
+        try await client
+            .from("game_wishlist")
+            .delete()
+            .eq("id", value: entryId.uuidString)
+            .execute()
+    }
+
+    func isOnWishlist(gameId: UUID) async throws -> UUID? {
+        let session = try await client.auth.session
+        let entries: [GameWishlistEntry] = try await client
+            .from("game_wishlist")
+            .select("id")
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("game_id", value: gameId.uuidString)
+            .execute()
+            .value
+        return entries.first?.id
+    }
+
+    func updateLibraryEntryCategory(entryId: UUID, categoryId: UUID?) async throws {
+        let value: AnyJSON = categoryId.map { .string($0.uuidString) } ?? .null
+        try await client
+            .from("game_library")
+            .update(["category_id": value])
             .eq("id", value: entryId.uuidString)
             .execute()
     }
@@ -1057,27 +1120,19 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchGamesByDesigner(name: String) async throws -> [Game] {
-        let games: [Game] = try await client
-            .from("games")
-            .select()
-            .contains("designers", value: [name])
-            .order("bgg_rating", ascending: false)
-            .limit(50)
+        try await client
+            .rpc("fetch_games_by_designer", params: ["designer_name": name])
+            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
             .execute()
             .value
-        return games
     }
 
     func fetchGamesByPublisher(name: String) async throws -> [Game] {
-        let games: [Game] = try await client
-            .from("games")
-            .select()
-            .contains("publishers", value: [name])
-            .order("bgg_rating", ascending: false)
-            .limit(50)
+        try await client
+            .rpc("fetch_games_by_publisher", params: ["publisher_name": name])
+            .select("id,bgg_id,name,year_published,thumbnail_url,image_url,min_players,max_players,recommended_players,min_playtime,max_playtime,complexity,bgg_rating,bgg_rank,categories,mechanics,designers,publishers,artists,min_age,owner_id")
             .execute()
             .value
-        return games
     }
 
     // MARK: - Categories
@@ -1113,6 +1168,17 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
         return groups
+    }
+
+    func fetchGroupById(_ id: UUID) async throws -> GameGroup {
+        let group: GameGroup = try await client
+            .from("groups")
+            .select("*, members:group_members(*)")
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+        return group
     }
 
     func createGroup(_ group: GameGroup) async throws -> GameGroup {
@@ -1198,44 +1264,59 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func expireStaleGroupInvites() async throws {
+        try await client.rpc("expire_stale_group_invites").execute()
+    }
+
+    func fetchGroupInvitePreview(groupId: UUID) async throws -> GroupInvitePreview {
+        let response = try await client
+            .rpc("get_group_invite_preview", params: ["p_group_id": groupId.uuidString])
+            .execute()
+        let preview = try JSONDecoder().decode(GroupInvitePreview.self, from: response.data)
+        return preview
+    }
+
     // MARK: - Saved Contacts
 
     func fetchSavedContacts() async throws -> [SavedContact] {
         let session = try await client.auth.session
-        let contacts: [SavedContact] = try await client
-            .from("saved_contacts")
-            .select()
-            .eq("user_id", value: session.user.id.uuidString)
-            .order("name")
-            .execute()
-            .value
 
-        guard !contacts.isEmpty else { return contacts }
+        // Paginate to avoid PostgREST default 1000-row cap
+        let pageSize = 1000
+        var allContacts: [SavedContact] = []
+        var offset = 0
 
-        // Cross-reference with users table to determine who is on the app
-        // and resolve their Supabase user ID for DMs.
-        // saved_contacts stores E.164 ("+19546080345"), users stores digits-only ("19546080345").
-        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }
+        while true {
+            let page: [SavedContact] = try await client
+                .from("saved_contacts")
+                .select()
+                .eq("user_id", value: session.user.id.uuidString)
+                .order("name")
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute()
+                .value
 
-        struct PhoneCheck: Decodable { let id: UUID; let phone_number: String }
-        let results: [PhoneCheck] = try await client
-            .from("users")
-            .select("id,phone_number")
-            .in("phone_number", values: digitsOnly)
-            .execute()
-            .value
+            allContacts.append(contentsOf: page)
+            if page.count < pageSize { break }
+            offset += pageSize
+        }
 
-        let appUsersByPhone = Dictionary(
-            results.map { ($0.phone_number, $0.id) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        guard !allContacts.isEmpty else { return allContacts }
 
-        return contacts.map { contact in
+        // Cross-reference with users table (chunked to avoid URL length limits)
+        let digitsOnly = allContacts.map { $0.phoneNumber.filter(\.isNumber) }
+        let appUsersByPhone = try await fetchAppUserPhones(from: digitsOnly)
+
+        return allContacts.map { contact in
             var updated = contact
             let digits = contact.phoneNumber.filter(\.isNumber)
-            if let userId = appUsersByPhone[digits] {
+            if let info = appUsersByPhone[digits] {
                 updated.isAppUser = true
-                updated.appUserId = userId
+                updated.appUserId = info.id
+                // Use app user's profile avatar if contact doesn't have one
+                if updated.avatarUrl == nil {
+                    updated.avatarUrl = info.avatarUrl
+                }
             } else {
                 updated.isAppUser = false
             }
@@ -1243,11 +1324,67 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         }
     }
 
+    struct AppUserInfo {
+        let id: UUID
+        let avatarUrl: String?
+    }
+
+    /// Chunked lookup of which phone numbers belong to app users.
+    /// Returns phone → (userId, avatarUrl) mapping.
+    /// Splits into groups of 200 to avoid PostgREST URL length limits.
+    private func fetchAppUserPhones(from phoneDigits: [String]) async throws -> [String: AppUserInfo] {
+        guard !phoneDigits.isEmpty else { return [:] }
+        let chunkSize = 200
+        var result: [String: AppUserInfo] = [:]
+
+        struct PhoneCheck: Decodable { let id: UUID; let phone_number: String; let avatar_url: String? }
+
+        let unique = Array(Set(phoneDigits))
+        for chunkStart in stride(from: 0, to: unique.count, by: chunkSize) {
+            let chunk = Array(unique[chunkStart..<min(chunkStart + chunkSize, unique.count)])
+            let results: [PhoneCheck] = try await client
+                .from("users")
+                .select("id,phone_number,avatar_url")
+                .in("phone_number", values: chunk)
+                .execute()
+                .value
+            for r in results {
+                result[r.phone_number] = AppUserInfo(id: r.id, avatarUrl: r.avatar_url)
+            }
+        }
+        return result
+    }
+
     func saveContacts(_ contacts: [UserContact]) async throws -> [SavedContact] {
+        guard !contacts.isEmpty else { return [] }
         let session = try await client.auth.session
 
+        // Deduplicate by phone number (keep first occurrence)
+        var seen = Set<String>()
+        let uniqueContacts = contacts.filter { contact in
+            let key = contact.phoneNumber.filter(\.isNumber)
+            if seen.contains(key) {
+                return false
+            }
+            seen.insert(key)
+            return true
+        }
+
+        // Fetch existing contacts to avoid upserting unchanged ones
+        let existingContacts: [SavedContact] = try await client
+            .from("saved_contacts")
+            .select()
+            .eq("user_id", value: session.user.id.uuidString)
+            .execute()
+            .value
+
+        let existingByPhone = Dictionary(
+            existingContacts.map { ($0.phoneNumber.filter(\.isNumber), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
         // Check which contacts are app users before saving
-        let digitsOnly = contacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
+        let digitsOnly = uniqueContacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
         var appUserPhones = Set<String>()
         if !digitsOnly.isEmpty {
             struct PhoneCheck: Decodable { let phone_number: String }
@@ -1260,24 +1397,118 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             appUserPhones = Set(results.map(\.phone_number))
         }
 
-        let toSave = contacts.map { contact in
-            SavedContact(
-                id: UUID(),
-                userId: session.user.id,
-                name: contact.name,
-                phoneNumber: contact.phoneNumber,
-                avatarUrl: contact.avatarUrl,
-                isAppUser: appUserPhones.contains(contact.phoneNumber.filter(\.isNumber)),
-                createdAt: nil
-            )
+        // Only upsert contacts that are new or have a different name
+        let toUpsert = uniqueContacts.compactMap { contact -> SavedContact? in
+            let normalized = contact.phoneNumber.filter(\.isNumber)
+            let existing = existingByPhone[normalized]
+
+            // Only include if new or name changed
+            if existing == nil || existing?.name != contact.name {
+                return SavedContact(
+                    id: existing?.id ?? UUID(),
+                    userId: session.user.id,
+                    name: contact.name,
+                    phoneNumber: contact.phoneNumber,
+                    avatarUrl: contact.avatarUrl,
+                    isAppUser: appUserPhones.contains(normalized),
+                    createdAt: existing?.createdAt
+                )
+            }
+            return nil
         }
+
+        guard !toUpsert.isEmpty else { return existingContacts }
+
         let saved: [SavedContact] = try await client
             .from("saved_contacts")
-            .upsert(toSave, onConflict: "user_id,phone_number")
+            .upsert(toUpsert, onConflict: "user_id,phone_number")
             .select()
             .execute()
             .value
         return saved
+    }
+
+    /// Bulk-syncs device contacts to saved_contacts efficiently.
+    /// Fetches existing contacts once, deduplicates, and upserts only new/changed entries.
+    /// Returns the total number of contacts upserted.
+    func saveContactsBulk(
+        _ contacts: [UserContact],
+        onBatchComplete: @Sendable (Int) -> Void = { _ in }
+    ) async throws -> Int {
+        guard !contacts.isEmpty else { return 0 }
+        let session = try await client.auth.session
+
+        // Deduplicate by phone number (keep first occurrence)
+        var seen = Set<String>()
+        let uniqueContacts = contacts.filter { contact in
+            let key = contact.phoneNumber.filter(\.isNumber)
+            if seen.contains(key) { return false }
+            seen.insert(key)
+            return true
+        }
+
+        // Fetch ALL existing contacts once (paginated)
+        let pageSize = 1000
+        var existingContacts: [SavedContact] = []
+        var offset = 0
+        while true {
+            let page: [SavedContact] = try await client
+                .from("saved_contacts")
+                .select()
+                .eq("user_id", value: session.user.id.uuidString)
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute()
+                .value
+            existingContacts.append(contentsOf: page)
+            if page.count < pageSize { break }
+            offset += pageSize
+        }
+
+        let existingByPhone = Dictionary(
+            existingContacts.map { ($0.phoneNumber.filter(\.isNumber), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        // Check which contacts are app users (chunked)
+        let digitsOnly = uniqueContacts.map { $0.phoneNumber.filter(\.isNumber) }.filter { !$0.isEmpty }
+        let appUserMap = try await fetchAppUserPhones(from: digitsOnly)
+
+        // Filter to new or name-changed contacts only
+        let toUpsert = uniqueContacts.compactMap { contact -> SavedContact? in
+            let normalized = contact.phoneNumber.filter(\.isNumber)
+            let existing = existingByPhone[normalized]
+
+            if existing == nil || existing?.name != contact.name {
+                let appInfo = appUserMap[normalized]
+                return SavedContact(
+                    id: existing?.id ?? UUID(),
+                    userId: session.user.id,
+                    name: contact.name,
+                    phoneNumber: contact.phoneNumber,
+                    avatarUrl: contact.avatarUrl ?? appInfo?.avatarUrl,
+                    isAppUser: appInfo != nil,
+                    createdAt: existing?.createdAt
+                )
+            }
+            return nil
+        }
+
+        guard !toUpsert.isEmpty else { return 0 }
+
+        // Upsert in batches of 100
+        let batchSize = 100
+        var totalUpserted = 0
+        for batchStart in stride(from: 0, to: toUpsert.count, by: batchSize) {
+            let batch = Array(toUpsert[batchStart..<min(batchStart + batchSize, toUpsert.count)])
+            try await client
+                .from("saved_contacts")
+                .upsert(batch, onConflict: "user_id,phone_number")
+                .execute()
+            totalUpserted += batch.count
+            onBatchComplete(totalUpserted)
+        }
+
+        return totalUpserted
     }
 
     func autoSaveInviteContact(name: String, phoneNumber: String, isAppUser: Bool) async {
@@ -1515,6 +1746,22 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func resetEventPollState(eventId: UUID) async throws {
+        try await client
+            .rpc("reset_event_poll_state", params: [
+                "p_event_id": eventId.uuidString
+            ])
+            .execute()
+    }
+
+    func resetEventRSVPsForScheduleChange(eventId: UUID) async throws {
+        try await client
+            .rpc("reset_event_rsvps_for_schedule_change", params: [
+                "p_event_id": eventId.uuidString
+            ])
+            .execute()
+    }
+
     func confirmGame(eventId: UUID, gameId: UUID, gameName: String) async throws {
         // Set confirmed game and end game voting
         let updates: [String: AnyJSON] = [
@@ -1644,6 +1891,22 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return plays
     }
 
+    func fetchPlaysForGameAmongUsers(gameId: UUID, userIds: [UUID]) async throws -> [Play] {
+        let plays: [Play] = try await client
+            .from("plays")
+            .select(Self.playSelect)
+            .eq("game_id", value: gameId.uuidString)
+            .order("played_at", ascending: false)
+            .execute()
+            .value
+
+        let userIdSet = Set(userIds)
+        return plays.filter { play in
+            let playUserIds = Set(play.participants.compactMap(\.userId))
+            return !playUserIds.isDisjoint(with: userIdSet)
+        }
+    }
+
     func updatePlay(_ play: Play) async throws {
         try await client
             .from("plays")
@@ -1658,6 +1921,67 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    /// Fetches avatar URLs for a list of user IDs.
+    func fetchUserAvatars(userIds: [UUID]) async throws -> [UUID: String] {
+        guard !userIds.isEmpty else { return [:] }
+        struct UserAvatar: Decodable { let id: UUID; let avatar_url: String? }
+
+        let chunkSize = 200
+        var result: [UUID: String] = [:]
+        let ids = userIds.map(\.uuidString)
+
+        for chunkStart in stride(from: 0, to: ids.count, by: chunkSize) {
+            let chunk = Array(ids[chunkStart..<min(chunkStart + chunkSize, ids.count)])
+            let users: [UserAvatar] = try await client
+                .from("users")
+                .select("id,avatar_url")
+                .in("id", values: chunk)
+                .execute()
+                .value
+            for u in users {
+                if let url = u.avatar_url { result[u.id] = url }
+            }
+        }
+        return result
+    }
+
+    /// Replaces all participants for a play (delete + re-insert).
+    func replacePlayParticipants(playId: UUID, participants: [PlayParticipant]) async throws {
+        try await client
+            .from("play_participants")
+            .delete()
+            .eq("play_id", value: playId.uuidString)
+            .execute()
+
+        if !participants.isEmpty {
+            try await client
+                .from("play_participants")
+                .insert(participants)
+                .execute()
+        }
+    }
+
+    /// Updates specific fields on a play (partial update).
+    func updatePlayFields(id: UUID, fields: [String: AnyJSON]) async throws {
+        try await client
+            .from("plays")
+            .update(fields)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Re-fetches a single play with full joins.
+    func fetchPlayById(_ id: UUID) async throws -> Play {
+        let play: Play = try await client
+            .from("plays")
+            .select(Self.playSelect)
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+        return play
     }
 
     // MARK: - Group Events
@@ -1854,23 +2178,36 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Push Tokens
 
-    func registerPushToken(_ token: String) async throws {
+    func registerPushToken(_ token: String, apnsEnvironment: String) async throws {
         let userId = try await currentUserId()
         struct PushTokenEntry: Encodable {
             let user_id: String
             let device_token: String
             let platform: String
+            let apns_environment: String
             let updated_at: String
         }
+
+        let normalizedEnvironment: String
+        switch apnsEnvironment.lowercased() {
+        case "sandbox":
+            normalizedEnvironment = "sandbox"
+        case "production":
+            normalizedEnvironment = "production"
+        default:
+            normalizedEnvironment = "production"
+        }
+
         let entry = PushTokenEntry(
             user_id: userId.uuidString,
             device_token: token,
             platform: "ios",
+            apns_environment: normalizedEnvironment,
             updated_at: Date().ISO8601Format()
         )
         try await client
             .from("push_tokens")
-            .upsert(entry)
+            .upsert(entry, onConflict: "user_id,device_token,apns_environment")
             .execute()
     }
 

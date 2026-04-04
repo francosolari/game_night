@@ -39,8 +39,26 @@ final class GroupsViewModel: ObservableObject {
 
         do {
             let created = try await supabase.createGroup(group)
-            groups.insert(created, at: 0)
-            return created
+
+            // Fetch current user and add them as an accepted member
+            let currentUser = try await supabase.fetchUserById(userId)
+            let ownerMember = GroupMember(
+                id: UUID(),
+                groupId: created.id,
+                userId: userId,
+                phoneNumber: currentUser.phoneNumber,
+                displayName: currentUser.displayName,
+                tier: 1,
+                sortOrder: 0,
+                addedAt: Date(),
+                status: .accepted
+            )
+            try await supabase.addGroupMember(ownerMember)
+
+            var groupWithOwner = created
+            groupWithOwner.members = [ownerMember]
+            groups.insert(groupWithOwner, at: 0)
+            return groupWithOwner
         } catch {
             self.error = error.localizedDescription
             return nil
@@ -67,7 +85,8 @@ final class GroupsViewModel: ObservableObject {
             displayName: name,
             tier: tier,
             sortOrder: groups[idx].members.count,
-            addedAt: Date()
+            addedAt: Date(),
+            status: .pending
         )
 
         do {
@@ -89,12 +108,13 @@ final class GroupsViewModel: ObservableObject {
             let member = GroupMember(
                 id: UUID(),
                 groupId: groupId,
-                userId: nil,
+                userId: contact.appUserId,
                 phoneNumber: normalized,
                 displayName: contact.name,
                 tier: 1,
                 sortOrder: groups[idx].members.count,
-                addedAt: Date()
+                addedAt: Date(),
+                status: .pending
             )
 
             do {
@@ -132,7 +152,7 @@ final class GroupsViewModel: ObservableObject {
 
         let now = Date()
         upcomingEvents = allEvents
-            .filter { $0.effectiveEndDate >= now && $0.status == .published }
+            .filter { $0.effectiveEndDate >= now && $0.status != .cancelled }
             .sorted { $0.effectiveStartDate < $1.effectiveStartDate }
 
         // Fetch invite counts for upcoming events

@@ -23,6 +23,7 @@ struct Game: Identifiable, Codable, Hashable {
     var artists: [String]
     var minAge: Int?
     var bggRank: Int?
+    var bggLastSynced: Date?
 
     var isManual: Bool {
         bggId == nil && ownerId != nil
@@ -55,6 +56,7 @@ struct Game: Identifiable, Codable, Hashable {
         case artists
         case minAge = "min_age"
         case bggRank = "bgg_rank"
+        case bggLastSynced = "bgg_last_synced"
     }
 
     init(
@@ -79,7 +81,8 @@ struct Game: Identifiable, Codable, Hashable {
         publishers: [String] = [],
         artists: [String] = [],
         minAge: Int? = nil,
-        bggRank: Int? = nil
+        bggRank: Int? = nil,
+        bggLastSynced: Date? = nil
     ) {
         self.id = id
         self.ownerId = ownerId
@@ -103,6 +106,7 @@ struct Game: Identifiable, Codable, Hashable {
         self.artists = artists
         self.minAge = minAge
         self.bggRank = bggRank
+        self.bggLastSynced = bggLastSynced
     }
 
     init(from decoder: Decoder) throws {
@@ -129,6 +133,7 @@ struct Game: Identifiable, Codable, Hashable {
         artists = try container.decodeIfPresent([String].self, forKey: .artists) ?? []
         minAge = try container.decodeIfPresent(Int.self, forKey: .minAge)
         bggRank = try container.decodeIfPresent(Int.self, forKey: .bggRank)
+        bggLastSynced = try container.decodeIfPresent(Date.self, forKey: .bggLastSynced)
     }
 
     var playerCountDisplay: String {
@@ -243,6 +248,24 @@ struct GameLibraryEntry: Identifiable, Codable {
     }
 }
 
+struct GameWishlistEntry: Identifiable, Codable {
+    let id: UUID
+    var userId: UUID
+    var gameId: UUID
+    var game: Game?
+    var addedAt: Date
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case gameId = "game_id"
+        case game
+        case addedAt = "added_at"
+        case notes
+    }
+}
+
 struct GameCategory: Identifiable, Codable, Hashable {
     let id: UUID
     var userId: UUID
@@ -273,9 +296,16 @@ struct GameCategory: Identifiable, Codable, Hashable {
 }
 
 // MARK: - BGG Search Result
-struct BGGSearchResult: Identifiable, Hashable {
+struct BGGSearchResult: Identifiable, Codable, Hashable {
     let id: Int // BGG ID
     let name: String
     let yearPublished: Int?
     let thumbnailUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "bgg_id"
+        case name
+        case yearPublished = "year_published"
+        case thumbnailUrl = "thumbnail_url"
+    }
 }

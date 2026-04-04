@@ -61,6 +61,7 @@ final class PlayLoggingViewModel: ObservableObject {
 
         // Build participant list from accepted invites + host
         var drafts: [PlayParticipantDraft] = []
+        let currentUserId = supabase.client.auth.currentSession?.user.id
 
         // Add host
         if let host = event.host {
@@ -86,6 +87,13 @@ final class PlayLoggingViewModel: ObservableObject {
             ))
         }
 
+        // Ensure current user is playing by default
+        if let currentUserId {
+            if let idx = drafts.firstIndex(where: { $0.userId == currentUserId }) {
+                drafts[idx].isPlaying = true
+            }
+        }
+
         // Assign same participants to all games
         for game in games {
             participantsByGame[game.id] = drafts
@@ -96,8 +104,9 @@ final class PlayLoggingViewModel: ObservableObject {
 
     func prefillFromGroup(_ group: GameGroup) {
         groupId = group.id
+        let currentUserId = supabase.client.auth.currentSession?.user.id
 
-        // Show all group members but none pre-selected — user picks who played
+        // Show all group members — current user pre-selected, others not
         var drafts: [PlayParticipantDraft] = []
         for member in group.members {
             drafts.append(PlayParticipantDraft(
@@ -105,9 +114,22 @@ final class PlayLoggingViewModel: ObservableObject {
                 userId: member.userId,
                 phoneNumber: member.phoneNumber,
                 displayName: member.displayName ?? "Player",
-                isPlaying: false,
+                isPlaying: member.userId != nil && member.userId == currentUserId,
                 isWinner: false
             ))
+        }
+
+        // If current user isn't a group member, add them at the top
+        if let currentUserId, !drafts.contains(where: { $0.userId == currentUserId }) {
+            let currentUser = supabase.client.auth.currentSession?.user
+            drafts.insert(PlayParticipantDraft(
+                id: UUID(),
+                userId: currentUserId,
+                phoneNumber: currentUser?.phone,
+                displayName: currentUser?.userMetadata["display_name"]?.value as? String ?? "Me",
+                isPlaying: true,
+                isWinner: false
+            ), at: 0)
         }
 
         // No games preselected — user picks from library

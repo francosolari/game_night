@@ -728,7 +728,7 @@ final class CreateEventViewModel: ObservableObject {
             status: status,
             games: selectedGames,
             timeOptions: resolvedTimeOptions(),
-            confirmedTimeOptionId: existingEvent?.confirmedTimeOptionId,
+            confirmedTimeOptionId: scheduleMode == .poll ? nil : existingEvent?.confirmedTimeOptionId,
             allowTimeSuggestions: scheduleMode == .poll ? allowTimeSuggestions : false,
             scheduleMode: scheduleMode,
             inviteStrategy: inviteStrategy,
@@ -859,12 +859,46 @@ final class CreateEventViewModel: ObservableObject {
     }
 
     private func syncTimeOptions(eventId: UUID) async throws {
-        let existingIds = Set(eventToEdit?.timeOptions.map(\.id) ?? [])
         let currentOptions = resolvedTimeOptions(eventId: eventId)
+
+        if eventToEdit?.scheduleMode == .fixed {
+            if scheduleMode == .poll {
+                try await supabase.resetEventPollState(eventId: eventId)
+            } else if scheduleMode == .fixed,
+                      didChangeFixedSchedule(from: eventToEdit?.timeOptions.first, to: currentOptions.first) {
+                try await supabase.resetEventRSVPsForScheduleChange(eventId: eventId)
+            }
+        }
+
+        let existingIds = Set(eventToEdit?.timeOptions.map(\.id) ?? [])
         let currentIds = Set(currentOptions.map(\.id))
 
         try await supabase.upsertTimeOptions(currentOptions)
         try await supabase.deleteTimeOptions(ids: Array(existingIds.subtracting(currentIds)))
+    }
+
+    private func didChangeFixedSchedule(from existing: TimeOption?, to updated: TimeOption?) -> Bool {
+        switch (existing, updated) {
+        case (nil, nil):
+            return false
+        case (nil, _), (_, nil):
+            return true
+        case let (.some(old), .some(new)):
+            let calendar = Calendar.current
+            let dayChanged = !calendar.isDate(old.date, equalTo: new.date, toGranularity: .day)
+            let startChanged = !calendar.isDate(old.startTime, equalTo: new.startTime, toGranularity: .minute)
+            let endChanged: Bool = {
+                switch (old.endTime, new.endTime) {
+                case (nil, nil):
+                    return false
+                case (nil, _), (_, nil):
+                    return true
+                case let (.some(oldEnd), .some(newEnd)):
+                    return !calendar.isDate(oldEnd, equalTo: newEnd, toGranularity: .minute)
+                }
+            }()
+            return dayChanged || startChanged || endChanged
+        }
     }
 
     private func resolvedTimeOptions(eventId: UUID? = nil) -> [TimeOption] {

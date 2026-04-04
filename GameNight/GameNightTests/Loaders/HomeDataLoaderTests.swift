@@ -2,6 +2,36 @@ import XCTest
 @testable import GameNight
 
 final class HomeDataLoaderTests: XCTestCase {
+    func testLoadRetriesTransientFailureBeforeSurfacingError() async {
+        actor Attempts {
+            private(set) var count = 0
+            func next() -> Int {
+                count += 1
+                return count
+            }
+        }
+
+        let attempts = Attempts()
+        let event = FixtureFactory.makeEvent()
+
+        let snapshot = await HomeDataLoader.load(
+            fetchUpcomingEvents: {
+                let attempt = await attempts.next()
+                if attempt == 1 {
+                    throw URLError(.networkConnectionLost)
+                }
+                return [event]
+            },
+            fetchMyInvites: { [] },
+            fetchDrafts: { [] }
+        )
+
+        let totalAttempts = await attempts.count
+        XCTAssertEqual(totalAttempts, 2)
+        XCTAssertEqual(snapshot.upcomingEvents.map(\.id), [event.id])
+        XCTAssertEqual(snapshot.errorMessage, nil)
+    }
+
     func testLoadReturnsPartialSnapshotWhenInvitesFail() async {
         let event = FixtureFactory.makeEvent()
         let draft = FixtureFactory.makeEvent(status: .draft)

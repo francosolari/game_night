@@ -1,6 +1,7 @@
 import Foundation
 
 protocol GameDetailDataProviding {
+    func fetchGame(id: UUID) async throws -> Game?
     func upsertGame(_ game: Game) async throws -> Game
     func fetchExpansions(gameId: UUID) async throws -> [Game]
     func fetchBaseGame(expansionGameId: UUID) async throws -> Game?
@@ -39,10 +40,11 @@ final class GameDetailViewModel: ObservableObject {
 
     func loadRelatedData() async {
         isLoading = true
-        do {
-            try await hydrateFromBGGIfNeeded()
-        } catch {
-            // Non-critical — fallback to whatever local data is already available.
+
+        // Search RPC returns a lightweight payload for speed; refresh to full row
+        // so detail fields (description/designers/publishers/etc.) render immediately.
+        if let fullGame = try? await supabase.fetchGame(id: game.id) {
+            game = fullGame
         }
 
         async let expansionsResult = supabase.fetchExpansions(gameId: game.id)
@@ -57,10 +59,37 @@ final class GameDetailViewModel: ObservableObject {
             // Non-critical — detail page still shows game info
         }
         isLoading = false
+
+        // Hydrate sparse BGG games in the background so detail rendering is not blocked
+        // on a network round-trip to the edge function.
+        do {
+            try await hydrateFromBGGIfNeeded()
+        } catch {
+            return
+        }
+
+        async let refreshedExpansions = supabase.fetchExpansions(gameId: game.id)
+        async let refreshedBase = supabase.fetchBaseGame(expansionGameId: game.id)
+        async let refreshedFamilies = supabase.fetchFamilyMembers(gameId: game.id)
+
+        do {
+            expansions = try await refreshedExpansions
+            baseGame = try await refreshedBase
+            families = try await refreshedFamilies
+        } catch {
+            // Non-critical — keep initial relation fetch.
+        }
     }
 
     private func hydrateFromBGGIfNeeded() async throws {
         guard let bggId = game.bggId else { return }
+
+        // Skip hydration if the game is already fully populated.
+        // Key signal: description + at least one mechanic/category means BGG data is present.
+        let isHydrated = game.description != nil
+            && !game.mechanics.isEmpty
+            && !game.categories.isEmpty
+        if isHydrated { return }
 
         let parseResult = try await bgg.fetchGameDetailsWithRelations(bggId: bggId)
         let savedGame = try await supabase.upsertGame(

@@ -10,6 +10,7 @@ struct GameDetailView: View {
     @State private var showImageCropPicker = false
     @State private var isUploadingImage = false
     @State private var imageUploadError: String?
+    @State private var expandedCreatorRoles: Set<CreatorRole> = []
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -33,6 +34,35 @@ struct GameDetailView: View {
             .compactMap(\.first)
         let initials = String(parts)
         return initials.isEmpty ? "GM" : initials
+    }
+
+    private static let filteredFamilyPrefixes = [
+        "Mechanism:",
+        "Category:",
+        "Theme:",
+        "Continents:",
+        "Players:",
+        "Digital Implementations:",
+        "Components:",
+        "Setting:",
+        "Crowdfunding:",
+        "Admin:"
+    ]
+
+    private var relevantFamilies: [(family: GameFamily, games: [Game])] {
+        viewModel.families.filter { familyData in
+            !Self.filteredFamilyPrefixes.contains { prefix in
+                familyData.family.name.lowercased().hasPrefix(prefix.lowercased())
+            }
+        }
+    }
+
+    private var visibleFamilies: [(family: GameFamily, games: [Game])] {
+        Array(relevantFamilies.prefix(3))
+    }
+
+    private var hiddenFamilyCount: Int {
+        max(relevantFamilies.count - visibleFamilies.count, 0)
     }
 
     init(game: Game) {
@@ -159,18 +189,10 @@ struct GameDetailView: View {
                     if isEditingManualGame, let draftBinding = manualDraftBinding {
                         ManualDescriptionEditorSection(game: draftBinding)
                     } else if let desc = displayedGame.description, !desc.isEmpty {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                            Text(desc)
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                                .lineLimit(isDescriptionExpanded ? nil : 3)
-
-                            Button(isDescriptionExpanded ? "Show less" : "Read more") {
-                                withAnimation { isDescriptionExpanded.toggle() }
-                            }
-                            .font(Theme.Typography.calloutMedium)
-                            .foregroundColor(Theme.Colors.primary)
-                        }
+                        DescriptionSection(
+                            text: desc.strippingHTML(),
+                            isExpanded: $isDescriptionExpanded
+                        )
                     }
 
                     // 6. Base game link
@@ -194,48 +216,59 @@ struct GameDetailView: View {
                         }
                     }
 
-                    // 7. Family links
-                    if !isEditingManualGame {
-                        ForEach(viewModel.families, id: \.family.id) { familyData in
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                                NavigationLink(
-                                    value: GameFamilyDestination(
-                                        family: familyData.family,
-                                        games: familyData.games
-                                    )
-                                ) {
-                                    HStack(spacing: Theme.Spacing.sm) {
-                                        Text("Part of \(familyData.family.name)")
-                                            .font(Theme.Typography.label)
-                                            .foregroundColor(Theme.Colors.accent)
-                                            .textCase(.uppercase)
+                }
+                .padding(.horizontal, Theme.Spacing.xl)
 
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundColor(Theme.Colors.textTertiary)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-
-                                HorizontalGameScroll(
-                                    title: "",
-                                    games: familyData.games.filter { $0.id != displayedGame.id }
+                // 7. Family links (edge-to-edge horizontal scroll)
+                if !isEditingManualGame {
+                    ForEach(visibleFamilies, id: \.family.id) { familyData in
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            NavigationLink(
+                                value: GameFamilyDestination(
+                                    family: familyData.family,
+                                    games: familyData.games
                                 )
+                            ) {
+                                HStack(spacing: Theme.Spacing.sm) {
+                                    Text("Part of \(familyData.family.name)")
+                                        .font(Theme.Typography.label)
+                                        .foregroundColor(Theme.Colors.accent)
+                                        .textCase(.uppercase)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(Theme.Colors.textTertiary)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, Theme.Spacing.xl)
+
+                            HorizontalGameScroll(
+                                title: "",
+                                games: familyData.games.filter { $0.id != displayedGame.id },
+                                contentPadding: Theme.Spacing.xl
+                            )
                         }
                     }
 
-                    // 8. Expansions
-                    if !isEditingManualGame, !viewModel.expansions.isEmpty {
-                        HorizontalGameScroll(
-                            title: "Expansions",
-                            games: viewModel.expansions
-                        )
+                    if hiddenFamilyCount > 0 {
+                        Text("+ \(hiddenFamilyCount) more series")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textTertiary)
+                            .padding(.horizontal, Theme.Spacing.xl)
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.xl)
+
+                // 8. Expansions (edge-to-edge horizontal scroll)
+                if !isEditingManualGame, !viewModel.expansions.isEmpty {
+                    HorizontalGameScroll(
+                        title: "Expansions",
+                        games: viewModel.expansions,
+                        contentPadding: Theme.Spacing.xl
+                    )
+                }
             }
-            .padding(.bottom, 100)
+            .padding(.bottom, 160)
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -295,10 +328,10 @@ struct GameDetailView: View {
                     .foregroundColor(Theme.Colors.textTertiary)
                 }
                 if !designerLinks.isEmpty {
-                    creatorRow(links: designerLinks)
+                    creatorRow(links: designerLinks, maxVisible: 2, role: .designer)
                 }
                 if !publisherLinks.isEmpty {
-                    creatorRow(links: publisherLinks)
+                    creatorRow(links: publisherLinks, maxVisible: 1, role: .publisher)
                 }
                 if let year = displayedGame.yearPublished {
                     Label(String(year), systemImage: "calendar")
@@ -316,21 +349,25 @@ struct GameDetailView: View {
     }
 
     @ViewBuilder
-    private func creatorRow(links: [(name: String, destination: CreatorDestination)]) -> some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            ForEach(Array(links.enumerated()), id: \.offset) { index, item in
-                if index > 0 {
-                    Text("\u{00B7}")
-                        .foregroundColor(Theme.Colors.textTertiary)
+    private func creatorRow(
+        links: [(name: String, destination: CreatorDestination)],
+        maxVisible: Int,
+        role: CreatorRole
+    ) -> some View {
+        ExpandableCreatorRow(
+            links: links,
+            maxVisible: maxVisible,
+            isExpanded: Binding(
+                get: { expandedCreatorRoles.contains(role) },
+                set: { newValue in
+                    if newValue {
+                        expandedCreatorRoles.insert(role)
+                    } else {
+                        expandedCreatorRoles.remove(role)
+                    }
                 }
-
-                NavigationLink(value: item.destination) {
-                    Text(item.name)
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.accent)
-                }
-            }
-        }
+            )
+        )
     }
 
     private var manualDraftBinding: Binding<Game>? {
@@ -878,5 +915,127 @@ struct GameFamilyDetailView: View {
         }
         .background(Theme.Colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Description Section (isolated view for reliable tap handling)
+
+private struct DescriptionSection: View {
+    let text: String
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(text)
+                .font(Theme.Typography.body)
+                .foregroundColor(Theme.Colors.textSecondary)
+                .lineLimit(isExpanded ? nil : 3)
+                .animation(.easeInOut(duration: 0.25), value: isExpanded)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                Text(isExpanded ? "Show less" : "Read more")
+                    .font(Theme.Typography.calloutMedium)
+                    .foregroundColor(Theme.Colors.primary)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+}
+
+// MARK: - Expandable Creator Row (isolated view for reliable tap handling)
+
+private struct ExpandableCreatorRow: View {
+    let links: [(name: String, destination: CreatorDestination)]
+    let maxVisible: Int
+    @Binding var isExpanded: Bool
+
+    private var displayLinks: [(name: String, destination: CreatorDestination)] {
+        isExpanded ? links : Array(links.prefix(maxVisible))
+    }
+
+    private var hiddenCount: Int {
+        isExpanded ? 0 : max(links.count - maxVisible, 0)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            HStack(spacing: Theme.Spacing.xs) {
+                ForEach(Array(displayLinks.enumerated()), id: \.offset) { index, item in
+                    if index > 0 {
+                        Text("\u{00B7}")
+                            .foregroundColor(Theme.Colors.textTertiary)
+                    }
+                    NavigationLink(value: item.destination) {
+                        Text(item.name)
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if hiddenCount > 0 {
+                    Text("\u{00B7}")
+                        .foregroundColor(Theme.Colors.textTertiary)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isExpanded = true
+                        }
+                    } label: {
+                        Text("+ \(hiddenCount) more")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.primary)
+                            .padding(.vertical, Theme.Spacing.xs)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            if isExpanded && links.count > maxVisible {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded = false
+                    }
+                } label: {
+                    Text("Show less")
+                        .font(Theme.Typography.callout)
+                        .foregroundColor(Theme.Colors.primary)
+                        .padding(.vertical, Theme.Spacing.xs)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+    }
+}
+
+private extension String {
+    func strippingHTML() -> String {
+        let wrapped = "<div>\(self)</div>"
+        if let data = wrapped.data(using: .utf8),
+           let attributed = try? NSAttributedString(
+            data: data,
+            options: [
+                .documentType: NSAttributedString.DocumentType.html,
+                .characterEncoding: String.Encoding.utf8.rawValue
+            ],
+            documentAttributes: nil
+           ) {
+            return attributed.string
+                .replacingOccurrences(of: "\r\n", with: "\n")
+                .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return self
+            .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "</p>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

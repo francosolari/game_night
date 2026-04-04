@@ -3,6 +3,8 @@ import SwiftUI
 @main
 struct GameNightApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var appState = AppState()
     @StateObject private var supabase = SupabaseService.shared
     @StateObject private var themeManager = ThemeManager.shared
@@ -19,13 +21,23 @@ struct GameNightApp: App {
                     OnboardingView()
                 }
             }
-            .animation(.easeInOut(duration: 0.25), value: themeManager.mode)
+            .animation(.easeInOut(duration: 0.25), value: themeManager.isDark)
             .task {
                 await appState.checkAuthState()
                 // Request push permission after auth check
                 if appState.isAuthenticated {
                     _ = await pushManager.requestPermission()
                 }
+            }
+            .onAppear {
+                themeManager.updateSystemColorScheme(colorScheme)
+            }
+            .onChange(of: colorScheme) { _, newScheme in
+                themeManager.updateSystemColorScheme(newScheme)
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active else { return }
+                themeManager.updateSystemColorScheme(colorScheme)
             }
             .onOpenURL { url in
                 handleDeepLink(url)

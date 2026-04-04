@@ -65,7 +65,7 @@ struct NotificationRow: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if let body = notification.body {
+            if let body = notification.displayBody {
                 Text(body)
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.textTertiary)

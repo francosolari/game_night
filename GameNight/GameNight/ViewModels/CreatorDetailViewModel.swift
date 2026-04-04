@@ -17,10 +17,14 @@ final class CreatorDetailViewModel: ObservableObject {
         switch sortMode {
         case .topRated:
             sorted = games.sorted { ($0.bggRating ?? 0) > ($1.bggRating ?? 0) }
+        case .alphabetical:
+            sorted = games.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .byYear:
             sorted = games.sorted { ($0.yearPublished ?? 0) > ($1.yearPublished ?? 0) }
         case .byWeight:
             sorted = games.sorted { $0.complexity > $1.complexity }
+        case .recentlyAdded:
+            sorted = games
         }
         return isExpanded ? sorted : Array(sorted.prefix(5))
     }
@@ -31,6 +35,12 @@ final class CreatorDetailViewModel: ObservableObject {
 
     var subtitle: String {
         "\(role.rawValue) · \(games.count)\(hasMoreGames ? "+" : "") games"
+    }
+
+    var representativeImageUrl: String? {
+        // Use the top-rated game's image (already sorted by bgg_rating DESC)
+        games.first(where: { $0.imageUrl != nil })?.imageUrl
+            ?? games.first(where: { $0.thumbnailUrl != nil })?.thumbnailUrl
     }
 
     var averageRating: Double? {
@@ -68,8 +78,7 @@ final class CreatorDetailViewModel: ObservableObject {
     }
 
     func loadAllGames() async {
-        // Re-fetch without limit — requires adding unlimited fetch methods
-        // For now, the initial 50 is sufficient
+        // Re-fetch without limit
         isExpanded = true
     }
 }

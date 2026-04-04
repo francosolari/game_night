@@ -54,8 +54,26 @@ struct GameEvent: Identifiable, Codable {
            let end = confirmed.endTime {
             return end
         }
-        // Fall back to end of the start day
-        return Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: effectiveStartDate) ?? effectiveStartDate
+
+        if scheduleMode == .fixed,
+           let fixedOption = timeOptions.min(by: { $0.startTime < $1.startTime }),
+           let end = fixedOption.endTime {
+            return end
+        }
+
+        // Fall back to midnight (start of the next day)
+        let cal = Calendar.current
+        return cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: effectiveStartDate)) ?? effectiveStartDate
+    }
+
+    /// Returns true once the event should be treated as over in the UI.
+    /// - Completed events are always ended.
+    /// - Otherwise, use `effectiveEndDate` as the cutoff.
+    func hasEnded(asOf now: Date = Date()) -> Bool {
+        if status == .completed {
+            return true
+        }
+        return now >= effectiveEndDate
     }
 
     enum CodingKeys: String, CodingKey {
@@ -322,6 +340,19 @@ struct InviteStrategy: Codable {
     enum InviteType: String, Codable {
         case allAtOnce = "all_at_once"
         case tiered
+    }
+
+    init(type: InviteType, tierSize: Int?, autoPromote: Bool) {
+        self.type = type
+        self.tierSize = tierSize
+        self.autoPromote = autoPromote
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(InviteType.self, forKey: .type)
+        tierSize = try container.decodeIfPresent(Int.self, forKey: .tierSize)
+        autoPromote = try container.decodeIfPresent(Bool.self, forKey: .autoPromote) ?? true
     }
 }
 

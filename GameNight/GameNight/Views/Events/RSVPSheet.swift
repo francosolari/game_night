@@ -6,7 +6,7 @@ struct RSVPSheet: View {
     let currentStatus: InviteStatus?
     let isSending: Bool
     @Binding var pollVotes: [UUID: TimeOptionVoteType]
-    let onSubmit: (InviteStatus) async -> Void
+    let onSubmit: (InviteStatus, [TimeOptionVote]) async -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedStatus: InviteStatus?
@@ -16,60 +16,20 @@ struct RSVPSheet: View {
     }
 
     private var canSubmit: Bool {
-        selectedStatus != nil && !isSending
+        if isPollMode {
+            return PollRSVP.submissionStatus(from: pollVotes) != nil && !isSending
+        }
+        return selectedStatus != nil && !isSending
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Theme.Spacing.xxl) {
-                    // RSVP Selection
-                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        Text("Are you going?")
-                            .font(Theme.Typography.displaySmall)
-                            .foregroundColor(Theme.Colors.textPrimary)
-
-                        VStack(spacing: Theme.Spacing.sm) {
-                            RSVPOptionButton(
-                                title: "Going",
-                                icon: "checkmark.circle.fill",
-                                color: Theme.Colors.success,
-                                isSelected: selectedStatus == .accepted
-                            ) {
-                                withAnimation(Theme.Animation.snappy) {
-                                    selectedStatus = .accepted
-                                }
-                            }
-
-                            RSVPOptionButton(
-                                title: "Maybe",
-                                icon: "questionmark.circle.fill",
-                                color: Theme.Colors.warning,
-                                isSelected: selectedStatus == .maybe
-                            ) {
-                                withAnimation(Theme.Animation.snappy) {
-                                    selectedStatus = .maybe
-                                }
-                            }
-
-                            RSVPOptionButton(
-                                title: "Can't Go",
-                                icon: "xmark.circle.fill",
-                                color: Theme.Colors.error,
-                                isSelected: selectedStatus == .declined
-                            ) {
-                                withAnimation(Theme.Animation.snappy) {
-                                    selectedStatus = .declined
-                                }
-                            }
-                        }
-                    }
-
-                    // Time poll voting (only for Going/Maybe in poll mode)
-                    if isPollMode, let status = selectedStatus, status != .declined {
+                    if isPollMode {
                         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                             Text("Find a Time")
-                                .font(Theme.Typography.headlineLarge)
+                                .font(Theme.Typography.displaySmall)
                                 .foregroundColor(Theme.Colors.textPrimary)
 
                             Text("Vote on the times that work for you:")
@@ -80,6 +40,58 @@ struct RSVPSheet: View {
                                 timeOptions: event.timeOptions,
                                 votes: $pollVotes
                             )
+
+                            if PollRSVP.submissionStatus(from: pollVotes) != nil {
+                                Text("Votes saved as pending until the host confirms a time.")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.textSecondary)
+                            } else {
+                                Text("Vote at least once to submit your RSVP.")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.textTertiary)
+                            }
+                        }
+                    } else {
+                        // Standard RSVP Selection (fixed date mode)
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            Text("Are you going?")
+                                .font(Theme.Typography.displaySmall)
+                                .foregroundColor(Theme.Colors.textPrimary)
+
+                            VStack(spacing: Theme.Spacing.sm) {
+                                RSVPOptionButton(
+                                    title: "Going",
+                                    icon: "checkmark.circle.fill",
+                                    color: Theme.Colors.success,
+                                    isSelected: selectedStatus == .accepted
+                                ) {
+                                    withAnimation(Theme.Animation.snappy) {
+                                        selectedStatus = .accepted
+                                    }
+                                }
+
+                                RSVPOptionButton(
+                                    title: "Maybe",
+                                    icon: "questionmark.circle.fill",
+                                    color: Theme.Colors.warning,
+                                    isSelected: selectedStatus == .maybe
+                                ) {
+                                    withAnimation(Theme.Animation.snappy) {
+                                        selectedStatus = .maybe
+                                    }
+                                }
+
+                                RSVPOptionButton(
+                                    title: "Can't Go",
+                                    icon: "xmark.circle.fill",
+                                    color: Theme.Colors.error,
+                                    isSelected: selectedStatus == .declined
+                                ) {
+                                    withAnimation(Theme.Animation.snappy) {
+                                        selectedStatus = .declined
+                                    }
+                                }
+                            }
 
                             Text("When the host picks a time, your RSVP will auto-update.")
                                 .font(Theme.Typography.caption)
@@ -105,9 +117,19 @@ struct RSVPSheet: View {
                         .frame(height: 0.5)
 
                     Button {
-                        guard let status = selectedStatus else { return }
+                        let status: InviteStatus
+                        let votes: [TimeOptionVote]
+                        if isPollMode {
+                            guard let submissionStatus = PollRSVP.submissionStatus(from: pollVotes) else { return }
+                            status = submissionStatus
+                            votes = pollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
+                        } else {
+                            guard let selectedStatus else { return }
+                            status = selectedStatus
+                            votes = status == .declined ? [] : pollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
+                        }
                         Task {
-                            await onSubmit(status)
+                            await onSubmit(status, votes)
                             dismiss()
                         }
                     } label: {

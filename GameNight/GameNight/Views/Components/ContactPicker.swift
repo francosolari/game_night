@@ -8,6 +8,12 @@ struct ContactRow: View {
     let isSelected: Bool
     let onTap: () -> Void
 
+    /// Resolves avatar: prefers stored URL, falls back to local contact cache.
+    private var resolvedAvatarUrl: String? {
+        if let url = contact.avatarUrl, !url.isEmpty { return url }
+        return ContactPickerService.cachedAvatarUrl(for: contact.phoneNumber)
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: Theme.Spacing.md) {
@@ -29,7 +35,7 @@ struct ContactRow: View {
                     }
                 }
 
-                AvatarView(url: contact.avatarUrl, size: 40, placeholder: "person.fill")
+                AvatarView(url: resolvedAvatarUrl, size: 40, placeholder: "person.fill")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(contact.name)
@@ -75,7 +81,8 @@ struct ContactRow: View {
 /// Handles all access levels: full, limited, denied.
 struct ContactPickerSheet: View {
     @Environment(\.dismiss) var dismiss
-    @State private var showLimitedAlert = false
+    @Environment(\.scenePhase) var scenePhase
+    @State private var showLimitedExpansionAlert = false
     @State private var showNativePicker = false
     @State private var showDeniedView = false
     @State private var isChecking = true
@@ -83,6 +90,8 @@ struct ContactPickerSheet: View {
     @State private var syncedCount = 0
     @State private var totalCount = 0
     @State private var syncError: String?
+    @State private var didOpenSettings = false
+    @State private var syncedDeviceContacts: [UserContact] = []
 
     let onSelect: ([UserContact]) -> Void
 
@@ -93,18 +102,25 @@ struct ContactPickerSheet: View {
                 ProgressView().tint(Theme.Colors.primary)
             } else if isSyncing {
                 VStack(spacing: Theme.Spacing.lg) {
-                    ProgressView(value: totalCount > 0 ? Double(syncedCount) / Double(totalCount) : 0)
-                        .progressViewStyle(.linear)
-                        .tint(Theme.Colors.primary)
-                        .frame(width: 200)
+                    if totalCount > 0 {
+                        ProgressView(value: Double(syncedCount) / Double(totalCount))
+                            .progressViewStyle(.linear)
+                            .tint(Theme.Colors.primary)
+                            .frame(width: 200)
+                    } else {
+                        ProgressView()
+                            .tint(Theme.Colors.primary)
+                    }
 
                     Text("Syncing contacts...")
                         .font(Theme.Typography.headlineMedium)
                         .foregroundColor(Theme.Colors.textPrimary)
 
-                    Text("\(syncedCount) of \(totalCount)")
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.textSecondary)
+                    if totalCount > 0 {
+                        Text("\(syncedCount) of \(totalCount)")
+                            .font(Theme.Typography.callout)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                    }
                 }
                 .padding(Theme.Spacing.xl)
             } else if let syncError {
@@ -137,16 +153,26 @@ struct ContactPickerSheet: View {
             }
         }
         .task { await checkAndPresent() }
-        .alert("Limited Contact Access", isPresented: $showLimitedAlert) {
-            Button("Edit Selected Contacts") {
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active && didOpenSettings {
+                didOpenSettings = false
+                isChecking = true
+                Task { await checkAndPresent() }
+            }
+        }
+        .alert("Contacts Synced", isPresented: $showLimitedExpansionAlert) {
+            Button("Add More from Settings") {
+                didOpenSettings = true
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
+            }
+            Button("Done", role: .cancel) {
+                onSelect(syncedDeviceContacts)
                 dismiss()
             }
-            Button("Cancel", role: .cancel) { dismiss() }
         } message: {
-            Text("If you've picked Limited Access, then you can use Edit Selected Contacts to select the new contacts that haven't synced yet.")
+            Text("Synced \(syncedDeviceContacts.count) contacts. To share more, go to Settings and select additional contacts.")
         }
         .sheet(isPresented: $showNativePicker, onDismiss: { dismiss() }) {
             NativeContactPicker(onSelect: onSelect)
@@ -168,10 +194,10 @@ struct ContactPickerSheet: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.Spacing.xxxl)
             Button("Open Settings") {
+                didOpenSettings = true
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
-                dismiss()
             }
             .buttonStyle(PrimaryButtonStyle())
             .padding(.horizontal, Theme.Spacing.jumbo)
@@ -185,7 +211,6 @@ struct ContactPickerSheet: View {
 
         switch status {
         case .authorized:
-            // Full access — bulk-sync all device contacts into saved_contacts
             isChecking = false
             await syncAllContacts()
 
@@ -193,12 +218,12 @@ struct ContactPickerSheet: View {
             let granted = (try? await picker.requestAccess()) ?? false
             isChecking = false
             if granted {
+                // Sync whatever is available (full or limited)
+                await syncAllContacts()
+                // If limited, offer to expand after sync
                 let newStatus = await picker.authorizationStatus
                 if #available(iOS 18, *), newStatus == .limited {
-                    showLimitedAlert = true
-                } else {
-                    // Full access granted — bulk-sync
-                    await syncAllContacts()
+                    showLimitedExpansionAlert = true
                 }
             } else {
                 showDeniedView = true
@@ -207,16 +232,16 @@ struct ContactPickerSheet: View {
         default:
             isChecking = false
             if #available(iOS 18, *), status == .limited {
-                showLimitedAlert = true
+                // Sync the contacts that ARE available under limited access
+                await syncAllContacts()
+                showLimitedExpansionAlert = true
             } else {
                 showDeniedView = true
             }
         }
     }
 
-    private static let batchSize = 100
-
-    /// Fetches all device contacts and upserts them into saved_contacts in chunks.
+    /// Fetches all device contacts and upserts them into saved_contacts using bulk save.
     /// Re-running catches any contacts added since the last sync.
     private func syncAllContacts() async {
         isSyncing = true
@@ -227,26 +252,28 @@ struct ContactPickerSheet: View {
             let deviceContacts = try await ContactPickerService.shared.fetchLocalContacts()
             guard !deviceContacts.isEmpty else {
                 isSyncing = false
+                syncedDeviceContacts = []
                 onSelect([])
                 dismiss()
                 return
             }
 
             totalCount = deviceContacts.count
+            syncedDeviceContacts = deviceContacts
 
-            // Chunk into batches to avoid PostgREST payload limits
-            let chunks = stride(from: 0, to: deviceContacts.count, by: Self.batchSize).map {
-                Array(deviceContacts[$0..<min($0 + Self.batchSize, deviceContacts.count)])
-            }
-
-            for chunk in chunks {
-                _ = try await SupabaseService.shared.saveContacts(chunk)
-                syncedCount += chunk.count
+            _ = try await SupabaseService.shared.saveContactsBulk(deviceContacts) { upserted in
+                Task { @MainActor in
+                    syncedCount = upserted
+                }
             }
 
             isSyncing = false
-            onSelect(deviceContacts)
-            dismiss()
+            // For full access, auto-dismiss. For limited, the alert handles dismissal.
+            let status = await ContactPickerService.shared.authorizationStatus
+            if status == .authorized {
+                onSelect(deviceContacts)
+                dismiss()
+            }
         } catch {
             isSyncing = false
             syncError = error.localizedDescription

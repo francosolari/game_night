@@ -24,34 +24,36 @@ final class HomeViewModel: ObservableObject {
         self.init(supabase: SupabaseService.shared)
     }
 
-    func loadData() async {
+    func loadData(preloadedSnapshot: HomeDataLoadSnapshot? = nil) async {
         // Only show skeleton on initial load, not on pull-to-refresh
         let isInitialLoad = upcomingEvents.isEmpty && myInvites.isEmpty && drafts.isEmpty
-        if isInitialLoad {
+        if isInitialLoad && preloadedSnapshot == nil {
             isLoading = true
-        }
-        // Guarantee isLoading is always set to false, even if something unexpected happens
-        defer {
-            if isInitialLoad {
-                isLoading = false
-            }
         }
         error = nil
 
-        // Mark past events as completed before fetching
-        await SupabaseService.shared.completePastEvents()
+        // Housekeeping should not block the first paint of home content.
+        Task {
+            await SupabaseService.shared.completePastEvents()
+        }
 
-        let snapshot = await HomeDataLoader.load(
-            fetchUpcomingEvents: { [supabase] in
-                try await supabase.fetchUpcomingEvents()
-            },
-            fetchMyInvites: { [supabase] in
-                try await supabase.fetchMyInvites()
-            },
-            fetchDrafts: { [supabase] in
-                try await supabase.fetchDrafts()
-            }
-        )
+        let snapshot: HomeDataLoadSnapshot
+        if let preloaded = preloadedSnapshot {
+            print("🏠 [HomeViewModel] Using preloaded snapshot.")
+            snapshot = preloaded
+        } else {
+            snapshot = await HomeDataLoader.load(
+                fetchUpcomingEvents: { [supabase] in
+                    try await supabase.fetchUpcomingEvents()
+                },
+                fetchMyInvites: { [supabase] in
+                    try await supabase.fetchMyInvites()
+                },
+                fetchDrafts: { [supabase] in
+                    try await supabase.fetchDrafts()
+                }
+            )
+        }
 
         // If the task was cancelled (e.g. SwiftUI .refreshable releasing),
         // don't overwrite existing good data with empty results.
@@ -62,57 +64,65 @@ final class HomeViewModel: ObservableObject {
         var upcomingEvents = snapshot.upcomingEvents
         let errorMessage = snapshot.errorMessage
 
-        let pendingInvites = snapshot.myInvites.filter { $0.status == .pending }
-        print("🏠 [HomeViewModel] pending invites count: \(pendingInvites.count)")
-        var pendingEvents: [(event: GameEvent, invite: Invite)] = []
-        if !pendingInvites.isEmpty {
-            let pendingIds = Set(pendingInvites.map(\.eventId))
-            do {
-                let fetched = try await supabase.fetchEvents(ids: Array(pendingIds))
-                let eventsById = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
-                pendingEvents = pendingInvites.compactMap { invite in
-                    guard let event = eventsById[invite.eventId] else { return nil }
-                    return (event, invite)
+        if snapshot.isHydratedForHome {
+            self.awaitingResponseEvents = snapshot.awaitingResponseEvents
+            self.pendingGroupInvites = snapshot.pendingGroupInvites
+            inviteCounts = snapshot.inviteCounts
+            upcomingEvents = snapshot.upcomingEvents
+            print("🏠 [HomeViewModel] using hydrated preloaded home snapshot")
+        } else {
+            let pendingInvites = snapshot.myInvites.filter { $0.status == .pending }
+            print("🏠 [HomeViewModel] pending invites count: \(pendingInvites.count)")
+            var pendingEvents: [(event: GameEvent, invite: Invite)] = []
+            if !pendingInvites.isEmpty {
+                let pendingIds = Set(pendingInvites.map(\.eventId))
+                do {
+                    let fetched = try await supabase.fetchEvents(ids: Array(pendingIds))
+                    let eventsById = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
+                    pendingEvents = pendingInvites.compactMap { invite in
+                        guard let event = eventsById[invite.eventId] else { return nil }
+                        return (event, invite)
+                    }
+                    pendingEvents.sort { a, b in
+                        a.event.effectiveStartDate < b.event.effectiveStartDate
+                    }
+                } catch is CancellationError {
+                    // Ignore cancellations — pending list can stay empty
+                } catch {
+                    print("🏠 [HomeViewModel] Pending invite fetch failed: \(error)")
                 }
-                pendingEvents.sort { a, b in
-                    a.event.effectiveStartDate < b.event.effectiveStartDate
+            }
+            self.awaitingResponseEvents = pendingEvents
+            print("🏠 [HomeViewModel] awaiting response events count: \(pendingEvents.count)")
+
+            let existingEventIds = Set(upcomingEvents.map(\.id))
+            let acceptedInviteEventIds = Set(
+                snapshot.myInvites
+                    .filter { $0.status == .accepted || $0.status == .maybe }
+                    .map(\.eventId)
+            )
+            let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
+
+            if !missingInviteEventIds.isEmpty {
+                do {
+                    let inviteEvents = try await supabase.fetchEvents(ids: Array(missingInviteEventIds))
+                    upcomingEvents = mergeUpcomingEvents(upcomingEvents, with: inviteEvents)
+                } catch is CancellationError {
+                    // Ignore — don't treat cancellation as a failure
+                } catch {
+                    // Non-fatal — accepted invite events are supplemental data
+                    print("🏠 [HomeViewModel] Invite events fetch failed: \(error)")
                 }
-            } catch is CancellationError {
-                // Ignore cancellations — pending list can stay empty
-            } catch {
-                print("🏠 [HomeViewModel] Pending invite fetch failed: \(error)")
             }
-        }
-        self.awaitingResponseEvents = pendingEvents
-        print("🏠 [HomeViewModel] awaiting response events count: \(pendingEvents.count)")
 
-        let existingEventIds = Set(upcomingEvents.map(\.id))
-        let acceptedInviteEventIds = Set(
-            snapshot.myInvites
-                .filter { $0.status == .accepted || $0.status == .maybe }
-                .map(\.eventId)
-        )
-        let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
-
-        if !missingInviteEventIds.isEmpty {
+            // Fetch accepted invite counts for all events
+            let allEventIds = upcomingEvents.map(\.id)
             do {
-                let inviteEvents = try await supabase.fetchEvents(ids: Array(missingInviteEventIds))
-                upcomingEvents = mergeUpcomingEvents(upcomingEvents, with: inviteEvents)
-            } catch is CancellationError {
-                // Ignore — don't treat cancellation as a failure
+                inviteCounts = try await supabase.fetchAcceptedInviteCounts(eventIds: allEventIds)
             } catch {
-                // Non-fatal — accepted invite events are supplemental data
-                print("🏠 [HomeViewModel] Invite events fetch failed: \(error)")
+                // Non-fatal — counts will just show 0
+                inviteCounts = [:]
             }
-        }
-
-        // Fetch accepted invite counts for all events
-        let allEventIds = upcomingEvents.map(\.id)
-        do {
-            inviteCounts = try await supabase.fetchAcceptedInviteCounts(eventIds: allEventIds)
-        } catch {
-            // Non-fatal — counts will just show 0
-            inviteCounts = [:]
         }
 
         // Sort by event date ascending (soonest first)
@@ -121,15 +131,18 @@ final class HomeViewModel: ObservableObject {
         self.drafts = snapshot.drafts
         self.error = errorMessage
 
+        if isInitialLoad {
+            isLoading = false
+        }
+
         if let error = errorMessage {
             print("🏠 [HomeViewModel] \(error)")
         }
 
-        // defer handles isLoading = false
-
-        // Load pending group invites (non-blocking — runs after main content is shown)
-        if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
-            self.pendingGroupInvites = groupInvites
+        if !snapshot.isHydratedForHome {
+            Task { @MainActor in
+                await refreshPendingGroupInvites()
+            }
         }
     }
 
@@ -162,5 +175,12 @@ final class HomeViewModel: ObservableObject {
 
     private func sortByEventDate(_ events: [GameEvent]) -> [GameEvent] {
         events.sorted { $0.effectiveStartDate < $1.effectiveStartDate }
+    }
+
+    private func refreshPendingGroupInvites() async {
+        try? await SupabaseService.shared.expireStaleGroupInvites()
+        if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
+            pendingGroupInvites = groupInvites
+        }
     }
 }

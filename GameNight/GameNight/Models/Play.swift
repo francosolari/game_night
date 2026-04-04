@@ -14,6 +14,9 @@ struct Play: Identifiable, Codable, Hashable {
     var isCooperative: Bool
     var cooperativeResult: CooperativeResult?
     var bggPlayId: Int?
+    var quantity: Int?
+    var location: String?
+    var incomplete: Bool?
     var participants: [PlayParticipant]
     var game: Game?
     var logger: User?
@@ -37,6 +40,9 @@ struct Play: Identifiable, Codable, Hashable {
         case isCooperative = "is_cooperative"
         case cooperativeResult = "cooperative_result"
         case bggPlayId = "bgg_play_id"
+        case quantity
+        case location
+        case incomplete
         case participants = "play_participants"
         case game
         case logger = "logged_by_user"
@@ -56,6 +62,9 @@ struct Play: Identifiable, Codable, Hashable {
         isCooperative: Bool = false,
         cooperativeResult: CooperativeResult? = nil,
         bggPlayId: Int? = nil,
+        quantity: Int? = nil,
+        location: String? = nil,
+        incomplete: Bool? = nil,
         participants: [PlayParticipant] = [],
         game: Game? = nil,
         logger: User? = nil,
@@ -73,6 +82,9 @@ struct Play: Identifiable, Codable, Hashable {
         self.isCooperative = isCooperative
         self.cooperativeResult = cooperativeResult
         self.bggPlayId = bggPlayId
+        self.quantity = quantity
+        self.location = location
+        self.incomplete = incomplete
         self.participants = participants
         self.game = game
         self.logger = logger
@@ -93,6 +105,9 @@ struct Play: Identifiable, Codable, Hashable {
         isCooperative = try container.decodeIfPresent(Bool.self, forKey: .isCooperative) ?? false
         cooperativeResult = try container.decodeIfPresent(CooperativeResult.self, forKey: .cooperativeResult)
         bggPlayId = try container.decodeIfPresent(Int.self, forKey: .bggPlayId)
+        quantity = try container.decodeIfPresent(Int.self, forKey: .quantity)
+        location = try container.decodeIfPresent(String.self, forKey: .location)
+        incomplete = try container.decodeIfPresent(Bool.self, forKey: .incomplete)
         participants = (try? container.decodeIfPresent([PlayParticipant].self, forKey: .participants)) ?? []
         game = try? container.decodeIfPresent(Game.self, forKey: .game)
         logger = try? container.decodeIfPresent(User.self, forKey: .logger)
@@ -113,6 +128,9 @@ struct Play: Identifiable, Codable, Hashable {
         try container.encode(isCooperative, forKey: .isCooperative)
         try container.encodeIfPresent(cooperativeResult, forKey: .cooperativeResult)
         try container.encodeIfPresent(bggPlayId, forKey: .bggPlayId)
+        try container.encodeIfPresent(quantity, forKey: .quantity)
+        try container.encodeIfPresent(location, forKey: .location)
+        try container.encodeIfPresent(incomplete, forKey: .incomplete)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         // Skip: participants, game, logger (joined relations)

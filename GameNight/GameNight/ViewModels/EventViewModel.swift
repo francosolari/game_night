@@ -8,6 +8,7 @@ final class EventViewModel: ObservableObject {
     @Published var invites: [Invite] = []
     @Published var myInvite: Invite?
     @Published var isLoading = false
+    @Published var isNotFound = false
     @Published var error: String?
     @Published var isSending = false
     @Published var isDeleting = false
@@ -92,6 +93,14 @@ final class EventViewModel: ObservableObject {
             && event.confirmedTimeOptionId == nil
     }
 
+    var canEditPollVotesDirectly: Bool {
+        if isOwner { return true }
+        guard let invite = myInvite else { return false }
+        if !myPollVotes.isEmpty { return true }
+        let status = invite.status
+        return status == .accepted || status == .maybe
+    }
+
     var canSeeActivityFeed: Bool {
         hasRSVPd || isOwner
     }
@@ -123,14 +132,14 @@ final class EventViewModel: ObservableObject {
         let waitlisted = nonHostInvites.filter { $0.status == .waitlisted }
 
         func mapUsers(_ list: [Invite]) -> [InviteSummary.InviteUser] {
-            list.map { .init(id: $0.id, name: $0.displayName ?? "Unknown", phoneNumber: $0.phoneNumber, avatarUrl: nil, status: $0.status, tier: $0.tier, inviteToken: $0.inviteToken, promotedAt: $0.promotedAt) }
+            list.map { .init(id: $0.id, userId: $0.userId, name: $0.displayName ?? "Unknown", phoneNumber: $0.phoneNumber, avatarUrl: nil, status: $0.status, tier: $0.tier, inviteToken: $0.inviteToken, promotedAt: $0.promotedAt) }
         }
 
         let hostUser: InviteSummary.InviteUser? = {
             guard let event else { return nil }
             let name = event.host?.displayName ?? "Host"
             let avatarUrl = event.host?.avatarUrl
-            return .init(id: event.hostId, name: name, avatarUrl: avatarUrl, status: .accepted, tier: 1)
+            return .init(id: event.hostId, userId: event.hostId, name: name, avatarUrl: avatarUrl, status: .accepted, tier: 1)
         }()
 
         let acceptedUsers = mapUsers(accepted) + (hostUser.map { [$0] } ?? [])
@@ -151,7 +160,18 @@ final class EventViewModel: ObservableObject {
     }
 
     func loadEvent(id: UUID) async {
+        // Restore from cache instantly (no loading spinner)
+        if let cached = EventDetailCache.shared.get(id) {
+            restoreFromCache(cached)
+            // Subscribe to realtime updates
+            subscribeIfNeeded(eventId: id)
+            // Silent background refresh
+            await refreshEventData(eventId: id)
+            return
+        }
+
         isLoading = true
+        isNotFound = false
         do {
             async let eventResult = supabase.fetchEvent(id: id)
             async let invitesResult = supabase.fetchInvites(eventId: id)
@@ -168,23 +188,21 @@ final class EventViewModel: ObservableObject {
                 self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
             }
 
-            // Load activity feed, game votes, and poll voter details
-            await loadActivityFeed(eventId: id)
-            await loadGameVotes(eventId: id, currentUserId: session.user.id)
-            await loadPollVoterDetails(eventId: id)
+            // Load activity feed, game votes, and poll voter details in parallel
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadActivityFeed(eventId: id) }
+                group.addTask { await self.loadGameVotes(eventId: id, currentUserId: session.user.id) }
+                group.addTask { await self.loadPollVoterDetails(eventId: id) }
+            }
+
+            saveToCache(eventId: id)
 
             // Subscribe to realtime updates
-            if subscribedEventId != id {
-                subscribeToUpdates(eventId: id)
-                subscribedEventId = id
-            }
-
-            if subscribedActivityEventId != id {
-                subscribeToActivityFeed(eventId: id)
-                subscribedActivityEventId = id
-            }
+            subscribeIfNeeded(eventId: id)
         } catch {
-            self.error = error.localizedDescription
+            // Any failure here means the event can't be shown — deleted, no access, or not found.
+            // Show a friendly not-found screen rather than a blank view.
+            self.isNotFound = true
         }
         isLoading = false
     }
@@ -205,8 +223,12 @@ final class EventViewModel: ObservableObject {
                 self.myPollVotes = (try? await supabase.fetchMyPollVotes(inviteId: invite.id)) ?? [:]
             }
 
-            await loadPollVoterDetails(eventId: eventId)
-            await loadGameVotes(eventId: eventId, currentUserId: session.user.id)
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.loadPollVoterDetails(eventId: eventId) }
+                group.addTask { await self.loadGameVotes(eventId: eventId, currentUserId: session.user.id) }
+            }
+
+            saveToCache(eventId: eventId)
         } catch {
             // Non-critical for background refresh
         }
@@ -316,9 +338,10 @@ final class EventViewModel: ObservableObject {
             // Re-submit all current votes with this one updated
             myPollVotes[optionId] = voteType
             let allVotes = myPollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
+            let statusToPersist: InviteStatus = event?.scheduleMode == .poll ? .pending : invite.status
             try await supabase.respondToInvite(
                 inviteId: invite.id,
-                status: invite.status,
+                status: statusToPersist,
                 timeVotes: allVotes,
                 suggestedTimes: nil
             )
@@ -333,13 +356,6 @@ final class EventViewModel: ObservableObject {
         do {
             try await supabase.confirmTimeOption(eventId: eventId, timeOptionId: timeOptionId)
             event?.confirmedTimeOptionId = timeOptionId
-            // Notify invitees (fire-and-forget)
-            Task {
-                try? await supabase.invokeAuthenticatedFunction(
-                    "notify-poll-confirmed",
-                    body: ["event_id": eventId.uuidString, "type": "time"]
-                )
-            }
             // Refresh to show final state (poll ended, guest list restored)
             await refreshEventData(eventId: eventId)
             toast = ToastItem(style: .success, message: "Time confirmed!")
@@ -390,7 +406,15 @@ final class EventViewModel: ObservableObject {
 
     func respondToInvite(status: InviteStatus, timeVotes: [TimeOptionVote], suggestedTimes: [TimeOption]?) async {
         guard let invite = myInvite else { return }
+
+        // Optimistic update — apply immediately so UI reflects change before network
+        let previousStatus = invite.status
+        let previousVotes = myPollVotes
+        myInvite?.status = status
+        myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
         isSending = true
+        defer { isSending = false }
+
         do {
             try await supabase.respondToInvite(
                 inviteId: invite.id,
@@ -398,17 +422,15 @@ final class EventViewModel: ObservableObject {
                 timeVotes: timeVotes,
                 suggestedTimes: suggestedTimes
             )
-            myInvite?.status = status
-            // Keep local poll votes in sync
-            myPollVotes = Dictionary(uniqueKeysWithValues: timeVotes.map { ($0.timeOptionId, $0.voteType) })
-            // Refresh event data without flashing loading state
             if let eventId = event?.id {
                 await refreshEventData(eventId: eventId)
             }
         } catch {
+            // Rollback on failure
+            myInvite?.status = previousStatus
+            myPollVotes = previousVotes
             self.error = error.localizedDescription
         }
-        isSending = false
     }
 
     func inviteContacts(_ contacts: [UserContact]) async {
@@ -482,6 +504,48 @@ final class EventViewModel: ObservableObject {
             Task { @MainActor in
                 await self?.loadActivityFeed(eventId: eventId)
             }
+        }
+    }
+
+    // MARK: - Cache Helpers
+
+    private func restoreFromCache(_ snapshot: EventDetailCache.Snapshot) {
+        self.event = snapshot.event
+        self.invites = snapshot.invites
+        self.myInvite = snapshot.myInvite
+        self.myPollVotes = snapshot.myPollVotes
+        self.activityFeed = snapshot.activityFeed
+        self.gameVotes = snapshot.gameVotes
+        self.myGameVotes = snapshot.myGameVotes
+        self.timeOptionVoters = snapshot.timeOptionVoters
+        self.gameVoterDetails = snapshot.gameVoterDetails
+    }
+
+    private func saveToCache(eventId: UUID) {
+        guard let event else { return }
+        let snapshot = EventDetailCache.Snapshot(
+            event: event,
+            invites: invites,
+            myInvite: myInvite,
+            myPollVotes: myPollVotes,
+            activityFeed: activityFeed,
+            gameVotes: gameVotes,
+            myGameVotes: myGameVotes,
+            timeOptionVoters: timeOptionVoters,
+            gameVoterDetails: gameVoterDetails,
+            cachedAt: Date()
+        )
+        EventDetailCache.shared.set(eventId, snapshot: snapshot)
+    }
+
+    private func subscribeIfNeeded(eventId: UUID) {
+        if subscribedEventId != eventId {
+            subscribeToUpdates(eventId: eventId)
+            subscribedEventId = eventId
+        }
+        if subscribedActivityEventId != eventId {
+            subscribeToActivityFeed(eventId: eventId)
+            subscribedActivityEventId = eventId
         }
     }
 

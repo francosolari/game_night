@@ -93,6 +93,9 @@ struct ConversationView: View {
         case .invite:
             inviteBubble(message, isSent: isSent)
 
+        case .groupInvite:
+            groupInviteBubble(message, isSent: isSent)
+
         case .text:
             textBubble(message, isSent: isSent)
         }
@@ -157,6 +160,36 @@ struct ConversationView: View {
                         }
                     }
                     .frame(maxWidth: 280)
+                }
+
+                Text(message.createdAt.relativeDisplay)
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .padding(.horizontal, Theme.Spacing.xs)
+            }
+
+            if isSent {
+                AvatarView(url: appState.currentUser?.avatarUrl, size: 28)
+                    .padding(.bottom, 2)
+            } else {
+                Spacer(minLength: 32)
+            }
+        }
+    }
+
+    private func groupInviteBubble(_ message: DirectMessage, isSent: Bool) -> some View {
+        HStack(alignment: .bottom, spacing: Theme.Spacing.sm) {
+            if isSent { Spacer(minLength: 32) }
+
+            if !isSent {
+                AvatarView(url: viewModel.otherUser.avatarUrl, size: 28)
+                    .padding(.bottom, 2)
+            }
+
+            VStack(alignment: isSent ? .trailing : .leading, spacing: 4) {
+                if let metadata = message.metadata {
+                    GroupInviteMessageCard(metadata: metadata)
+                        .frame(maxWidth: 280)
                 }
 
                 Text(message.createdAt.relativeDisplay)

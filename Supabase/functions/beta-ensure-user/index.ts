@@ -5,11 +5,12 @@ interface BetaUserRequest {
   phone: string;
   password?: string;
   mode?: "probe" | "ensure";
+  betaPassword?: string;
 }
 
 const PAGE_SIZE = 1000;
-const SECRET_HEADER = "x-beta-secret";
 const SECRET_ENV = "BETA_SHARED_SECRET";
+const LEGACY_SECRET_HEADER = "x-beta-secret";
 
 serve(async (req) => {
   if (req.method !== "POST") {
@@ -28,14 +29,6 @@ serve(async (req) => {
     });
   }
 
-  const providedSecret = req.headers.get(SECRET_HEADER);
-  if (providedSecret !== expectedSecret) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   let body: BetaUserRequest;
   try {
     body = await req.json();
@@ -43,6 +36,19 @@ serve(async (req) => {
     console.error("[beta-ensure-user] invalid JSON", error);
     return new Response(JSON.stringify({ error: "Invalid JSON payload" }), {
       status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const providedSecret = (body?.betaPassword ?? "").trim();
+  const legacyHeaderSecret = (req.headers.get(LEGACY_SECRET_HEADER) ?? "").trim();
+  const secretIsValid =
+    (providedSecret.length > 0 && secureEquals(providedSecret, expectedSecret)) ||
+    (legacyHeaderSecret.length > 0 && secureEquals(legacyHeaderSecret, expectedSecret));
+
+  if (!secretIsValid) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -65,42 +71,43 @@ serve(async (req) => {
 
   const supabase = createServiceClient();
 
-    try {
-        const existingUser = await findUserByPhone(supabase, normalizedPhone);
-        let userId: string | undefined;
+  try {
+    const existingUser = await findUserByPhone(supabase, normalizedPhone);
+    let userId: string | undefined;
 
-        if (mode === "probe") {
-            return new Response(
-              JSON.stringify({ exists: Boolean(existingUser), userId: existingUser?.id ?? null }),
-              { status: 200, headers: { "Content-Type": "application/json" } },
-            );
-        }
+    if (mode === "probe") {
+      return new Response(
+        JSON.stringify({ exists: Boolean(existingUser), userId: existingUser?.id ?? null }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
-        if (existingUser) {
-            userId = existingUser.id;
+    if (existingUser) {
+      userId = existingUser.id;
+    } else {
+      const { data, error } = await supabase.auth.admin.createUser({
+        phone: normalizedPhone,
+        password: password!,
+        phone_confirm: true,
+        user_metadata: { beta: true },
+      });
+
+      if (error) {
+        console.error("[beta-ensure-user] createUser failed", error);
+        const fallbackExisting = await retryFindUserByPhone(supabase, normalizedPhone);
+        if (fallbackExisting) {
+          userId = fallbackExisting.id;
         } else {
-            const { data, error } = await supabase.auth.admin.createUser({
-                phone: normalizedPhone,
-                password: password!,
-                phone_confirm: true,
-                user_metadata: { beta: true },
-            });
-            if (error) {
-                console.error("[beta-ensure-user] createUser failed", error);
-                const fallbackExisting = await retryFindUserByPhone(supabase, normalizedPhone);
-                if (fallbackExisting) {
-                    userId = fallbackExisting.id;
-                } else {
-                    const body = JSON.stringify(error);
-                    return new Response(
-                        JSON.stringify({ error: body ?? "Phone collision" }),
-                        { status: 500, headers: { "Content-Type": "application/json" } },
-                    );
-                }
-            } else {
-                userId = data?.user?.id;
-            }
+          const body = JSON.stringify(error);
+          return new Response(
+            JSON.stringify({ error: body ?? "Phone collision" }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
         }
+      } else {
+        userId = data?.user?.id;
+      }
+    }
 
     return new Response(
       JSON.stringify({ success: true, userId }),
@@ -114,6 +121,20 @@ serve(async (req) => {
     });
   }
 });
+
+function secureEquals(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) {
+    return false;
+  }
+
+  let mismatch = 0;
+  for (let i = 0; i < aBytes.length; i += 1) {
+    mismatch |= aBytes[i] ^ bBytes[i];
+  }
+  return mismatch === 0;
+}
 
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");

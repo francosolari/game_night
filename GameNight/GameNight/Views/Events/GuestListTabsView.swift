@@ -210,40 +210,7 @@ private struct GuestTabContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(displayUsers.enumerated()), id: \.element.id) { index, user in
-                HStack(spacing: Theme.Spacing.sm) {
-                    StatusDot(color: accentColor, size: 6)
-                    AvatarView(url: user.avatarUrl, size: 32)
-                    Text(appState.resolveDisplayName(phone: user.phoneNumber, fallback: user.name))
-                        .font(Theme.Typography.bodyMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    Spacer()
-                    if user.promotedAt != nil {
-                        Label("Promoted", systemImage: "arrow.up.circle.fill")
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.primary)
-                    }
-                    if user.tier > 1 {
-                        Text("Tier \(user.tier)")
-                            .font(Theme.Typography.caption)
-                            .foregroundColor(Theme.Colors.textTertiary)
-                    }
-                }
-                .padding(.vertical, 6)
-                .contextMenu {
-                    if let token = user.inviteToken, !token.isEmpty {
-                        Button {
-                            UIPasteboard.general.string = "https://cardboardwithme.com/invite/\(token)"
-                        } label: {
-                            Label("Copy Invite Link", systemImage: "link")
-                        }
-                    }
-                }
-
-                if index < displayUsers.count - 1 {
-                    Divider()
-                        .background(Theme.Colors.divider)
-                        .padding(.leading, 46)
-                }
+                guestRow(user: user, index: index)
             }
 
             if hiddenCount > 0, let onSeeMore {
@@ -257,6 +224,69 @@ private struct GuestTabContent: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func guestRow(user: InviteSummary.InviteUser, index: Int) -> some View {
+        let rowContent = HStack(spacing: Theme.Spacing.sm) {
+            StatusDot(color: accentColor, size: 6)
+            AvatarView(url: user.avatarUrl, size: 32)
+            Text(appState.resolveDisplayName(phone: user.phoneNumber, fallback: user.name))
+                .font(Theme.Typography.bodyMedium)
+                .foregroundColor(Theme.Colors.textPrimary)
+            Spacer()
+            if user.promotedAt != nil {
+                Label("Promoted", systemImage: "arrow.up.circle.fill")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.primary)
+            }
+            if user.tier > 1 {
+                Text("Tier \(user.tier)")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+            if user.userId != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+        }
+        .padding(.vertical, 6)
+
+        if let userId = user.userId {
+            NavigationLink {
+                GuestPublicProfileView(userId: userId, name: user.name, avatarUrl: user.avatarUrl)
+            } label: {
+                rowContent
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                if let token = user.inviteToken, !token.isEmpty {
+                    Button {
+                        UIPasteboard.general.string = "https://cardboardwithme.com/invite/\(token)"
+                    } label: {
+                        Label("Copy Invite Link", systemImage: "link")
+                    }
+                }
+            }
+        } else {
+            rowContent
+                .contextMenu {
+                    if let token = user.inviteToken, !token.isEmpty {
+                        Button {
+                            UIPasteboard.general.string = "https://cardboardwithme.com/invite/\(token)"
+                        } label: {
+                            Label("Copy Invite Link", systemImage: "link")
+                        }
+                    }
+                }
+        }
+
+        if index < displayUsers.count - 1 {
+            Divider()
+                .background(Theme.Colors.divider)
+                .padding(.leading, 46)
         }
     }
 }
@@ -433,3 +463,4 @@ struct GuestListFullPageView: View {
         }
     }
 }
+

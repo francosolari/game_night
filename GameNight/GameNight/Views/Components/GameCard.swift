@@ -63,14 +63,7 @@ struct GameCard: View {
             }
 
             if let rating = game.bggRating {
-                VStack(spacing: 2) {
-                    Text(String(format: "%.1f", rating))
-                        .font(Theme.Typography.titleMedium)
-                        .foregroundColor(Theme.Colors.textPrimary)
-                    Text("BGG")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
+                RatingBadge(rating: rating, size: .small)
             }
         }
     }
@@ -163,7 +156,27 @@ struct GameThumbnail: View {
     }
 }
 
-// MARK: - Complexity Badge
+// MARK: - Weight Display (canonical complexity/weight badge)
+struct WeightDisplay: View {
+    let weight: Double
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ComplexityDot(weight: weight)
+            Text(String(format: "%.1f", weight))
+                .font(Theme.Typography.caption2.weight(.semibold))
+                .foregroundColor(Theme.Colors.complexity(weight))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(Theme.Colors.complexity(weight).opacity(0.15))
+        )
+    }
+}
+
+// MARK: - Complexity Badge (full label variant, used on GameCard)
 struct ComplexityBadge: View {
     let weight: Double
 

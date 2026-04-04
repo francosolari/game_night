@@ -10,10 +10,14 @@ struct ExpandableGameGrid: View {
         switch sortMode {
         case .topRated:
             return games.sorted { ($0.bggRating ?? 0) > ($1.bggRating ?? 0) }
+        case .alphabetical:
+            return games.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .byYear:
             return games.sorted { ($0.yearPublished ?? 0) > ($1.yearPublished ?? 0) }
         case .byWeight:
             return games.sorted { $0.complexity > $1.complexity }
+        case .recentlyAdded:
+            return games
         }
     }
 
@@ -40,9 +44,9 @@ struct ExpandableGameGrid: View {
                                         .font(Theme.Typography.caption)
                                         .foregroundColor(Theme.Colors.textTertiary)
                                 }
-                                Text(String(format: "%.1f", game.complexity))
-                                    .font(Theme.Typography.caption)
-                                    .foregroundColor(Theme.Colors.textTertiary)
+                                if game.complexity > 0 {
+                                    WeightDisplay(weight: game.complexity)
+                                }
                             }
                         }
 

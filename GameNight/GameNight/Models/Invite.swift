@@ -4,6 +4,7 @@ import SwiftUI
 struct Invite: Identifiable, Codable {
     let id: UUID
     var eventId: UUID
+    var event: GameEvent?       // Joined relation
     var hostUserId: UUID?
     var userId: UUID?           // nil for non-app users
     var phoneNumber: String
@@ -25,6 +26,7 @@ struct Invite: Identifiable, Codable {
     enum CodingKeys: String, CodingKey {
         case id
         case eventId = "event_id"
+        case event
         case hostUserId = "host_user_id"
         case userId = "user_id"
         case phoneNumber = "phone_number"
@@ -48,6 +50,7 @@ struct Invite: Identifiable, Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         eventId = try container.decode(UUID.self, forKey: .eventId)
+        event = try? container.decodeIfPresent(GameEvent.self, forKey: .event)
         hostUserId = try container.decodeIfPresent(UUID.self, forKey: .hostUserId)
         userId = try container.decodeIfPresent(UUID.self, forKey: .userId)
         phoneNumber = try container.decode(String.self, forKey: .phoneNumber)
@@ -70,6 +73,7 @@ struct Invite: Identifiable, Codable {
     init(
         id: UUID,
         eventId: UUID,
+        event: GameEvent? = nil,
         hostUserId: UUID? = nil,
         userId: UUID? = nil,
         phoneNumber: String,
@@ -90,6 +94,7 @@ struct Invite: Identifiable, Codable {
     ) {
         self.id = id
         self.eventId = eventId
+        self.event = event
         self.hostUserId = hostUserId
         self.userId = userId
         self.phoneNumber = phoneNumber
@@ -201,6 +206,28 @@ enum SMSStatus: String, Codable {
     case undelivered
 }
 
+enum PollRSVP {
+    /// Derives the invite RSVP status from poll votes.
+    /// - Returns: `nil` when no votes are selected yet.
+    static func derivedStatus(from votes: [UUID: TimeOptionVoteType]) -> InviteStatus? {
+        guard !votes.isEmpty else { return nil }
+        if votes.values.contains(.yes) {
+            return .accepted
+        }
+        if votes.values.contains(.maybe) {
+            return .maybe
+        }
+        return .declined
+    }
+
+    /// RSVP status to persist while a poll is still open.
+    /// The final accepted/maybe/declined status is resolved when the host confirms a date.
+    static func submissionStatus(from votes: [UUID: TimeOptionVoteType]) -> InviteStatus? {
+        guard !votes.isEmpty else { return nil }
+        return .pending
+    }
+}
+
 // MARK: - Invite Summary (for event detail view)
 struct InviteSummary {
     var total: Int
@@ -217,6 +244,7 @@ struct InviteSummary {
 
     struct InviteUser: Identifiable {
         let id: UUID
+        var userId: UUID?
         var name: String
         var phoneNumber: String?
         var avatarUrl: String?

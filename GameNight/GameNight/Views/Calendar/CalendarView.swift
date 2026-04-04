@@ -5,6 +5,7 @@ struct CalendarView: View {
     @EnvironmentObject var appState: AppState
     @Binding var navigationPath: NavigationPath
     @Environment(\.dismiss) private var dismiss
+    var defaultViewMode: CalendarViewModel.ViewMode = .calendar
 
     private let monthFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -66,6 +67,9 @@ struct CalendarView: View {
             CalendarFilterSheet(viewModel: viewModel)
         }
         .navigationBarBackButtonHidden(true)
+        .onAppear {
+            viewModel.viewMode = defaultViewMode
+        }
         .task {
             await viewModel.loadData()
         }

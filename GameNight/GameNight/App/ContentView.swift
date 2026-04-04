@@ -7,6 +7,25 @@ struct MainTabView: View {
     @State private var homeNavigationPath = NavigationPath()
     @State private var previousTab: AppState.Tab = .home
 
+    private func applyShortcut(type: String) {
+        print("[Shortcut] applyShortcut called with type: \(type)")
+        print("[Shortcut] Current selectedTab before: \(appState.selectedTab)")
+        switch type {
+        case "com.gamenight.createEvent":
+            appState.showCreateEvent = true
+            print("[Shortcut] Set appState.showCreateEvent = true")
+        case "com.gamenight.viewGroups":
+            appState.selectedTab = .groups
+            print("[Shortcut] Set selectedTab = .groups")
+        case "com.gamenight.gameLibrary":
+            appState.selectedTab = .games
+            print("[Shortcut] Set selectedTab = .games")
+        default:
+            print("[Shortcut] Unknown type: \(type)")
+        }
+        print("[Shortcut] Current selectedTab after: \(appState.selectedTab)")
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $appState.selectedTab) {
@@ -15,8 +34,11 @@ struct MainTabView: View {
                         .navigationDestination(for: GameEvent.self) { event in
                             EventDetailView(eventId: event.id)
                         }
-                        .navigationDestination(for: CalendarDestination.self) { _ in
-                            CalendarView(navigationPath: $homeNavigationPath)
+                        .navigationDestination(for: CalendarDestination.self) { dest in
+                            CalendarView(
+                                navigationPath: $homeNavigationPath,
+                                defaultViewMode: dest.startInListMode ? .list : .calendar
+                            )
                         }
                         .navigationDestination(for: Game.self) { game in
                             GameDetailView(game: game)
@@ -39,6 +61,8 @@ struct MainTabView: View {
                                 InboxView(navigationPath: $homeNavigationPath)
                             case .eventDetail(let id):
                                 EventDetailView(eventId: id)
+                            case .groupDetail(let id):
+                                GroupDetailLoadingView(groupId: id)
                             }
                         }
                         .navigationDestination(for: DMNavDestination.self) { dest in
@@ -105,15 +129,40 @@ struct MainTabView: View {
             appState.selectedTab = .home
             homeNavigationPath.append(HomeDestination.eventDetail(uuid))
         }
+        .onChange(of: appState.navigateToCalendar) { _, newValue in
+            if newValue {
+                appState.navigateToCalendar = false
+                appState.selectedTab = .home
+                homeNavigationPath.append(CalendarDestination(startInListMode: true))
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .pushNotificationTapped)) { note in
             if let eventId = note.userInfo?["event_id"] as? String,
                let uuid = UUID(uuidString: eventId) {
                 appState.selectedTab = .home
                 homeNavigationPath.append(HomeDestination.eventDetail(uuid))
+            } else if let groupId = note.userInfo?["group_id"] as? String,
+                      let uuid = UUID(uuidString: groupId) {
+                appState.selectedTab = .home
+                homeNavigationPath.append(HomeDestination.groupDetail(uuid))
             } else if note.userInfo?["conversation_id"] != nil {
                 appState.selectedTab = .home
                 homeNavigationPath.append(HomeDestination.inbox)
             }
+        }
+        .onAppear {
+            print("[Shortcut] MainTabView onAppear — pendingShortcutType: \(AppDelegate.pendingShortcutType ?? "nil")")
+            if let type = AppDelegate.pendingShortcutType {
+                AppDelegate.pendingShortcutType = nil
+                // Defer so SwiftUI has fully mounted before we push a state change.
+                DispatchQueue.main.async { applyShortcut(type: type) }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .homeScreenShortcutTriggered)) { note in
+            print("[Shortcut] onReceive homeScreenShortcutTriggered: \(note.userInfo ?? [:])")
+            guard let type = note.userInfo?["type"] as? String else { return }
+            AppDelegate.pendingShortcutType = nil
+            applyShortcut(type: type)
         }
     }
 }

@@ -4,6 +4,7 @@ struct NotificationFeedView: View {
     @Binding var navigationPath: NavigationPath
     @StateObject private var viewModel = NotificationViewModel()
     @ObservedObject private var themeManager = ThemeManager.shared
+    @EnvironmentObject private var appState: AppState
 
     var body: some View {
         ZStack {
@@ -26,7 +27,11 @@ struct NotificationFeedView: View {
             }
         }
         .onAppear {
-            Task { await viewModel.loadNotifications() }
+            Task {
+                await viewModel.loadNotifications()
+                await viewModel.markAllAsRead()
+                appState.refreshUnreadCounts()
+            }
             viewModel.subscribe()
         }
         .onDisappear {
@@ -44,6 +49,8 @@ struct NotificationFeedView: View {
                         Task { await viewModel.markAsRead(notification) }
                         if let eventId = notification.eventId {
                             navigationPath.append(HomeDestination.eventDetail(eventId))
+                        } else if notification.type == .groupInvite, let groupId = notification.groupId {
+                            navigationPath.append(HomeDestination.groupDetail(groupId))
                         }
                     } label: {
                         NotificationRow(notification: notification)

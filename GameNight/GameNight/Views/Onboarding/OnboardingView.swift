@@ -683,8 +683,6 @@ struct BetaAuthFlowView: View {
     @FocusState private var accountPasswordFieldFocused: Bool
     @FocusState private var nameFieldFocused: Bool
 
-    private let correctPassword = "francosfriend"
-
     enum BetaStep {
         case password, phone, accountPassword, name
     }
@@ -1022,13 +1020,12 @@ struct BetaAuthFlowView: View {
     // MARK: - Actions
 
     private func checkPassword() {
-        if betaPassword == correctPassword {
-            error = nil
-            withAnimation(Theme.Animation.snappy) { step = .phone }
-        } else {
-            error = "Wrong password."
-            betaPassword = ""
+        guard !betaPassword.isEmpty else {
+            error = "Password required."
+            return
         }
+        error = nil
+        withAnimation(Theme.Animation.snappy) { step = .phone }
     }
 
     private func prepareAccountStep() async {
@@ -1036,12 +1033,25 @@ struct BetaAuthFlowView: View {
         error = nil
 
         do {
-            let probe = try await SupabaseService.shared.probeBetaUser(phoneNumber: fullPhoneNumber)
+            let probe = try await SupabaseService.shared.probeBetaUser(
+                phoneNumber: fullPhoneNumber,
+                betaPassword: betaPassword
+            )
             accountExistsForPhone = probe.exists
             accountPassword = ""
             withAnimation(Theme.Animation.snappy) { step = .accountPassword }
         } catch {
-            self.error = "Couldn't check this account. Please try again."
+            let message = (error as NSError).localizedDescription.lowercased()
+            if message.contains("missing bearer token") || message.contains("invalid or expired token") {
+                self.error = "Beta login service is misconfigured. Please ping Franco."
+            } else
+            if message.contains("unauthorized") || message.contains("401") {
+                self.error = "Wrong password."
+                betaPassword = ""
+                withAnimation(Theme.Animation.snappy) { step = .password }
+            } else {
+                self.error = "Couldn't check this account. Please try again."
+            }
         }
         isLoading = false
     }
@@ -1059,7 +1069,8 @@ struct BetaAuthFlowView: View {
             } else {
                 try await SupabaseService.shared.ensureBetaUser(
                     phoneNumber: fullPhoneNumber,
-                    password: accountPassword
+                    password: accountPassword,
+                    betaPassword: betaPassword
                 )
                 try await SupabaseService.shared.signInWithPassword(
                     phoneNumber: fullPhoneNumber,

@@ -8,7 +8,6 @@ struct ProfileView: View {
     @State private var showBGGLink = false
     @State private var showPrivacy = false
     @State private var showContacts = false
-    @State private var showEventHistory = false
     @State private var showNotificationSettings = false
 
     var body: some View {
@@ -51,9 +50,6 @@ struct ProfileView: View {
             }
             .navigationDestination(isPresented: $showContacts) {
                 MyContactsView()
-            }
-            .navigationDestination(isPresented: $showEventHistory) {
-                ProfileEventHistoryView()
             }
             .navigationDestination(isPresented: $showNotificationSettings) {
                 NotificationSettingsView()
@@ -185,7 +181,7 @@ struct ProfileView: View {
                 Spacer()
 
                 Button("View All") {
-                    showEventHistory = true
+                    appState.navigateToCalendar = true
                 }
                 .font(Theme.Typography.bodySemibold)
                 .foregroundColor(Theme.Colors.primaryAction)
@@ -658,57 +654,224 @@ struct ThemeToggleRow: View {
 struct LinkBGGSheet: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
-    @State private var username = ""
+    @State private var username: String
+    @State private var isSavingUsername = false
+    @State private var isSyncingCollection = false
+    @State private var isSyncingPlays = false
+    @State private var toast: ToastItem?
+
+    init() {
+        // Will be set in onAppear from appState
+        _username = State(initialValue: "")
+    }
+
+    private var isLinked: Bool { !(appState.currentUser?.bggUsername ?? "").isEmpty }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Theme.Spacing.xxl) {
-                Image(systemName: "dice.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(Theme.Gradients.secondary)
+            ScrollView {
+                VStack(spacing: Theme.Spacing.xxl) {
+                    // Header
+                    VStack(spacing: Theme.Spacing.md) {
+                        Image(systemName: "dice.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(Theme.Gradients.secondary)
 
-                Text("Link BoardGameGeek")
-                    .font(Theme.Typography.displaySmall)
-                    .foregroundColor(Theme.Colors.textPrimary)
+                        Text("BoardGameGeek")
+                            .font(Theme.Typography.displaySmall)
+                            .foregroundColor(Theme.Colors.textPrimary)
 
-                Text("Connect your BGG account to import your game collection and get personalized recommendations.")
-                    .font(Theme.Typography.body)
-                    .foregroundColor(Theme.Colors.textSecondary)
-                    .multilineTextAlignment(.center)
-
-                TextField("BGG Username", text: $username)
-                    .font(Theme.Typography.body)
-                    .padding(Theme.Spacing.md)
-                    .background(
-                        RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
-                            .fill(Theme.Colors.fieldBackground)
-                    )
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-
-                Button("Link Account") {
-                    Task {
-                        guard var user = appState.currentUser else { return }
-                        user.bggUsername = username
-                        try? await SupabaseService.shared.updateUser(user)
-                        appState.currentUser = user
-                        dismiss()
+                        Text("Enter your BGG username to sync your collection and play history.")
+                            .font(Theme.Typography.body)
+                            .foregroundColor(Theme.Colors.textSecondary)
+                            .multilineTextAlignment(.center)
                     }
-                }
-                .buttonStyle(PrimaryButtonStyle(isEnabled: !username.isEmpty))
-                .disabled(username.isEmpty)
 
-                Spacer()
+                    // Username field
+                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                        Text("BGG Username")
+                            .font(Theme.Typography.label)
+                            .foregroundColor(Theme.Colors.textSecondary)
+
+                        HStack(spacing: Theme.Spacing.sm) {
+                            TextField("username", text: $username)
+                                .font(Theme.Typography.body)
+                                .foregroundColor(Theme.Colors.textPrimary)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .padding(Theme.Spacing.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                        .fill(Theme.Colors.fieldBackground)
+                                )
+
+                            Button {
+                                Task { await saveUsername() }
+                            } label: {
+                                if isSavingUsername {
+                                    ProgressView().tint(.white).frame(width: 44, height: 44)
+                                } else {
+                                    Text("Save")
+                                        .font(Theme.Typography.bodyMedium)
+                                        .foregroundColor(.white)
+                                        .frame(width: 56, height: 44)
+                                }
+                            }
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                                    .fill(username.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.primary)
+                            )
+                            .disabled(username.isEmpty || isSavingUsername)
+                        }
+
+                        if isLinked {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(Theme.Colors.success)
+                                    .font(.system(size: 12))
+                                Text("Linked as \(appState.currentUser?.bggUsername ?? "")")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundColor(Theme.Colors.success)
+                            }
+                        }
+                    }
+
+                    // Sync options — only shown when username is linked
+                    if isLinked {
+                        VStack(spacing: Theme.Spacing.md) {
+                            BGGSyncCard(
+                                icon: "square.and.arrow.down",
+                                title: "Sync Collection",
+                                description: "Import games you own on BGG into your library.",
+                                isLoading: isSyncingCollection
+                            ) {
+                                Task { await syncCollection() }
+                            }
+
+                            BGGSyncCard(
+                                icon: "clock.arrow.2.circlepath",
+                                title: "Import Play History",
+                                description: "Import your BGG play log into the app.",
+                                isLoading: isSyncingPlays
+                            ) {
+                                Task { await syncPlays() }
+                            }
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(Theme.Spacing.xl)
             }
-            .padding(Theme.Spacing.xl)
             .background(Theme.Colors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(Theme.Colors.textSecondary)
+                    Button("Done") { dismiss() }
+                        .foregroundColor(Theme.Colors.primary)
                 }
             }
+            .toast($toast)
+            .onAppear {
+                username = appState.currentUser?.bggUsername ?? ""
+            }
         }
+    }
+
+    private func saveUsername() async {
+        guard !username.isEmpty, var user = appState.currentUser else { return }
+        isSavingUsername = true
+        user.bggUsername = username
+        do {
+            try await SupabaseService.shared.updateUser(user)
+            appState.currentUser = user
+            toast = ToastItem(style: .success, message: "BGG account linked!")
+        } catch {
+            toast = ToastItem(style: .error, message: "Failed to save: \(error.localizedDescription)")
+        }
+        isSavingUsername = false
+    }
+
+    private func syncCollection() async {
+        guard let bggUsername = appState.currentUser?.bggUsername, !bggUsername.isEmpty else { return }
+        isSyncingCollection = true
+        do {
+            let response = try await BGGService.shared.fetchUserCollection(username: bggUsername)
+            toast = ToastItem(style: .success, message: "Synced \(response.count) game\(response.count == 1 ? "" : "s") from your collection!")
+        } catch {
+            toast = ToastItem(style: .error, message: error.localizedDescription)
+        }
+        isSyncingCollection = false
+    }
+
+    private func syncPlays() async {
+        guard let bggUsername = appState.currentUser?.bggUsername, !bggUsername.isEmpty else { return }
+        isSyncingPlays = true
+        do {
+            let response = try await BGGService.shared.syncPlaysFromBGG(username: bggUsername)
+            let count = response.imported ?? 0
+            toast = ToastItem(style: .success, message: "Imported \(count) play\(count == 1 ? "" : "s") from BGG!")
+        } catch {
+            toast = ToastItem(style: .error, message: error.localizedDescription)
+        }
+        isSyncingPlays = false
+    }
+}
+
+// MARK: - BGG Sync Card
+
+private struct BGGSyncCard: View {
+    let icon: String
+    let title: String
+    let description: String
+    let isLoading: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Theme.CornerRadius.sm)
+                    .fill(Theme.Colors.primary.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(Theme.Colors.primary)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                Text(description)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Button(action: action) {
+                if isLoading {
+                    ProgressView()
+                        .tint(Theme.Colors.primary)
+                        .frame(width: 28, height: 28)
+                } else {
+                    Image(systemName: "arrow.trianglehead.2.clockwise")
+                        .font(.system(size: 18))
+                        .foregroundColor(Theme.Colors.primary)
+                }
+            }
+            .disabled(isLoading)
+        }
+        .padding(Theme.Spacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                .fill(Theme.Colors.cardBackground)
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
+                        .stroke(Theme.Colors.divider, lineWidth: 1)
+                )
+        )
     }
 }

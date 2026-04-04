@@ -5,7 +5,6 @@ struct EventDetailView: View {
     @StateObject private var viewModel = EventViewModel()
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedTimeIds = Set<UUID>()
     @State private var pollVotes: [UUID: TimeOptionVoteType] = [:]
     @State private var showTimeSuggestion = false
     @State private var showInviteContacts = false
@@ -38,6 +37,8 @@ struct EventDetailView: View {
             ScrollView {
                 if viewModel.isLoading {
                     LoadingView()
+                } else if viewModel.isNotFound {
+                    EventNotFoundView()
                 } else if let event = viewModel.event {
                     VStack(spacing: 0) {
                         // 1. Hero cover with overlay (title, RSVP, location, host, date badge)
@@ -74,9 +75,13 @@ struct EventDetailView: View {
                                     voters: viewModel.timeOptionVoters,
                                     isHost: viewModel.isOwner,
                                     pollVotes: pollVotes,
+                                    canVoteDirectly: viewModel.canEditPollVotesDirectly,
                                     onVote: { optionId, voteType in
                                         pollVotes[optionId] = voteType
                                         await viewModel.voteOnTimeOption(optionId: optionId, voteType: voteType)
+                                    },
+                                    onRequireRSVP: {
+                                        showRSVPSheet = true
                                     },
                                     onConfirmTime: viewModel.isOwner ? { timeOptionId in
                                         await viewModel.confirmTimeOption(timeOptionId: timeOptionId)
@@ -250,11 +255,10 @@ struct EventDetailView: View {
                     currentStatus: viewModel.myInvite?.status,
                     isSending: viewModel.isSending,
                     pollVotes: $pollVotes,
-                    onSubmit: { status in
-                        let votes = buildTimeVotes(for: event)
+                    onSubmit: { status, votes in
                         await viewModel.respondToInvite(
                             status: status,
-                            timeVotes: status == .declined ? [] : votes,
+                            timeVotes: votes,
                             suggestedTimes: nil
                         )
                         let message = status == .accepted ? "You're going!" : status == .maybe ? "Maybe next time!" : "RSVP updated"
@@ -393,14 +397,6 @@ struct EventDetailView: View {
 
     // MARK: - Helpers
 
-    private func buildTimeVotes(for event: GameEvent) -> [TimeOptionVote] {
-        if event.scheduleMode == .poll && event.timeOptions.count > 1 {
-            return pollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
-        } else {
-            return selectedTimeIds.map { TimeOptionVote(timeOptionId: $0, voteType: .yes) }
-        }
-    }
-
     private var guestListVisibilityMode: GuestListVisibilityMode {
         guard viewModel.accessPolicy?.canViewGuestList ?? true else {
             return .countsWithBlocker(message: "RSVP to see who's going.")
@@ -505,7 +501,7 @@ struct EventHeroHeader: View {
     }
 
     private var isEventPast: Bool {
-        event.status == .completed || (event.timeOptions.first?.date ?? Date()) < Date()
+        event.hasEnded()
     }
 
     private var relativeTimeLabel: String {
@@ -527,7 +523,6 @@ struct EventHeroHeader: View {
                 // Frosted material that fades in from mid → bottom
                 Rectangle()
                     .fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, ThemeManager.shared.isDark ? .dark : .light)
                     .mask(
                         LinearGradient(stops: [
                             .init(color: .clear, location: 0.0),

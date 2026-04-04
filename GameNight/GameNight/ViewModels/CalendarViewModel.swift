@@ -163,6 +163,15 @@ final class CalendarViewModel: ObservableObject {
         }
     }
 
+    func navigateToDate(_ date: Date) {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month], from: date)
+        if let monthStart = calendar.date(from: components) {
+            currentMonth = monthStart
+            selectedDate = date
+        }
+    }
+
     // MARK: - Helpers
 
     private func eventSortDate(_ event: GameEvent) -> Date {
