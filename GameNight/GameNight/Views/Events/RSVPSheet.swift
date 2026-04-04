@@ -138,7 +138,7 @@ struct RSVPSheet: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text(currentStatus == nil || currentStatus == .pending ? "Confirm RSVP" : "Update RSVP")
+                                Text(currentStatus == nil || currentStatus == .pending || currentStatus == .voted ? "Confirm RSVP" : "Update RSVP")
                                     .font(Theme.Typography.bodyMedium)
                             }
                         }
@@ -159,7 +159,7 @@ struct RSVPSheet: View {
             }
         }
         .onAppear {
-            if let currentStatus, currentStatus != .pending {
+            if let currentStatus, currentStatus != .pending && currentStatus != .voted {
                 selectedStatus = currentStatus
             }
         }

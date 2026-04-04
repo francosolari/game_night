@@ -1067,6 +1067,9 @@ struct InviteListSheet: View {
                     if !summary.acceptedUsers.isEmpty {
                         InviteSection(title: "Going", users: summary.acceptedUsers, color: Theme.Colors.success)
                     }
+                    if !summary.votedUsers.isEmpty {
+                        InviteSection(title: "Voted", users: summary.votedUsers, color: Theme.Colors.accent)
+                    }
                     if !summary.pendingUsers.isEmpty {
                         InviteSection(title: "Pending", users: summary.pendingUsers, color: Theme.Colors.warning)
                     }

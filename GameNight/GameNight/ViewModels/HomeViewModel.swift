@@ -98,7 +98,7 @@ final class HomeViewModel: ObservableObject {
             let existingEventIds = Set(upcomingEvents.map(\.id))
             let acceptedInviteEventIds = Set(
                 snapshot.myInvites
-                    .filter { $0.status == .accepted || $0.status == .maybe }
+                    .filter { $0.status == .accepted || $0.status == .maybe || $0.status == .voted }
                     .map(\.eventId)
             )
             let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)

@@ -13,7 +13,7 @@ struct CreateGroupFromAttendeesSheet: View {
     private let emojiOptions = ["🎲", "🏜️", "🐉", "🧙", "⚔️", "🎯", "🃏", "♟️", "🎮", "🌌", "🏰", "🚀"]
 
     private var eligibleInvites: [Invite] {
-        invites.filter { [.accepted, .pending, .maybe].contains($0.status) }
+        invites.filter { [.accepted, .pending, .maybe, .voted].contains($0.status) }
     }
 
     var body: some View {

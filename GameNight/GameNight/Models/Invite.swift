@@ -145,6 +145,7 @@ enum InviteStatus: String, Codable, CaseIterable {
     case maybe
     case expired
     case waitlisted
+    case voted
 
     var displayLabel: String {
         switch self {
@@ -154,6 +155,7 @@ enum InviteStatus: String, Codable, CaseIterable {
         case .maybe: return "Maybe"
         case .expired: return "Expired"
         case .waitlisted: return "Waitlisted"
+        case .voted: return "Voted"
         }
     }
 
@@ -166,6 +168,7 @@ enum InviteStatus: String, Codable, CaseIterable {
         case .maybe: return "Maybe"
         case .expired: return "Expired"
         case .waitlisted: return "Waitlisted"
+        case .voted: return "Vote submitted"
         }
     }
 
@@ -177,6 +180,7 @@ enum InviteStatus: String, Codable, CaseIterable {
         case .maybe: return "questionmark.circle.fill"
         case .expired: return "clock.badge.exclamationmark.fill"
         case .waitlisted: return "list.number"
+        case .voted: return "checkmark.bubble.fill"
         }
     }
 
@@ -188,6 +192,7 @@ enum InviteStatus: String, Codable, CaseIterable {
         case .pending: return Theme.Colors.textTertiary
         case .expired: return Theme.Colors.textTertiary
         case .waitlisted: return Theme.Colors.accent
+        case .voted: return Theme.Colors.accent
         }
     }
 }
@@ -224,7 +229,7 @@ enum PollRSVP {
     /// The final accepted/maybe/declined status is resolved when the host confirms a date.
     static func submissionStatus(from votes: [UUID: TimeOptionVoteType]) -> InviteStatus? {
         guard !votes.isEmpty else { return nil }
-        return .pending
+        return .voted
     }
 }
 
@@ -236,11 +241,13 @@ struct InviteSummary {
     var pending: Int
     var maybe: Int
     var waitlisted: Int
+    var voted: Int
     var acceptedUsers: [InviteUser]
     var pendingUsers: [InviteUser]
     var maybeUsers: [InviteUser]
     var declinedUsers: [InviteUser]
     var waitlistedUsers: [InviteUser]
+    var votedUsers: [InviteUser]
 
     struct InviteUser: Identifiable {
         let id: UUID

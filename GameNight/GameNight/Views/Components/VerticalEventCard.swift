@@ -13,7 +13,7 @@ struct VerticalEventCard: View {
 
     private var viewerRole: EventViewerRole {
         if isCurrentUserHost { return .host }
-        if let status = myInvite?.status, status == .accepted || status == .maybe {
+        if let status = myInvite?.status, status == .accepted || status == .maybe || status == .voted {
             return .rsvpd
         }
         if myInvite != nil { return .invitedNotRSVPd }

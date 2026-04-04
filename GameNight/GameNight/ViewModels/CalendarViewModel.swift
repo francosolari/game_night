@@ -93,7 +93,7 @@ final class CalendarViewModel: ObservableObject {
 
             if activeFilters.contains(.myEvents) && isHost { return true }
             if activeFilters.contains(.attending) && invite?.status == .accepted { return true }
-            if activeFilters.contains(.deciding) && (invite?.status == .pending || invite?.status == .maybe) { return true }
+            if activeFilters.contains(.deciding) && (invite?.status == .pending || invite?.status == .maybe || invite?.status == .voted) { return true }
             if activeFilters.contains(.waitingOnHost) && invite?.status == .waitlisted { return true }
             if activeFilters.contains(.notGoing) {
                 if invite?.status == .declined || invite?.status == .expired { return true }
