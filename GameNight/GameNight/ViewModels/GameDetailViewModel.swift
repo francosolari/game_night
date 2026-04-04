@@ -35,12 +35,10 @@ final class GameDetailViewModel: ObservableObject {
     @Published var isSavingCollection = false
     @Published var isSavingWishlist = false
     @Published var actionError: String?
-    @Published var actionMessage: String?
     @Published var toast: ToastItem?
 
     private var libraryEntryId: UUID?
     private var wishlistEntryId: UUID?
-    private var isLoadingRelatedData = false
 
     private let supabase: GameDetailDataProviding
     private let bgg: GameDetailBGGProviding
@@ -56,13 +54,6 @@ final class GameDetailViewModel: ObservableObject {
     }
 
     func loadRelatedData() async {
-        guard !isLoadingRelatedData else {
-            print("[GameDetailActions] loadRelatedData skipped (already running) gameId=\(game.id)")
-            return
-        }
-        isLoadingRelatedData = true
-        defer { isLoadingRelatedData = false }
-        print("[GameDetailActions] loadRelatedData start gameId=\(game.id) bggId=\(String(describing: game.bggId))")
         isLoading = true
         actionError = nil
 
@@ -84,7 +75,6 @@ final class GameDetailViewModel: ObservableObject {
             families = try await familiesResult
         } catch {
             // Non-critical — detail page still shows game info
-            print("[GameDetailActions] loadRelatedData relation fetch failed: \(error.localizedDescription)")
         }
         isLoading = false
 
@@ -93,30 +83,14 @@ final class GameDetailViewModel: ObservableObject {
         do {
             try await hydrateFromBGGIfNeeded()
         } catch {
-            print("[GameDetailActions] hydrateFromBGGIfNeeded failed: \(error.localizedDescription)")
             return
-        }
-
-        async let refreshedExpansions = supabase.fetchExpansions(gameId: game.id)
-        async let refreshedBase = supabase.fetchBaseGame(expansionGameId: game.id)
-        async let refreshedFamilies = supabase.fetchFamilyMembers(gameId: game.id)
-
-        do {
-            expansions = try await refreshedExpansions
-            baseGame = try await refreshedBase
-            families = try await refreshedFamilies
-        } catch {
-            // Non-critical — keep initial relation fetch.
-            print("[GameDetailActions] refreshed relation fetch failed: \(error.localizedDescription)")
         }
     }
 
     func toggleCollection() async {
-        print("[GameDetailActions] toggleCollection start gameId=\(game.id) bggId=\(String(describing: game.bggId)) isInCollection=\(isInCollection) isSavingCollection=\(isSavingCollection)")
         guard game.bggId != nil, !isSavingCollection else { return }
         isSavingCollection = true
         actionError = nil
-        actionMessage = nil
         defer { isSavingCollection = false }
 
         do {
@@ -131,41 +105,32 @@ final class GameDetailViewModel: ObservableObject {
                 isInCollection = false
                 libraryEntryId = nil
                 toast = ToastItem(style: .info, message: "Removed \(game.name) from collection")
-                actionMessage = "Removed from collection"
-                print("[GameDetailActions] toggleCollection removed from collection entryId=\(entryId)")
             } else {
                 try await supabase.addGameToLibrary(gameId: game.id, categoryId: nil)
                 libraryEntryId = try await supabase.libraryEntryId(gameId: game.id)
                 isInCollection = true
                 if let wishlistId = try await resolvedWishlistEntryId() {
                     try await supabase.removeFromWishlist(entryId: wishlistId)
-                    print("[GameDetailActions] toggleCollection removed wishlist entryId=\(wishlistId)")
                 }
                 isInWishlist = false
                 wishlistEntryId = nil
                 toast = ToastItem(style: .success, message: "\(game.name) is in your collection")
-                actionMessage = "In collection"
-                print("[GameDetailActions] toggleCollection added to collection libraryEntryId=\(String(describing: libraryEntryId))")
             }
         } catch {
             await refreshLibraryState()
-            actionMessage = nil
             if isInCollection {
                 actionError = nil
             } else {
                 actionError = error.localizedDescription
                 toast = ToastItem(style: .error, message: error.localizedDescription)
             }
-            print("[GameDetailActions] toggleCollection error: \(error.localizedDescription)")
         }
     }
 
     func toggleWishlist() async {
-        print("[GameDetailActions] toggleWishlist start gameId=\(game.id) bggId=\(String(describing: game.bggId)) isInWishlist=\(isInWishlist) isInCollection=\(isInCollection) isSavingWishlist=\(isSavingWishlist)")
         guard game.bggId != nil, !isSavingWishlist, !isInCollection else { return }
         isSavingWishlist = true
         actionError = nil
-        actionMessage = nil
         defer { isSavingWishlist = false }
 
         do {
@@ -180,62 +145,43 @@ final class GameDetailViewModel: ObservableObject {
                 isInWishlist = false
                 wishlistEntryId = nil
                 toast = ToastItem(style: .info, message: "Removed \(game.name) from wishlist")
-                actionMessage = "Removed from wishlist"
-                print("[GameDetailActions] toggleWishlist removed entryId=\(entryId)")
             } else {
                 try await supabase.addToWishlist(gameId: game.id)
                 wishlistEntryId = try await supabase.isOnWishlist(gameId: game.id)
                 isInWishlist = true
                 toast = ToastItem(style: .success, message: "\(game.name) is in your wishlist")
-                actionMessage = "In wishlist"
-                print("[GameDetailActions] toggleWishlist added wishlistEntryId=\(String(describing: wishlistEntryId))")
             }
         } catch {
             await refreshLibraryState()
-            actionMessage = nil
             if isInWishlist {
                 actionError = nil
             } else {
                 actionError = error.localizedDescription
                 toast = ToastItem(style: .error, message: error.localizedDescription)
             }
-            print("[GameDetailActions] toggleWishlist error: \(error.localizedDescription)")
         }
     }
 
     private func refreshLibraryState() async {
-        print("[GameDetailActions] refreshLibraryState start gameId=\(game.id) bggId=\(String(describing: game.bggId))")
         guard game.bggId != nil else {
             isInCollection = false
             isInWishlist = false
             libraryEntryId = nil
             wishlistEntryId = nil
-            print("[GameDetailActions] refreshLibraryState skipped (no bggId)")
             return
         }
-
-        var resolvedLibraryId: UUID?
-        var resolvedWishlistId: UUID?
-
         do {
-            resolvedLibraryId = try await supabase.libraryEntryId(gameId: game.id)
+            async let libraryId = supabase.libraryEntryId(gameId: game.id)
+            async let wishlistId = supabase.isOnWishlist(gameId: game.id)
+            let (resolvedLibraryId, resolvedWishlistId) = try await (libraryId, wishlistId)
+
+            libraryEntryId = resolvedLibraryId
+            wishlistEntryId = resolvedWishlistId
+            isInCollection = resolvedLibraryId != nil
+            isInWishlist = resolvedLibraryId == nil && resolvedWishlistId != nil
         } catch {
             actionError = error.localizedDescription
-            print("[GameDetailActions] refreshLibraryState library lookup error: \(error.localizedDescription)")
         }
-
-        do {
-            resolvedWishlistId = try await supabase.isOnWishlist(gameId: game.id)
-        } catch {
-            actionError = error.localizedDescription
-            print("[GameDetailActions] refreshLibraryState wishlist lookup error: \(error.localizedDescription)")
-        }
-
-        libraryEntryId = resolvedLibraryId
-        wishlistEntryId = resolvedWishlistId
-        isInCollection = resolvedLibraryId != nil
-        isInWishlist = resolvedLibraryId == nil && resolvedWishlistId != nil
-        print("[GameDetailActions] refreshLibraryState resolved libraryEntryId=\(String(describing: resolvedLibraryId)) wishlistEntryId=\(String(describing: resolvedWishlistId)) isInCollection=\(isInCollection) isInWishlist=\(isInWishlist)")
     }
 
     private func resolvedLibraryEntryId() async throws -> UUID? {

@@ -11,6 +11,7 @@ struct GameDetailView: View {
     @State private var isUploadingImage = false
     @State private var imageUploadError: String?
     @State private var expandedCreatorRoles: Set<CreatorRole> = []
+    @State private var hasLoadedRelatedData = false
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -307,8 +308,10 @@ struct GameDetailView: View {
                 }
             }
         }
-        .task {
-            await viewModel.loadRelatedData()
+        .onAppear {
+            guard !hasLoadedRelatedData else { return }
+            hasLoadedRelatedData = true
+            Task { await viewModel.loadRelatedData() }
         }
         .toast($viewModel.toast)
     }
@@ -318,17 +321,12 @@ struct GameDetailView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             HStack(spacing: Theme.Spacing.sm) {
                 Button {
-                    print("[GameDetailActions] Collection tap gameId=\(viewModel.game.id) inCollection=\(viewModel.isInCollection) savingCollection=\(viewModel.isSavingCollection) savingWishlist=\(viewModel.isSavingWishlist)")
                     Task { await viewModel.toggleCollection() }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle")
-                        Text(collectionButtonTitle)
-                        if viewModel.isSavingCollection {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                    }
+                    Label(
+                        collectionButtonTitle,
+                        systemImage: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle"
+                    )
                     .font(Theme.Typography.calloutMedium)
                     .padding(.vertical, Theme.Spacing.xs)
                     .padding(.horizontal, Theme.Spacing.md)
@@ -343,17 +341,12 @@ struct GameDetailView: View {
 
                 if !viewModel.isInCollection {
                     Button {
-                        print("[GameDetailActions] Wishlist tap gameId=\(viewModel.game.id) inWishlist=\(viewModel.isInWishlist) inCollection=\(viewModel.isInCollection) savingWishlist=\(viewModel.isSavingWishlist) savingCollection=\(viewModel.isSavingCollection)")
                         Task { await viewModel.toggleWishlist() }
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: viewModel.isInWishlist ? "heart.fill" : "heart")
-                            Text(wishlistButtonTitle)
-                            if viewModel.isSavingWishlist {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
+                        Label(
+                            wishlistButtonTitle,
+                            systemImage: viewModel.isInWishlist ? "heart.fill" : "heart"
+                        )
                         .font(Theme.Typography.calloutMedium)
                         .padding(.vertical, Theme.Spacing.xs)
                         .padding(.horizontal, Theme.Spacing.md)
@@ -374,10 +367,6 @@ struct GameDetailView: View {
                 Text(actionError)
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.error)
-            } else if let actionMessage = viewModel.actionMessage, !actionMessage.isEmpty {
-                Text(actionMessage)
-                    .font(Theme.Typography.caption)
-                    .foregroundColor(Theme.Colors.success)
             }
         }
     }
