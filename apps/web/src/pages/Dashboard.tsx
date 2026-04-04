@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, MessageCircle, Plus } from "lucide-react";
+import { useUnreadCounts } from "@/hooks/useUnreadCounts";
 import { useAuth } from "@/contexts/AuthContext";
 import { EventCard } from "@/components/EventCard";
 import { ListEventCard } from "@/components/ListEventCard";
@@ -22,6 +23,7 @@ import { getEffectiveStartDate } from "@/lib/types";
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { notificationCount, messageCount } = useUnreadCounts();
   const navigate = useNavigate();
 
   const [upcomingEvents, setUpcomingEvents] = useState<GameEvent[]>([]);
@@ -123,13 +125,37 @@ export default function Dashboard() {
             </div>
             <p className="text-[13px] text-muted-foreground mt-0.5">Your upcoming sessions</p>
           </div>
-          <button
-            onClick={() => navigate("/events/new")}
-            className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-            style={{ boxShadow: "0 2px 8px hsl(94 19% 48% / 0.3)" }}
-          >
-            <Plus className="w-5 h-5" strokeWidth={2.5} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate("/inbox")}
+              className="relative w-10 h-10 rounded-full flex items-center justify-center hover:bg-muted/50 transition-colors"
+            >
+              <MessageCircle className="w-5 h-5 text-foreground" />
+              {messageCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center px-1">
+                  {messageCount > 99 ? "99+" : messageCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => navigate("/notifications")}
+              className="relative w-10 h-10 rounded-full flex items-center justify-center hover:bg-muted/50 transition-colors"
+            >
+              <Bell className="w-5 h-5 text-foreground" />
+              {notificationCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center px-1">
+                  {notificationCount > 99 ? "99+" : notificationCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => navigate("/events/new")}
+              className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+              style={{ boxShadow: "0 2px 8px hsl(94 19% 48% / 0.3)" }}
+            >
+              <Plus className="w-5 h-5" strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
         {error && <ErrorBanner onRetry={loadData} />}

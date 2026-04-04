@@ -31,9 +31,10 @@ export async function fetchGroups(): Promise<GameGroup[]> {
     .eq("user_id", userId);
   if (memberError) throw memberError;
 
+  const ownedIds = new Set((ownedData ?? []).map(g => g.id));
   const memberGroupIds = (memberRows ?? [])
     .map(r => r.group_id)
-    .filter(id => !(ownedData ?? []).some(g => g.id === id));
+    .filter(gid => !ownedIds.has(gid));
 
   let memberGroups: GameGroup[] = [];
   if (memberGroupIds.length > 0) {
