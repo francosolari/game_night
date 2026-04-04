@@ -176,6 +176,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func validateSession() async -> Bool {
         do {
             let session = try await client.auth.session
+            guard Self.isLikelyJWT(session.accessToken) else {
+                print("⚠️ [SupabaseService] Local session token is malformed. Clearing keychain.")
+                try? await client.auth.signOut()
+                return false
+            }
             // One lightweight authenticated DB call to confirm the JWT is accepted.
             let _: [[String: String]] = try await client
                 .from("users")
@@ -201,6 +206,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     /// Extracted as a static pure function so it can be unit tested without a network stack.
     static func isDefinitiveAuthRejection(_ statusCode: Int) -> Bool {
         statusCode == 401 || statusCode == 403
+    }
+
+    private static func isLikelyJWT(_ token: String) -> Bool {
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        return parts.count == 3 && parts.allSatisfy { !$0.isEmpty }
     }
 
     func fetchCurrentUser() async throws -> User {
@@ -245,7 +255,10 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         _ functionName: String,
         body: some Encodable
     ) async throws {
-        try await client.functions.invoke(functionName, options: .init(body: body))
+        try await ensureSessionReadyForAuthenticatedCalls()
+        try await invokeFunctionWithAuthRecovery(functionName) {
+            try await self.client.functions.invoke(functionName, options: .init(body: body))
+        }
     }
 
     func invokeAuthenticatedFunction<Response: Decodable>(
@@ -256,23 +269,71 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         // Let the SDK handle auth — it correctly handles the new sb_publishable_ key format.
         // Do NOT pass Authorization manually; the SDK injects the session JWT automatically.
         print("[Supabase] invokeAuthenticatedFunction<\(Response.self)> '\(functionName)' via SDK")
-        do {
-            let result: Response = try await client.functions.invoke(
+        try await ensureSessionReadyForAuthenticatedCalls()
+        return try await invokeFunctionWithAuthRecovery(functionName) {
+            let result: Response = try await self.client.functions.invoke(
                 functionName,
                 options: .init(body: body),
                 decoder: decoder
             )
             print("[Supabase] '\(functionName)' succeeded")
             return result
+        }
+    }
+
+    private func ensureSessionReadyForAuthenticatedCalls() async throws {
+        let session = try await client.auth.session
+        guard Self.isLikelyJWT(session.accessToken) else {
+            print("⚠️ [SupabaseService] Malformed local access token, forcing re-auth.")
+            try? await client.auth.signOut()
+            throw NSError(
+                domain: "SupabaseService",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Session token is invalid. Please sign in again."]
+            )
+        }
+    }
+
+    private func invokeFunctionWithAuthRecovery<T>(
+        _ functionName: String,
+        invoke: () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await invoke()
         } catch let err as FunctionsError {
             switch err {
             case .httpError(let code, let data):
                 let body = String(data: data, encoding: .utf8) ?? "<non-utf8>"
                 print("[Supabase] '\(functionName)' HTTP \(code): \(body)")
+
+                guard Self.isDefinitiveAuthRejection(code) else {
+                    throw err
+                }
+
+                print("[Supabase] '\(functionName)' got auth rejection. Refreshing session and retrying once.")
+                do {
+                    _ = try await client.auth.refreshSession()
+                    try await ensureSessionReadyForAuthenticatedCalls()
+                } catch {
+                    print("[Supabase] '\(functionName)' refresh failed. Clearing keychain.")
+                    try? await client.auth.signOut()
+                    throw error
+                }
+
+                do {
+                    return try await invoke()
+                } catch let retryErr as FunctionsError {
+                    if case .httpError(let retryCode, _) = retryErr,
+                       Self.isDefinitiveAuthRejection(retryCode) {
+                        print("[Supabase] '\(functionName)' still unauthorized after retry. Clearing keychain.")
+                        try? await client.auth.signOut()
+                    }
+                    throw retryErr
+                }
             case .relayError:
                 print("[Supabase] '\(functionName)' relay error")
+                throw err
             }
-            throw err
         }
     }
 
