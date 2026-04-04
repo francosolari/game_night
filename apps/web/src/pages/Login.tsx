@@ -9,7 +9,14 @@ import { useToast } from "@/hooks/use-toast.ts";
 import { supabase } from "@/lib/supabase.ts";
 
 const BETA_PASSWORD = "francosfriend";
-const BETA_SHARED_SECRET = "YwxGHvb)MX1pV0eG";
+
+async function hashBetaPassword(password: string): Promise<string> {
+  const data = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 type Step = "beta-password" | "phone" | "account-password" | "display-name";
 
@@ -64,15 +71,15 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
+      const hashedSecret = await hashBetaPassword(betaPassword);
       const res = await fetch(
         `https://irhidoryicawwlwrilbb.supabase.co/functions/v1/beta-ensure-user`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-beta-secret": BETA_SHARED_SECRET,
           },
-          body: JSON.stringify({ phone: fullPhone, mode: "probe" }),
+          body: JSON.stringify({ phone: fullPhone, mode: "probe", betaPassword: hashedSecret }),
         }
       );
       const data = await res.json();
@@ -93,15 +100,15 @@ const Login = () => {
     try {
       if (!accountExists) {
         // Create user via edge function first
+        const hashedSecret = await hashBetaPassword(betaPassword);
         const res = await fetch(
           `https://irhidoryicawwlwrilbb.supabase.co/functions/v1/beta-ensure-user`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-beta-secret": BETA_SHARED_SECRET,
             },
-            body: JSON.stringify({ phone: fullPhone, password: accountPassword, mode: "ensure" }),
+            body: JSON.stringify({ phone: fullPhone, password: accountPassword, mode: "ensure", betaPassword: hashedSecret }),
           }
         );
         const data = await res.json();
