@@ -259,6 +259,7 @@ create or replace function confirm_time_option(
 )
 returns jsonb
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare
@@ -399,6 +400,7 @@ begin
 end;
 $$;
 
+revoke all on function confirm_time_option(uuid, uuid) from public, anon;
 grant execute on function confirm_time_option(uuid, uuid) to authenticated;
 
 -- 4. Update reset_event_poll_state to handle 'voted' status
