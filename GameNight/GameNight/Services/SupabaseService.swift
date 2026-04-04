@@ -169,6 +169,34 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         )
     }
 
+    /// Validates the locally-cached session is accepted server-side.
+    /// Returns true if the session is valid (or on network failure — give benefit of the doubt).
+    /// Returns false only on a definitive auth rejection (bad_jwt, invalid token).
+    /// Signs out the local session on hard rejection to clear the bad keychain entry.
+    func validateSession() async -> Bool {
+        do {
+            let session = try await client.auth.session
+            // One lightweight authenticated DB call to confirm the JWT is accepted.
+            let _: [[String: String]] = try await client
+                .from("users")
+                .select("id")
+                .eq("id", value: session.user.id.uuidString)
+                .limit(1)
+                .execute()
+                .value
+            return true
+        } catch let error as HTTPError where error.response.statusCode == 401 || error.response.statusCode == 403 {
+            // Hard auth rejection — the token is invalid server-side. Clear the stale session.
+            print("⚠️ [SupabaseService] Session rejected by server (bad_jwt). Clearing keychain.")
+            try? await client.auth.signOut()
+            return false
+        } catch {
+            // Network error, timeout, etc. — don't sign the user out; let them proceed.
+            print("⚠️ [SupabaseService] Session validation network error (giving benefit of doubt): \(error)")
+            return true
+        }
+    }
+
     func fetchCurrentUser() async throws -> User {
         let session = try await client.auth.session
         let user: User = try await client
@@ -181,11 +209,12 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return user
     }
 
+    /// Upserts the user profile. Uses upsert (not update) so that if the handle_new_user
+    /// trigger failed silently, the row is still created on first profile save.
     func updateUser(_ user: User) async throws {
         try await client
             .from("users")
-            .update(user)
-            .eq("id", value: user.id.uuidString)
+            .upsert(user, onConflict: "id")
             .execute()
     }
 

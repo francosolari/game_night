@@ -47,38 +47,63 @@ final class AppState: ObservableObject {
         let startTime = Date()
         self.isLoading = true
 
-        // 1. Quick check for session
-        if (try? await SupabaseService.shared.client.auth.session) != nil {
-            self.isAuthenticated = true
-            
-            // Start background warm-up
-            Task {
-                if let user = try? await SupabaseService.shared.fetchCurrentUser() {
-                    self.currentUser = user
-                }
-            }
-            refreshContactNames()
-            startNotificationSubscription()
-            refreshUnreadCounts()
-            Task {
-                _ = try? await SupabaseService.shared.fetchFrequentContacts(limit: 200)
-            }
-
-            // 2. Preload Home Data while splash is visible
-            let supabase = SupabaseService.shared
-            let snapshot = await HomeDataLoader.load(
-                fetchUpcomingEvents: { try await supabase.fetchUpcomingEvents() },
-                fetchMyInvites: { try await supabase.fetchMyInvites() },
-                fetchDrafts: { try await supabase.fetchDrafts() }
-            )
-            let hydratedSnapshot = await hydrateHomeSnapshot(snapshot, supabase: supabase)
-            self.preloadedHomeSnapshot = hydratedSnapshot
-            preloadImages(for: hydratedSnapshot)
-        } else {
+        // 1. Local session check (handles token refresh automatically)
+        guard (try? await SupabaseService.shared.client.auth.session) != nil else {
             self.isAuthenticated = false
+            let elapsed = Date().timeIntervalSince(startTime)
+            let minimumTime: TimeInterval = 2.0
+            if elapsed < minimumTime {
+                let delay = UInt64((minimumTime - elapsed) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            self.isLoading = false
+            return
         }
 
-        // 3. Minimum splash time (2 seconds for a polished feel, or until preload finishes)
+        // 2. Server-validate the session with one real DB call before firing all
+        //    background tasks. Catches stale/cross-env tokens that pass the local
+        //    keychain check but are rejected by the server (bad_jwt).
+        guard await SupabaseService.shared.validateSession() else {
+            self.isAuthenticated = false
+            let elapsed = Date().timeIntervalSince(startTime)
+            let minimumTime: TimeInterval = 2.0
+            if elapsed < minimumTime {
+                let delay = UInt64((minimumTime - elapsed) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            self.isLoading = false
+            return
+        }
+
+        self.isAuthenticated = true
+
+        // 3. Background warm-up (session is confirmed valid)
+        Task {
+            if let user = try? await SupabaseService.shared.fetchCurrentUser() {
+                self.currentUser = user
+            }
+        }
+        refreshContactNames()
+        startNotificationSubscription()
+        refreshUnreadCounts()
+        Task {
+            _ = try? await SupabaseService.shared.fetchFrequentContacts(limit: 200)
+        }
+
+        // 4. Preload Home Data while splash is visible
+        let supabase = SupabaseService.shared
+        let snapshot = await HomeDataLoader.load(
+            fetchUpcomingEvents: { try await supabase.fetchUpcomingEvents() },
+            fetchMyInvites: { try await supabase.fetchMyInvites() },
+            fetchDrafts: { try await supabase.fetchDrafts() }
+        )
+        let hydratedSnapshot = await hydrateHomeSnapshot(snapshot, supabase: supabase)
+        self.preloadedHomeSnapshot = hydratedSnapshot
+        preloadImages(for: hydratedSnapshot)
+
+        // 5. Minimum splash time (2 seconds for a polished feel, or until preload finishes)
         let elapsed = Date().timeIntervalSince(startTime)
         let minimumTime: TimeInterval = 2.0
         
