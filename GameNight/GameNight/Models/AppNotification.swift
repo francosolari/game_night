@@ -129,7 +129,7 @@ struct AppNotification: Identifiable, Codable {
         let displayFormatter = DateFormatter()
         displayFormatter.locale = .current
         displayFormatter.timeZone = .current
-        displayFormatter.dateFormat = "EEE, MMM d at h:mm a"
+        displayFormatter.dateFormat = "EEE, MMM d 'at' h:mm a"
         return displayFormatter.string(from: date)
     }
 
@@ -146,7 +146,7 @@ struct AppNotification: Identifiable, Codable {
         let parser = DateFormatter()
         parser.locale = Locale(identifier: "en_US_POSIX")
         parser.timeZone = TimeZone(identifier: "UTC")
-        parser.dateFormat = "EEE, MMM d at h:mm a zzz"
+        parser.dateFormat = "EEE, MMM d 'at' h:mm a zzz"
         guard let date = parser.date(from: timeString) else {
             return nil
         }
