@@ -834,6 +834,7 @@ final class EventViewModelTests: XCTestCase {
             makeInvite(displayName: "Alex", phoneNumber: "+15555550113", tier: 1, status: .maybe),
             makeInvite(displayName: "Sam", phoneNumber: "+15555550114", tier: 1, status: .pending),
             makeInvite(displayName: "Riley", phoneNumber: "+15555550115", tier: 2, status: .waitlisted),
+            makeInvite(displayName: "Morgan", phoneNumber: "+15555550116", tier: 1, status: .voted),
         ]
 
         let summary = sut.inviteSummary
@@ -843,9 +844,11 @@ final class EventViewModelTests: XCTestCase {
         XCTAssertEqual(summary.maybe, 1)
         XCTAssertEqual(summary.pending, 1)
         XCTAssertEqual(summary.waitlisted, 1)
+        XCTAssertEqual(summary.voted, 1)
         XCTAssertTrue(summary.acceptedUsers.contains { $0.name == "Jordan" })
         XCTAssertTrue(summary.acceptedUsers.contains { $0.name == "Franco" })
         XCTAssertEqual(summary.declinedUsers.first?.name, "Casey")
+        XCTAssertEqual(summary.votedUsers.first?.name, "Morgan")
     }
 
     func testInviteSummaryExcludesHostByUserId() {
