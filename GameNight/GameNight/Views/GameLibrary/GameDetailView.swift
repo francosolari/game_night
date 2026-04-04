@@ -11,6 +11,7 @@ struct GameDetailView: View {
     @State private var isUploadingImage = false
     @State private var imageUploadError: String?
     @State private var expandedCreatorRoles: Set<CreatorRole> = []
+    @State private var hasLoadedRelatedData = false
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -307,8 +308,10 @@ struct GameDetailView: View {
                 }
             }
         }
-        .task {
-            await viewModel.loadRelatedData()
+        .onAppear {
+            guard !hasLoadedRelatedData else { return }
+            hasLoadedRelatedData = true
+            Task { await viewModel.loadRelatedData() }
         }
         .toast($viewModel.toast)
     }
@@ -334,7 +337,7 @@ struct GameDetailView: View {
                     .foregroundColor(viewModel.isInCollection ? Theme.Colors.primary : Theme.Colors.textPrimary)
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.isSavingCollection || viewModel.isSavingWishlist || viewModel.isLoading)
+                .disabled(viewModel.isSavingCollection || viewModel.isSavingWishlist)
 
                 if !viewModel.isInCollection {
                     Button {
@@ -354,7 +357,7 @@ struct GameDetailView: View {
                         .foregroundColor(viewModel.isInWishlist ? Theme.Colors.primary : Theme.Colors.textPrimary)
                     }
                     .buttonStyle(.plain)
-                    .disabled(viewModel.isSavingWishlist || viewModel.isSavingCollection || viewModel.isLoading)
+                    .disabled(viewModel.isSavingWishlist || viewModel.isSavingCollection)
                 }
 
                 Spacer()

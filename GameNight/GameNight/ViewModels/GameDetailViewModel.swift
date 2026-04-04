@@ -85,18 +85,6 @@ final class GameDetailViewModel: ObservableObject {
         } catch {
             return
         }
-
-        async let refreshedExpansions = supabase.fetchExpansions(gameId: game.id)
-        async let refreshedBase = supabase.fetchBaseGame(expansionGameId: game.id)
-        async let refreshedFamilies = supabase.fetchFamilyMembers(gameId: game.id)
-
-        do {
-            expansions = try await refreshedExpansions
-            baseGame = try await refreshedBase
-            families = try await refreshedFamilies
-        } catch {
-            // Non-critical — keep initial relation fetch.
-        }
     }
 
     func toggleCollection() async {
@@ -182,7 +170,6 @@ final class GameDetailViewModel: ObservableObject {
             wishlistEntryId = nil
             return
         }
-
         do {
             async let libraryId = supabase.libraryEntryId(gameId: game.id)
             async let wishlistId = supabase.isOnWishlist(gameId: game.id)
