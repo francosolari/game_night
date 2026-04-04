@@ -1457,6 +1457,18 @@ private final class StubGameDetailDataProvider: GameDetailDataProviding {
         return game
     }
 
+    func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {}
+
+    func removeGameFromLibrary(entryId: UUID) async throws {}
+
+    func addToWishlist(gameId: UUID) async throws {}
+
+    func removeFromWishlist(entryId: UUID) async throws {}
+
+    func libraryEntryId(gameId: UUID) async throws -> UUID? { nil }
+
+    func isOnWishlist(gameId: UUID) async throws -> UUID? { nil }
+
     func fetchExpansions(gameId: UUID) async throws -> [Game] {
         expansions
     }

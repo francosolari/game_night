@@ -12,11 +12,21 @@ const PAGE_SIZE = 1000;
 const SECRET_ENV = "BETA_SHARED_SECRET";
 const LEGACY_SECRET_HEADER = "x-beta-secret";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-beta-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -25,7 +35,7 @@ serve(async (req) => {
     console.error("[beta-ensure-user] missing secret");
     return new Response(JSON.stringify({ error: "Service not configured" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -36,7 +46,7 @@ serve(async (req) => {
     console.error("[beta-ensure-user] invalid JSON", error);
     return new Response(JSON.stringify({ error: "Invalid JSON payload" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -49,7 +59,7 @@ serve(async (req) => {
   if (!secretIsValid) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -59,13 +69,13 @@ serve(async (req) => {
   if (!normalizedPhone) {
     return new Response(JSON.stringify({ error: "Missing phone number" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
   if (mode === "ensure" && !password) {
     return new Response(JSON.stringify({ error: "Missing password for ensure mode" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -117,7 +127,7 @@ serve(async (req) => {
     console.error("[beta-ensure-user] error", error);
     return new Response(JSON.stringify({ error: (error as Error).message ?? "unknown" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

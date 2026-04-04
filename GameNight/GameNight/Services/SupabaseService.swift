@@ -866,6 +866,19 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func libraryEntryId(gameId: UUID) async throws -> UUID? {
+        let session = try await client.auth.session
+        let entries: [GameLibraryEntry] = try await client
+            .from("game_library")
+            .select("id")
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("game_id", value: gameId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return entries.first?.id
+    }
+
     // MARK: - Wishlist
 
     func fetchWishlist() async throws -> [GameWishlistEntry] {

@@ -3,6 +3,12 @@ import Foundation
 protocol GameDetailDataProviding {
     func fetchGame(id: UUID) async throws -> Game?
     func upsertGame(_ game: Game) async throws -> Game
+    func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
+    func removeGameFromLibrary(entryId: UUID) async throws
+    func addToWishlist(gameId: UUID) async throws
+    func removeFromWishlist(entryId: UUID) async throws
+    func libraryEntryId(gameId: UUID) async throws -> UUID?
+    func isOnWishlist(gameId: UUID) async throws -> UUID?
     func fetchExpansions(gameId: UUID) async throws -> [Game]
     func fetchBaseGame(expansionGameId: UUID) async throws -> Game?
     func fetchFamilyMembers(gameId: UUID) async throws -> [(family: GameFamily, games: [Game])]
@@ -24,6 +30,14 @@ final class GameDetailViewModel: ObservableObject {
     @Published var baseGame: Game?
     @Published var families: [(family: GameFamily, games: [Game])] = []
     @Published var isLoading = true
+    @Published var isInCollection = false
+    @Published var isInWishlist = false
+    @Published var isSavingCollection = false
+    @Published var isSavingWishlist = false
+    @Published var actionError: String?
+
+    private var libraryEntryId: UUID?
+    private var wishlistEntryId: UUID?
 
     private let supabase: GameDetailDataProviding
     private let bgg: GameDetailBGGProviding
@@ -40,12 +54,15 @@ final class GameDetailViewModel: ObservableObject {
 
     func loadRelatedData() async {
         isLoading = true
+        actionError = nil
 
         // Search RPC returns a lightweight payload for speed; refresh to full row
         // so detail fields (description/designers/publishers/etc.) render immediately.
         if let fullGame = try? await supabase.fetchGame(id: game.id) {
             game = fullGame
         }
+
+        await refreshLibraryState()
 
         async let expansionsResult = supabase.fetchExpansions(gameId: game.id)
         async let baseGameResult = supabase.fetchBaseGame(expansionGameId: game.id)
@@ -79,6 +96,103 @@ final class GameDetailViewModel: ObservableObject {
         } catch {
             // Non-critical — keep initial relation fetch.
         }
+    }
+
+    func toggleCollection() async {
+        guard game.bggId != nil, !isSavingCollection else { return }
+        isSavingCollection = true
+        actionError = nil
+        defer { isSavingCollection = false }
+
+        do {
+            if isInCollection {
+                let entryId = try await resolvedLibraryEntryId()
+                guard let entryId else {
+                    isInCollection = false
+                    libraryEntryId = nil
+                    return
+                }
+                try await supabase.removeGameFromLibrary(entryId: entryId)
+                isInCollection = false
+                libraryEntryId = nil
+            } else {
+                try await supabase.addGameToLibrary(gameId: game.id, categoryId: nil)
+                libraryEntryId = try await supabase.libraryEntryId(gameId: game.id)
+                isInCollection = true
+            }
+        } catch {
+            await refreshLibraryState()
+            actionError = error.localizedDescription
+        }
+    }
+
+    func toggleWishlist() async {
+        guard game.bggId != nil, !isSavingWishlist else { return }
+        isSavingWishlist = true
+        actionError = nil
+        defer { isSavingWishlist = false }
+
+        do {
+            if isInWishlist {
+                let entryId = try await resolvedWishlistEntryId()
+                guard let entryId else {
+                    isInWishlist = false
+                    wishlistEntryId = nil
+                    return
+                }
+                try await supabase.removeFromWishlist(entryId: entryId)
+                isInWishlist = false
+                wishlistEntryId = nil
+            } else {
+                try await supabase.addToWishlist(gameId: game.id)
+                wishlistEntryId = try await supabase.isOnWishlist(gameId: game.id)
+                isInWishlist = true
+            }
+        } catch {
+            await refreshLibraryState()
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func refreshLibraryState() async {
+        guard game.bggId != nil else {
+            isInCollection = false
+            isInWishlist = false
+            libraryEntryId = nil
+            wishlistEntryId = nil
+            return
+        }
+
+        do {
+            async let libraryId = supabase.libraryEntryId(gameId: game.id)
+            async let wishlistId = supabase.isOnWishlist(gameId: game.id)
+            let (resolvedLibraryId, resolvedWishlistId) = try await (libraryId, wishlistId)
+
+            libraryEntryId = resolvedLibraryId
+            wishlistEntryId = resolvedWishlistId
+            isInCollection = resolvedLibraryId != nil
+            isInWishlist = resolvedWishlistId != nil
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func resolvedLibraryEntryId() async throws -> UUID? {
+        if let libraryEntryId {
+            return libraryEntryId
+        }
+        let fetched = try await supabase.libraryEntryId(gameId: game.id)
+        libraryEntryId = fetched
+        return fetched
+    }
+
+    private func resolvedWishlistEntryId() async throws -> UUID? {
+        if let wishlistEntryId {
+            return wishlistEntryId
+        }
+        let fetched = try await supabase.isOnWishlist(gameId: game.id)
+        wishlistEntryId = fetched
+        return fetched
     }
 
     private func hydrateFromBGGIfNeeded() async throws {
