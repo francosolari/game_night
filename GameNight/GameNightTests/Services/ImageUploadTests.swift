@@ -3,12 +3,12 @@ import PhotosUI
 @testable import GameNight
 
 class ImageUploadTests: XCTestCase {
-    var r2Service: R2StorageService!
+    var r2Service: MockR2StorageService!
     var mockSupabase: MockSupabaseService!
 
     override func setUp() {
         super.setUp()
-        r2Service = R2StorageService()
+        r2Service = MockR2StorageService()
         mockSupabase = MockSupabaseService()
     }
 
@@ -67,8 +67,15 @@ class ImageUploadTests: XCTestCase {
         }
     }
 
-    enum ImageFormat {
+enum ImageFormat {
         case jpeg, png
+    }
+}
+
+actor MockR2StorageService {
+    func uploadGameImage(data: Data, gameId: UUID) async throws -> String {
+        guard !data.isEmpty else { throw R2Error.uploadFailed }
+        return "https://r2.example.com/games/\(gameId.uuidString)/image.jpg"
     }
 }
 
