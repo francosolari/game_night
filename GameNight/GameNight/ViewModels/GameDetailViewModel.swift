@@ -35,6 +35,7 @@ final class GameDetailViewModel: ObservableObject {
     @Published var isSavingCollection = false
     @Published var isSavingWishlist = false
     @Published var actionError: String?
+    @Published var toast: ToastItem?
 
     private var libraryEntryId: UUID?
     private var wishlistEntryId: UUID?
@@ -115,19 +116,31 @@ final class GameDetailViewModel: ObservableObject {
                 try await supabase.removeGameFromLibrary(entryId: entryId)
                 isInCollection = false
                 libraryEntryId = nil
+                toast = ToastItem(style: .info, message: "Removed \(game.name) from collection")
             } else {
                 try await supabase.addGameToLibrary(gameId: game.id, categoryId: nil)
                 libraryEntryId = try await supabase.libraryEntryId(gameId: game.id)
                 isInCollection = true
+                if let wishlistId = try await resolvedWishlistEntryId() {
+                    try await supabase.removeFromWishlist(entryId: wishlistId)
+                }
+                isInWishlist = false
+                wishlistEntryId = nil
+                toast = ToastItem(style: .success, message: "\(game.name) is in your collection")
             }
         } catch {
             await refreshLibraryState()
-            actionError = error.localizedDescription
+            if isInCollection {
+                actionError = nil
+            } else {
+                actionError = error.localizedDescription
+                toast = ToastItem(style: .error, message: error.localizedDescription)
+            }
         }
     }
 
     func toggleWishlist() async {
-        guard game.bggId != nil, !isSavingWishlist else { return }
+        guard game.bggId != nil, !isSavingWishlist, !isInCollection else { return }
         isSavingWishlist = true
         actionError = nil
         defer { isSavingWishlist = false }
@@ -143,14 +156,21 @@ final class GameDetailViewModel: ObservableObject {
                 try await supabase.removeFromWishlist(entryId: entryId)
                 isInWishlist = false
                 wishlistEntryId = nil
+                toast = ToastItem(style: .info, message: "Removed \(game.name) from wishlist")
             } else {
                 try await supabase.addToWishlist(gameId: game.id)
                 wishlistEntryId = try await supabase.isOnWishlist(gameId: game.id)
                 isInWishlist = true
+                toast = ToastItem(style: .success, message: "\(game.name) is in your wishlist")
             }
         } catch {
             await refreshLibraryState()
-            actionError = error.localizedDescription
+            if isInWishlist {
+                actionError = nil
+            } else {
+                actionError = error.localizedDescription
+                toast = ToastItem(style: .error, message: error.localizedDescription)
+            }
         }
     }
 
@@ -171,7 +191,7 @@ final class GameDetailViewModel: ObservableObject {
             libraryEntryId = resolvedLibraryId
             wishlistEntryId = resolvedWishlistId
             isInCollection = resolvedLibraryId != nil
-            isInWishlist = resolvedWishlistId != nil
+            isInWishlist = resolvedLibraryId == nil && resolvedWishlistId != nil
         } catch {
             actionError = error.localizedDescription
         }

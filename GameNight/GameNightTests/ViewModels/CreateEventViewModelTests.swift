@@ -1329,6 +1329,32 @@ private final class StubEventGameBGGProvider: EventGameBGGProviding {
 
 @MainActor
 final class GameDetailViewModelTests: XCTestCase {
+    private func makeBGGGame(name: String = "Dune: Imperium") -> Game {
+        Game(
+            id: UUID(),
+            bggId: 123,
+            name: name,
+            yearPublished: 2020,
+            thumbnailUrl: nil,
+            imageUrl: nil,
+            minPlayers: 1,
+            maxPlayers: 4,
+            recommendedPlayers: nil,
+            minPlaytime: 60,
+            maxPlaytime: 120,
+            complexity: 3.0,
+            bggRating: 8.4,
+            description: nil,
+            categories: [],
+            mechanics: [],
+            designers: [],
+            publishers: [],
+            artists: [],
+            minAge: nil,
+            bggRank: nil
+        )
+    }
+
     func testLoadRelatedDataHydratesBGGGameAndPersistsRelationLinks() async {
         let originalGame = Game(
             id: UUID(),
@@ -1431,18 +1457,64 @@ final class GameDetailViewModelTests: XCTestCase {
         XCTAssertEqual(service.familyLinkCalls.first?.families.first?.name, "Dune")
         XCTAssertEqual(sut.game.designers, ["Paul Dennen"])
     }
+
+    func testLoadRelatedDataHidesWishlistWhenGameAlreadyInCollection() async {
+        let game = makeBGGGame()
+        let service = StubGameDetailDataProvider(
+            upsertResults: [:],
+            libraryByGameId: [game.id: UUID()],
+            wishlistByGameId: [game.id: UUID()]
+        )
+        let bgg = StubGameDetailBGGProvider(result: BGGGameParseResult(game: game, expansionLinks: [], familyLinks: []))
+        let sut = GameDetailViewModel(game: game, supabase: service, bgg: bgg)
+
+        await sut.loadRelatedData()
+
+        XCTAssertTrue(sut.isInCollection)
+        XCTAssertFalse(sut.isInWishlist)
+    }
+
+    func testToggleCollectionRemovesWishlistAndShowsCollectionState() async {
+        let game = makeBGGGame()
+        let wishlistId = UUID()
+        let service = StubGameDetailDataProvider(
+            upsertResults: [:],
+            libraryByGameId: [:],
+            wishlistByGameId: [game.id: wishlistId]
+        )
+        let bgg = StubGameDetailBGGProvider(result: BGGGameParseResult(game: game, expansionLinks: [], familyLinks: []))
+        let sut = GameDetailViewModel(game: game, supabase: service, bgg: bgg)
+
+        await sut.loadRelatedData()
+        await sut.toggleCollection()
+
+        XCTAssertTrue(sut.isInCollection)
+        XCTAssertFalse(sut.isInWishlist)
+        XCTAssertEqual(service.removeWishlistCalls, [wishlistId])
+        XCTAssertNil(service.wishlistByGameId[game.id])
+    }
 }
 
 private final class StubGameDetailDataProvider: GameDetailDataProviding {
     var upsertResults: [Int: Game]
     var expansions: [Game]
+    var libraryByGameId: [UUID: UUID]
+    var wishlistByGameId: [UUID: UUID]
     var upsertedGames: [Game] = []
     var expansionLinkCalls: [(baseGameId: UUID, expansionGameIds: [UUID])] = []
     var familyLinkCalls: [(gameId: UUID, families: [(bggFamilyId: Int, name: String)])] = []
+    var removeWishlistCalls: [UUID] = []
 
-    init(upsertResults: [Int: Game], expansions: [Game] = []) {
+    init(
+        upsertResults: [Int: Game],
+        expansions: [Game] = [],
+        libraryByGameId: [UUID: UUID] = [:],
+        wishlistByGameId: [UUID: UUID] = [:]
+    ) {
         self.upsertResults = upsertResults
         self.expansions = expansions
+        self.libraryByGameId = libraryByGameId
+        self.wishlistByGameId = wishlistByGameId
     }
 
     func fetchGame(id: UUID) async throws -> Game? {
@@ -1457,17 +1529,30 @@ private final class StubGameDetailDataProvider: GameDetailDataProviding {
         return game
     }
 
-    func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {}
+    func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {
+        libraryByGameId[gameId] = libraryByGameId[gameId] ?? UUID()
+    }
 
-    func removeGameFromLibrary(entryId: UUID) async throws {}
+    func removeGameFromLibrary(entryId: UUID) async throws {
+        libraryByGameId = libraryByGameId.filter { $0.value != entryId }
+    }
 
-    func addToWishlist(gameId: UUID) async throws {}
+    func addToWishlist(gameId: UUID) async throws {
+        wishlistByGameId[gameId] = wishlistByGameId[gameId] ?? UUID()
+    }
 
-    func removeFromWishlist(entryId: UUID) async throws {}
+    func removeFromWishlist(entryId: UUID) async throws {
+        removeWishlistCalls.append(entryId)
+        wishlistByGameId = wishlistByGameId.filter { $0.value != entryId }
+    }
 
-    func libraryEntryId(gameId: UUID) async throws -> UUID? { nil }
+    func libraryEntryId(gameId: UUID) async throws -> UUID? {
+        libraryByGameId[gameId]
+    }
 
-    func isOnWishlist(gameId: UUID) async throws -> UUID? { nil }
+    func isOnWishlist(gameId: UUID) async throws -> UUID? {
+        wishlistByGameId[gameId]
+    }
 
     func fetchExpansions(gameId: UUID) async throws -> [Game] {
         expansions
