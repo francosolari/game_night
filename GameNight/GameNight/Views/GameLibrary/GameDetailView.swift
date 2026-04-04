@@ -310,6 +310,7 @@ struct GameDetailView: View {
         .task {
             await viewModel.loadRelatedData()
         }
+        .toast($viewModel.toast)
     }
 
     @ViewBuilder
@@ -320,7 +321,7 @@ struct GameDetailView: View {
                     Task { await viewModel.toggleCollection() }
                 } label: {
                     Label(
-                        viewModel.isInCollection ? "In Collection" : "Add to Collection",
+                        collectionButtonTitle,
                         systemImage: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle"
                     )
                     .font(Theme.Typography.calloutMedium)
@@ -333,26 +334,28 @@ struct GameDetailView: View {
                     .foregroundColor(viewModel.isInCollection ? Theme.Colors.primary : Theme.Colors.textPrimary)
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.isSavingCollection || viewModel.isLoading)
+                .disabled(viewModel.isSavingCollection || viewModel.isSavingWishlist || viewModel.isLoading)
 
-                Button {
-                    Task { await viewModel.toggleWishlist() }
-                } label: {
-                    Label(
-                        viewModel.isInWishlist ? "Wishlisted" : "Add to Wishlist",
-                        systemImage: viewModel.isInWishlist ? "heart.fill" : "heart"
-                    )
-                    .font(Theme.Typography.calloutMedium)
-                    .padding(.vertical, Theme.Spacing.xs)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .background(
-                        Capsule()
-                            .fill(viewModel.isInWishlist ? Theme.Colors.primary.opacity(0.16) : Theme.Colors.backgroundElevated)
-                    )
-                    .foregroundColor(viewModel.isInWishlist ? Theme.Colors.primary : Theme.Colors.textPrimary)
+                if !viewModel.isInCollection {
+                    Button {
+                        Task { await viewModel.toggleWishlist() }
+                    } label: {
+                        Label(
+                            wishlistButtonTitle,
+                            systemImage: viewModel.isInWishlist ? "heart.fill" : "heart"
+                        )
+                        .font(Theme.Typography.calloutMedium)
+                        .padding(.vertical, Theme.Spacing.xs)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .background(
+                            Capsule()
+                                .fill(viewModel.isInWishlist ? Theme.Colors.primary.opacity(0.16) : Theme.Colors.backgroundElevated)
+                        )
+                        .foregroundColor(viewModel.isInWishlist ? Theme.Colors.primary : Theme.Colors.textPrimary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isSavingWishlist || viewModel.isSavingCollection || viewModel.isLoading)
                 }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isSavingWishlist || viewModel.isLoading)
 
                 Spacer()
             }
@@ -363,6 +366,20 @@ struct GameDetailView: View {
                     .foregroundColor(Theme.Colors.error)
             }
         }
+    }
+
+    private var collectionButtonTitle: String {
+        if viewModel.isSavingCollection {
+            return viewModel.isInCollection ? "Saving..." : "Adding..."
+        }
+        return viewModel.isInCollection ? "In Collection" : "Add to Collection"
+    }
+
+    private var wishlistButtonTitle: String {
+        if viewModel.isSavingWishlist {
+            return viewModel.isInWishlist ? "Saving..." : "Adding..."
+        }
+        return viewModel.isInWishlist ? "In Wishlist" : "Add to Wishlist"
     }
 
     @ViewBuilder

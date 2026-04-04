@@ -834,18 +834,18 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws {
-        let session = try await client.auth.session
-        var entry: [String: AnyJSON] = [
-            "user_id": .string(session.user.id.uuidString),
-            "game_id": .string(gameId.uuidString),
-            "play_count": .int(0)
-        ]
-        if let categoryId = categoryId {
-            entry["category_id"] = .string(categoryId.uuidString)
+        struct AddGameToLibraryParams: Encodable {
+            let gameId: UUID
+            let categoryId: UUID?
+
+            enum CodingKeys: String, CodingKey {
+                case gameId = "p_game_id"
+                case categoryId = "p_category_id"
+            }
         }
-        try await client
-            .from("game_library")
-            .insert(entry)
+
+        _ = try await client
+            .rpc("add_game_to_collection", params: AddGameToLibraryParams(gameId: gameId, categoryId: categoryId))
             .execute()
     }
 
@@ -858,8 +858,9 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func libraryEntryId(gameId: UUID) async throws -> UUID? {
+        struct EntryIdRow: Decodable { let id: UUID }
         let session = try await client.auth.session
-        let entries: [GameLibraryEntry] = try await client
+        let entries: [EntryIdRow] = try await client
             .from("game_library")
             .select("id")
             .eq("user_id", value: session.user.id.uuidString)
@@ -904,12 +905,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func isOnWishlist(gameId: UUID) async throws -> UUID? {
+        struct EntryIdRow: Decodable { let id: UUID }
         let session = try await client.auth.session
-        let entries: [GameWishlistEntry] = try await client
+        let entries: [EntryIdRow] = try await client
             .from("game_wishlist")
             .select("id")
             .eq("user_id", value: session.user.id.uuidString)
             .eq("game_id", value: gameId.uuidString)
+            .limit(1)
             .execute()
             .value
         return entries.first?.id
