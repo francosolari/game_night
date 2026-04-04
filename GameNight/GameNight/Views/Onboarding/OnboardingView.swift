@@ -1,6 +1,37 @@
 import SwiftUI
 import CryptoKit
 
+private let phoneInputFormatGroups: [String: [Int]] = [
+    "+1": [3, 3, 4],
+    "+44": [4, 3, 4],
+    "+61": [1, 4, 4],
+    "+49": [3, 3, 4],
+    "+33": [1, 2, 2, 2, 2],
+    "+81": [2, 4, 4]
+]
+
+private func formatPhoneForInput(countryCode: String, raw: String) -> String {
+    let digits = raw.filter(\.isNumber)
+    guard !digits.isEmpty else { return "" }
+
+    let groups = phoneInputFormatGroups[countryCode] ?? phoneInputFormatGroups["+1"]!
+    var parts: [String] = []
+    var cursor = digits.startIndex
+
+    for groupSize in groups {
+        guard cursor < digits.endIndex else { break }
+        let nextIndex = digits.index(cursor, offsetBy: groupSize, limitedBy: digits.endIndex) ?? digits.endIndex
+        parts.append(String(digits[cursor..<nextIndex]))
+        cursor = nextIndex
+    }
+
+    if cursor < digits.endIndex {
+        parts.append(String(digits[cursor...]))
+    }
+
+    return parts.joined(separator: "-")
+}
+
 struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var showAuth = false
@@ -359,6 +390,12 @@ struct AuthFlowView: View {
                                     .stroke(phoneFieldFocused ? Theme.Colors.primary.opacity(0.5) : .clear, lineWidth: 1.5)
                             )
                     )
+                    .onChange(of: phoneNumber) { _, newValue in
+                        let formatted = formatPhoneForInput(countryCode: countryCode, raw: newValue)
+                        if formatted != newValue {
+                            phoneNumber = formatted
+                        }
+                    }
             }
 
             if let error {
@@ -391,6 +428,9 @@ struct AuthFlowView: View {
             .padding(.top, Theme.Spacing.md)
         }
         .onAppear { phoneFieldFocused = true }
+        .onChange(of: countryCode) { _, _ in
+            phoneNumber = formatPhoneForInput(countryCode: countryCode, raw: phoneNumber)
+        }
     }
 
     // MARK: - OTP Step
@@ -873,6 +913,12 @@ struct BetaAuthFlowView: View {
                                     .stroke(phoneFieldFocused ? Theme.Colors.accent.opacity(0.5) : .clear, lineWidth: 1.5)
                             )
                     )
+                    .onChange(of: phoneNumber) { _, newValue in
+                        let formatted = formatPhoneForInput(countryCode: countryCode, raw: newValue)
+                        if formatted != newValue {
+                            phoneNumber = formatted
+                        }
+                    }
             }
 
             if let error {
@@ -894,6 +940,9 @@ struct BetaAuthFlowView: View {
             }
         }
         .onAppear { phoneFieldFocused = true }
+        .onChange(of: countryCode) { _, _ in
+            phoneNumber = formatPhoneForInput(countryCode: countryCode, raw: phoneNumber)
+        }
     }
 
     // MARK: - Account Password Step
