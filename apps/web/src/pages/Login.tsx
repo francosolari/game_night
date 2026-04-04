@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Dice5, ArrowLeft, Lock, Phone, KeyRound, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext.tsx";
 import { useToast } from "@/hooks/use-toast.ts";
 import { supabase } from "@/lib/supabase.ts";
@@ -19,6 +19,36 @@ async function hashBetaPassword(password: string): Promise<string> {
 }
 
 type Step = "beta-password" | "phone" | "account-password" | "display-name";
+
+const PHONE_FORMAT_GROUPS: Record<string, number[]> = {
+  "+1": [3, 3, 4],
+  "+44": [4, 3, 4],
+  "+61": [1, 4, 4],
+  "+49": [3, 3, 4],
+  "+33": [1, 2, 2, 2, 2],
+  "+81": [2, 4, 4],
+};
+
+export function formatPhoneForDisplay(countryCode: string, raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+
+  const groups = PHONE_FORMAT_GROUPS[countryCode] ?? PHONE_FORMAT_GROUPS["+1"];
+  const parts: string[] = [];
+  let cursor = 0;
+
+  for (const groupSize of groups) {
+    if (cursor >= digits.length) break;
+    parts.push(digits.slice(cursor, cursor + groupSize));
+    cursor += groupSize;
+  }
+
+  if (cursor < digits.length) {
+    parts.push(digits.slice(cursor));
+  }
+
+  return parts.join("-");
+}
 
 function normalizePhone(countryCode: string, raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -45,6 +75,10 @@ const Login = () => {
   const fullPhone = normalizePhone(countryCode, phoneNumber);
   const phoneDigits = phoneNumber.replace(/\D/g, "");
   const isPhoneValid = phoneDigits.length >= 7;
+
+  useEffect(() => {
+    setPhoneNumber((current) => formatPhoneForDisplay(countryCode, current));
+  }, [countryCode]);
 
   const stepIndex = { "beta-password": 0, phone: 1, "account-password": 2, "display-name": 3 }[step];
 
@@ -273,7 +307,7 @@ const Login = () => {
                     name="username"
                     placeholder="(555) 123-4567"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => setPhoneNumber(formatPhoneForDisplay(countryCode, e.target.value))}
                     autoFocus
                     autoComplete="username"
                     className="flex-1"
