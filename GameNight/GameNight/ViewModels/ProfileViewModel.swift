@@ -22,10 +22,10 @@ class ProfileViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        async let summaryTask = fetchSummary()
-        async let eventsTask = fetchRecentPastEvents()
-        async let contactsTask = fetchContactsCount()
-        async let gamesTask = fetchGameLibraryCount()
+        async let summaryTask: Void = fetchSummary()
+        async let eventsTask: Void = fetchRecentPastEvents()
+        async let contactsTask: Void = fetchContactsCount()
+        async let gamesTask: Void = fetchGameLibraryCount()
 
         await summaryTask
         await eventsTask
