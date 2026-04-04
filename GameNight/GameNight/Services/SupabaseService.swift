@@ -185,7 +185,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 .execute()
                 .value
             return true
-        } catch let error as HTTPError where error.response.statusCode == 401 || error.response.statusCode == 403 {
+        } catch let error as HTTPError where Self.isDefinitiveAuthRejection(error.response.statusCode) {
             // Hard auth rejection — the token is invalid server-side. Clear the stale session.
             print("⚠️ [SupabaseService] Session rejected by server (bad_jwt). Clearing keychain.")
             try? await client.auth.signOut()
@@ -195,6 +195,12 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             print("⚠️ [SupabaseService] Session validation network error (giving benefit of doubt): \(error)")
             return true
         }
+    }
+
+    /// Returns true if an HTTP status code is a definitive server-side auth rejection.
+    /// Extracted as a static pure function so it can be unit tested without a network stack.
+    static func isDefinitiveAuthRejection(_ statusCode: Int) -> Bool {
+        statusCode == 401 || statusCode == 403
     }
 
     func fetchCurrentUser() async throws -> User {

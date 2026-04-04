@@ -170,18 +170,18 @@ final class GameDetailViewModel: ObservableObject {
             wishlistEntryId = nil
             return
         }
-        do {
-            async let libraryId = supabase.libraryEntryId(gameId: game.id)
-            async let wishlistId = supabase.isOnWishlist(gameId: game.id)
-            let (resolvedLibraryId, resolvedWishlistId) = try await (libraryId, wishlistId)
+        // Fetch concurrently but independently — a wishlist failure must not prevent
+        // library state from being set (isInCollection must remain correct).
+        async let libraryIdTask = supabase.libraryEntryId(gameId: game.id)
+        async let wishlistIdTask = supabase.isOnWishlist(gameId: game.id)
 
-            libraryEntryId = resolvedLibraryId
-            wishlistEntryId = resolvedWishlistId
-            isInCollection = resolvedLibraryId != nil
-            isInWishlist = resolvedLibraryId == nil && resolvedWishlistId != nil
-        } catch {
-            actionError = error.localizedDescription
-        }
+        let resolvedLibraryId = try? await libraryIdTask
+        let resolvedWishlistId = try? await wishlistIdTask
+
+        libraryEntryId = resolvedLibraryId
+        wishlistEntryId = resolvedWishlistId
+        isInCollection = resolvedLibraryId != nil
+        isInWishlist = resolvedLibraryId == nil && resolvedWishlistId != nil
     }
 
     private func resolvedLibraryEntryId() async throws -> UUID? {
