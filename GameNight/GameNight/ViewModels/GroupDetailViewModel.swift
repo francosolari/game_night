@@ -235,7 +235,7 @@ final class GroupDetailViewModel: ObservableObject {
 
     func unsubscribeFromChat() {
         if let channel = chatChannel {
-            Task { try? await channel.unsubscribe() }
+            Task { await channel.unsubscribe() }
             chatChannel = nil
         }
     }

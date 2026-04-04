@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import Supabase
+import UserNotifications
 
 @MainActor
 final class AppState: ObservableObject {
@@ -47,7 +48,7 @@ final class AppState: ObservableObject {
         self.isLoading = true
 
         // 1. Quick check for session
-        if let session = try? await SupabaseService.shared.client.auth.session {
+        if (try? await SupabaseService.shared.client.auth.session) != nil {
             self.isAuthenticated = true
             
             // Start background warm-up
@@ -225,7 +226,11 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.unreadNotificationCount = notifCount
                     self.unreadMessageCount = msgCount
-                    UIApplication.shared.applicationIconBadgeNumber = notifCount
+                    if #available(iOS 17.0, *) {
+                        UNUserNotificationCenter.current().setBadgeCount(notifCount)
+                    } else {
+                        UIApplication.shared.applicationIconBadgeNumber = notifCount
+                    }
                 }
             } catch {
                 print("Failed to refresh unread counts: \(error)")

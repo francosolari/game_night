@@ -44,11 +44,11 @@ final class GameDetailViewModel: ObservableObject {
 
     init(
         game: Game,
-        supabase: GameDetailDataProviding = SupabaseService.shared,
+        supabase: GameDetailDataProviding? = nil,
         bgg: GameDetailBGGProviding = BGGService.shared
     ) {
         self.game = game
-        self.supabase = supabase
+        self.supabase = supabase ?? SupabaseService.shared
         self.bgg = bgg
     }
 
