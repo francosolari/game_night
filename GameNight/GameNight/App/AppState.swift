@@ -51,6 +51,9 @@ final class AppState: ObservableObject {
             refreshContactNames()
             startNotificationSubscription()
             refreshUnreadCounts()
+            Task {
+                _ = try? await SupabaseService.shared.fetchFrequentContacts(limit: 200)
+            }
 
             // 2. Preload Home Data while splash is visible
             let supabase = SupabaseService.shared
@@ -184,6 +187,7 @@ final class AppState: ObservableObject {
         await PushNotificationManager.shared.unregisterCurrentToken()
         stopNotificationSubscription()
         try? await SupabaseService.shared.client.auth.signOut()
+        SupabaseService.shared.clearFrequentContactsCache()
         isAuthenticated = false
         currentUser = nil
         contactNameMap = [:]

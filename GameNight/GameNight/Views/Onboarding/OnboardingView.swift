@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 
 struct OnboardingView: View {
     @State private var currentPage = 0
@@ -680,6 +681,7 @@ struct BetaAuthFlowView: View {
     @State private var error: String?
     @FocusState private var passwordFieldFocused: Bool
     @FocusState private var phoneFieldFocused: Bool
+    @State private var showAccountPassword = false
     @FocusState private var accountPasswordFieldFocused: Bool
     @FocusState private var nameFieldFocused: Bool
 
@@ -781,10 +783,12 @@ struct BetaAuthFlowView: View {
                     .multilineTextAlignment(.center)
             }
 
-            SecureField("Password", text: $betaPassword)
+            TextField("Password", text: $betaPassword)
                 .font(Theme.Typography.headlineLarge)
                 .foregroundColor(Theme.Colors.textPrimary)
                 .multilineTextAlignment(.center)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
                 .focused($passwordFieldFocused)
                 .padding(Theme.Spacing.lg)
                 .background(
@@ -908,12 +912,20 @@ struct BetaAuthFlowView: View {
                     .multilineTextAlignment(.center)
             }
 
-            SecureField("Account Password", text: $accountPassword)
+            ZStack(alignment: .trailing) {
+                Group {
+                    if showAccountPassword {
+                        TextField("Account Password", text: $accountPassword)
+                    } else {
+                        SecureField("Account Password", text: $accountPassword)
+                    }
+                }
                 .font(Theme.Typography.headlineLarge)
                 .foregroundColor(Theme.Colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .focused($accountPasswordFieldFocused)
                 .padding(Theme.Spacing.lg)
+                .padding(.trailing, 44)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
                         .fill(Theme.Colors.fieldBackground)
@@ -924,6 +936,16 @@ struct BetaAuthFlowView: View {
                 )
                 .submitLabel(.go)
                 .onSubmit { Task { await signInOrCreateWithAccountPassword() } }
+
+                Button {
+                    showAccountPassword.toggle()
+                } label: {
+                    Image(systemName: showAccountPassword ? "eye.slash.fill" : "eye.fill")
+                        .foregroundColor(Theme.Colors.textTertiary)
+                        .frame(width: 44, height: 44)
+                }
+                .padding(.trailing, Theme.Spacing.sm)
+            }
 
             if let error {
                 Text(error)
@@ -1017,6 +1039,12 @@ struct BetaAuthFlowView: View {
         return "\(countryCode)\(digits)"
     }
 
+    private var hashedBetaPassword: String {
+        let data = Data(betaPassword.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
+    }
+
     // MARK: - Actions
 
     private func checkPassword() {
@@ -1035,7 +1063,7 @@ struct BetaAuthFlowView: View {
         do {
             let probe = try await SupabaseService.shared.probeBetaUser(
                 phoneNumber: fullPhoneNumber,
-                betaPassword: betaPassword
+                betaPassword: hashedBetaPassword
             )
             accountExistsForPhone = probe.exists
             accountPassword = ""
@@ -1070,7 +1098,7 @@ struct BetaAuthFlowView: View {
                 try await SupabaseService.shared.ensureBetaUser(
                     phoneNumber: fullPhoneNumber,
                     password: accountPassword,
-                    betaPassword: betaPassword
+                    betaPassword: hashedBetaPassword
                 )
                 try await SupabaseService.shared.signInWithPassword(
                     phoneNumber: fullPhoneNumber,

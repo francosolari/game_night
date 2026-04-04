@@ -77,6 +77,13 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*), groups(id, name, emoji)"
 
     let client: SupabaseClient
+    private struct FrequentContactsCacheEntry {
+        let fetchedAt: Date
+        let contacts: [FrequentContact]
+    }
+    private var frequentContactsCache: [UUID: FrequentContactsCacheEntry] = [:]
+    private var frequentContactsInFlight: [UUID: Task<[FrequentContact], Error>] = [:]
+    private let frequentContactsCacheTTL: TimeInterval = 10 * 60
 
     private init() {
         self.client = SupabaseClient(
@@ -1535,15 +1542,47 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func fetchFrequentContacts(limit: Int = 20) async throws -> [FrequentContact] {
+        guard limit > 0 else { return [] }
         let session = try await client.auth.session
-        let contacts: [FrequentContact] = try await client
-            .rpc("get_frequent_contacts", params: [
-                "requesting_user_id": session.user.id.uuidString,
-                "max_results": "\(limit)"
-            ])
-            .execute()
-            .value
-        return contacts
+        let userId = session.user.id
+        let now = Date()
+
+        if let cached = frequentContactsCache[userId],
+           now.timeIntervalSince(cached.fetchedAt) < frequentContactsCacheTTL,
+           cached.contacts.count >= limit {
+            return Array(cached.contacts.prefix(limit))
+        }
+
+        if let inFlight = frequentContactsInFlight[userId] {
+            let contacts = try await inFlight.value
+            return Array(contacts.prefix(limit))
+        }
+
+        let task = Task<[FrequentContact], Error> { [client] in
+            try await client
+                .rpc("get_frequent_contacts", params: [
+                    "requesting_user_id": userId.uuidString,
+                    "max_results": "\(max(limit, 20))"
+                ])
+                .execute()
+                .value
+        }
+        frequentContactsInFlight[userId] = task
+
+        do {
+            let contacts = try await task.value
+            frequentContactsCache[userId] = FrequentContactsCacheEntry(fetchedAt: now, contacts: contacts)
+            frequentContactsInFlight[userId] = nil
+            return Array(contacts.prefix(limit))
+        } catch {
+            frequentContactsInFlight[userId] = nil
+            throw error
+        }
+    }
+
+    func clearFrequentContactsCache() {
+        frequentContactsCache.removeAll()
+        frequentContactsInFlight.removeAll()
     }
 
     // MARK: - Blocking
