@@ -81,7 +81,10 @@ final class PushNotificationManager: NSObject, ObservableObject, UNUserNotificat
         deviceToken = token
 
         do {
-            try await SupabaseService.shared.registerPushToken(token)
+            try await SupabaseService.shared.registerPushToken(
+                token,
+                apnsEnvironment: currentAPNsEnvironment
+            )
             print("Push token registered: \(token.prefix(8))...")
         } catch {
             print("Failed to register push token: \(error)")
@@ -155,6 +158,14 @@ final class PushNotificationManager: NSObject, ObservableObject, UNUserNotificat
                 userInfo: ["conversation_id": conversationId]
             )
         }
+    }
+
+    private var currentAPNsEnvironment: String {
+        #if DEBUG
+        return "sandbox"
+        #else
+        return "production"
+        #endif
     }
 }
 

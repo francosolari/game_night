@@ -39,7 +39,6 @@ targets:
     entitlements:
       path: GameNight/GameNight.entitlements
       properties:
-        aps-environment: development
         com.apple.developer.associated-domains:
           - applinks:cardboardwithme.com
     settings:
@@ -67,8 +66,6 @@ targets:
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
     entitlements:
       path: GameNightNSE/GameNightNSE.entitlements
-      properties:
-        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cardboardwithme.app.NotificationServiceExtension

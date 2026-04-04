@@ -2201,23 +2201,36 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Push Tokens
 
-    func registerPushToken(_ token: String) async throws {
+    func registerPushToken(_ token: String, apnsEnvironment: String) async throws {
         let userId = try await currentUserId()
         struct PushTokenEntry: Encodable {
             let user_id: String
             let device_token: String
             let platform: String
+            let apns_environment: String
             let updated_at: String
         }
+
+        let normalizedEnvironment: String
+        switch apnsEnvironment.lowercased() {
+        case "sandbox":
+            normalizedEnvironment = "sandbox"
+        case "production":
+            normalizedEnvironment = "production"
+        default:
+            normalizedEnvironment = "production"
+        }
+
         let entry = PushTokenEntry(
             user_id: userId.uuidString,
             device_token: token,
             platform: "ios",
+            apns_environment: normalizedEnvironment,
             updated_at: Date().ISO8601Format()
         )
         try await client
             .from("push_tokens")
-            .upsert(entry)
+            .upsert(entry, onConflict: "user_id,device_token,apns_environment")
             .execute()
     }
 

@@ -7,7 +7,6 @@ const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID") || "";
 const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID") || "";
 const APNS_KEY_P8 = Deno.env.get("APNS_KEY_P8") || "";
 const APNS_BUNDLE_ID = Deno.env.get("APNS_BUNDLE_ID") || "com.cardboardwithme.app";
-const APNS_ENVIRONMENT = Deno.env.get("APNS_ENVIRONMENT") || "development"; // "production" for App Store
 
 interface WebhookPayload {
   type: "INSERT";
@@ -32,6 +31,8 @@ interface NotificationEnrichment {
   image_url?: string;
   category?: string;
 }
+
+type APNsEnvironment = "sandbox" | "production";
 
 // Map notification type to preference field
 const TYPE_TO_PREFERENCE: Record<string, string> = {
@@ -301,7 +302,7 @@ serve(async (req) => {
     // Fetch user's push tokens
     const { data: tokens } = await supabase
       .from("push_tokens")
-      .select("device_token, platform")
+      .select("device_token, platform, apns_environment")
       .eq("user_id", notification.user_id);
 
     if (!tokens || tokens.length === 0) {
@@ -333,11 +334,6 @@ serve(async (req) => {
       );
     }
 
-    const apnsHost =
-      APNS_ENVIRONMENT === "production"
-        ? "api.push.apple.com"
-        : "api.sandbox.push.apple.com";
-
     // Build APNs payload — undefined values are dropped by JSON.stringify
     const apnsPayload = {
       aps: {
@@ -364,6 +360,11 @@ serve(async (req) => {
     // Send to all registered devices
     const results = await Promise.allSettled(
       tokens.map(async (token) => {
+        const apnsEnvironment = resolveAPNsEnvironment(token.apns_environment);
+        const apnsHost =
+          apnsEnvironment === "production"
+            ? "api.push.apple.com"
+            : "api.sandbox.push.apple.com";
         const url = `https://${apnsHost}/3/device/${token.device_token}`;
         const response = await fetch(url, {
           method: "POST",
@@ -380,7 +381,10 @@ serve(async (req) => {
 
         if (!response.ok) {
           const errorBody = await response.text();
-          console.error(`APNs error for token ${token.device_token}:`, errorBody);
+          console.error(
+            `APNs error for token ${token.device_token} (${apnsEnvironment}):`,
+            errorBody
+          );
 
           // Remove invalid tokens
           if (response.status === 410 || response.status === 400) {
@@ -388,13 +392,14 @@ serve(async (req) => {
               .from("push_tokens")
               .delete()
               .eq("device_token", token.device_token)
+              .eq("apns_environment", apnsEnvironment)
               .eq("user_id", notification.user_id);
           }
 
           throw new Error(`APNs ${response.status}: ${errorBody}`);
         }
 
-        return { token: token.device_token, status: "sent" };
+        return { token: token.device_token, status: "sent", apnsEnvironment };
       })
     );
 
@@ -413,3 +418,7 @@ serve(async (req) => {
     );
   }
 });
+
+function resolveAPNsEnvironment(raw: unknown): APNsEnvironment {
+  return raw === "sandbox" ? "sandbox" : "production";
+}

@@ -46,39 +46,74 @@ final class NotificationService: UNNotificationServiceExtension {
         guard
             let notificationType = userInfo["notification_type"] as? String,
             notificationType == "time_confirmed",
-            let startTimeUTC = userInfo["start_time_utc"] as? String,
-            let localizedTime = Self.localizedTimeString(fromUTCISO8601: startTimeUTC)
+            let localizedTime = Self.localizedTimeString(
+                fromUTCISO8601: userInfo["start_time_utc"] as? String,
+                orParsedBody: content.body
+            )
         else {
             return
         }
 
-        let existingBody = content.body
-
-        if let range = existingBody.range(of: Self.timeConfirmedPrefix) {
-            let prefix = existingBody[..<range.upperBound]
-            let suffix = existingBody[range.upperBound...]
-            if suffix.hasSuffix(".") {
-                content.body = "\(prefix)\(localizedTime)."
-            } else {
-                content.body = "\(prefix)\(localizedTime)"
-            }
-            return
-        }
-
-        content.body = localizedTime
+        content.body = Self.replacingTimeConfirmedBody(content.body, with: localizedTime)
     }
 
-    private static func localizedTimeString(fromUTCISO8601 isoString: String) -> String? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let date = formatter.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString)
-        guard let date else { return nil }
+    private static func localizedTimeString(
+        fromUTCISO8601 isoString: String?,
+        orParsedBody body: String
+    ) -> String? {
+        if let isoString {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let date = formatter.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString)
+            if let date {
+                return localizedTimeString(from: date)
+            }
+        }
 
+        return localizedTimeString(fromParsedBody: body)
+    }
+
+    private static func localizedTimeString(from date: Date) -> String? {
         let displayFormatter = DateFormatter()
         displayFormatter.locale = .current
         displayFormatter.timeZone = .current
         displayFormatter.dateFormat = "EEE, MMM d at h:mm a"
         return displayFormatter.string(from: date)
+    }
+
+    private static func localizedTimeString(fromParsedBody body: String) -> String? {
+        let marker = " is locked in for "
+        guard
+            let range = body.range(of: marker),
+            let endOfTime = body.lastIndex(of: ".")
+        else {
+            return nil
+        }
+
+        let timeString = String(body[range.upperBound..<endOfTime]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(identifier: "UTC")
+        parser.dateFormat = "EEE, MMM d at h:mm a zzz"
+        guard let date = parser.date(from: timeString) else {
+            return nil
+        }
+
+        return localizedTimeString(from: date)
+    }
+
+    private static func replacingTimeConfirmedBody(_ body: String, with localizedTime: String) -> String {
+        let marker = " is locked in for "
+        guard let range = body.range(of: marker) else {
+            return body
+        }
+
+        let prefix = body[..<range.upperBound]
+        let suffix = body[range.upperBound...]
+        if suffix.hasSuffix(".") {
+            return "\(prefix)\(localizedTime)."
+        }
+        return "\(prefix)\(localizedTime)"
     }
 
     override func serviceExtensionTimeWillExpire() {

@@ -24,4 +24,27 @@ final class AppNotificationTests: XCTestCase {
 
         XCTAssertEqual(notification.displayBody, "Game Night is locked in for Fri, Apr 3 at 3:00 PM.")
     }
+
+    func testTimeConfirmedDisplayBodyFallsBackToParsingUtcBodyText() {
+        let originalTimezone = TimeZone.default
+        TimeZone.default = TimeZone(secondsFromGMT: -4 * 3600)!
+        defer { TimeZone.default = originalTimezone }
+
+        let notification = AppNotification(
+            id: UUID(),
+            userId: UUID(),
+            type: .timeConfirmed,
+            title: "Date Confirmed",
+            body: "Game Night is locked in for Fri, Apr 3 at 11:00 PM UTC.",
+            metadata: nil,
+            eventId: nil,
+            inviteId: nil,
+            groupId: nil,
+            conversationId: nil,
+            readAt: nil,
+            createdAt: Date()
+        )
+
+        XCTAssertEqual(notification.displayBody, "Game Night is locked in for Fri, Apr 3 at 7:00 PM.")
+    }
 }
