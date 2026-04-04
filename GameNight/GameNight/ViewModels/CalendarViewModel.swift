@@ -42,8 +42,8 @@ final class CalendarViewModel: ObservableObject {
 
     private let supabase: any HomeDataProviding
 
-    init(supabase: any HomeDataProviding = SupabaseService.shared) {
-        self.supabase = supabase
+    init(supabase: (any HomeDataProviding)? = nil) {
+        self.supabase = supabase ?? SupabaseService.shared
     }
 
     // MARK: - Loading

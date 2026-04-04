@@ -75,7 +75,7 @@ struct PhotoPickerButton: View {
                 }
             }
         }
-        .onChange(of: selectedItem) { newValue in
+        .onChange(of: selectedItem) { _, newValue in
             Task {
                 await handleImageSelection(newValue)
             }

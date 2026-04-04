@@ -69,14 +69,13 @@ final class HomeViewModelTests: XCTestCase {
     func testLoadDataDoesNotSurfacePendingPrivateInvitesInUpcoming() async {
         let publicEvent = FixtureFactory.makeEvent(visibility: .public)
         let privateInviteEvent = FixtureFactory.makeEvent(visibility: .private)
+        let pendingInvite = FixtureFactory.makeInvite(
+            eventId: privateInviteEvent.id,
+            status: .pending
+        )
         let provider = StubHomeDataProvider(
             upcomingEventsResult: .success([publicEvent]),
-            invitesResult: .success([
-                FixtureFactory.makeInvite(
-                    eventId: privateInviteEvent.id,
-                    status: .pending
-                )
-            ]),
+            invitesResult: .success([pendingInvite]),
             draftsResult: .success([]),
             fetchedEventsResult: .success([privateInviteEvent])
         )
@@ -85,7 +84,9 @@ final class HomeViewModelTests: XCTestCase {
         await sut.loadData()
 
         XCTAssertEqual(sut.upcomingEvents.map(\.id), [publicEvent.id])
-        XCTAssertTrue(provider.fetchedEventIds.isEmpty)
+        XCTAssertEqual(provider.fetchedEventIds, [privateInviteEvent.id])
+        XCTAssertEqual(sut.awaitingResponseEvents.map(\.event.id), [privateInviteEvent.id])
+        XCTAssertEqual(sut.awaitingResponseEvents.first?.invite.id, pendingInvite.id)
     }
 }
 

@@ -150,22 +150,13 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                 password: password
             )
             print("✅ [SupabaseService] Successfully signed up user with phone: \(phoneNumber).")
-        } catch let errorCode as Auth.ErrorCode { // Catch Auth.ErrorCode directly and use switch
-            switch errorCode {
-            case .smsSendFailed:
-                // Log the bypass for beta sign-up due to SMS send failure.
-                // This is intended behavior for beta users to bypass OTP.
-                print("⚠️ [SupabaseService] SMS send failed for \(phoneNumber) (error: \(errorCode)). Bypassing OTP for beta sign-up.")
-                // We treat this as a success for the beta flow as OTP is intentionally bypassed.
-            // If there are other Auth.ErrorCode cases that should also be bypassed for beta, they can be added here.
-            default:
-                // Re-throw other Auth.ErrorCode cases
-                print("❌ [SupabaseService] Unhandled Supabase Auth Error Code during signUpWithPassword: \(errorCode)")
-                // Wrap the specific Auth.ErrorCode in a general Error for rethrowing
-                throw NSError(domain: "com.supabase.AuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unhandled Auth Error Code: \(errorCode)"])
-            }
         } catch {
-            // Catch any other non-Auth.ErrorCode errors
+            let message = String(describing: error).lowercased()
+            if message.contains("sms_send_failed") {
+                // Beta flow intentionally bypasses OTP delivery failures.
+                print("⚠️ [SupabaseService] SMS send failed for \(phoneNumber). Bypassing OTP for beta sign-up.")
+                return
+            }
             print("❌ [SupabaseService] Unexpected error during signUpWithPassword: \(error)")
             throw error
         }
@@ -660,7 +651,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                         avatarUrl: hostUser.avatarUrl,
                         isAppUser: true
                     )
-                    try? await saveContacts([contact])
+                    _ = try? await saveContacts([contact])
                 }
             }
         }
@@ -724,7 +715,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
                     isAppUser: invite.userId != nil
                 )
             }
-            try? await saveContacts(contacts)
+            _ = try? await saveContacts(contacts)
         }
 
         // Trigger SMS sending for active invites
@@ -1538,7 +1529,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func autoSaveInviteContact(name: String, phoneNumber: String, isAppUser: Bool) async {
         let contact = UserContact(id: UUID(), name: name, phoneNumber: phoneNumber, avatarUrl: nil, isAppUser: isAppUser)
-        try? await saveContacts([contact])
+        _ = try? await saveContacts([contact])
     }
 
     func deleteSavedContact(id: UUID) async throws {

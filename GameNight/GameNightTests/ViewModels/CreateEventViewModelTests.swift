@@ -497,28 +497,28 @@ final class CreateEventViewModelTests: XCTestCase {
         XCTAssertTrue(sut.canProceed)
     }
 
-    func testCanProceedGamesStepRequiresSelectedGames() {
+    func testCanProceedGamesStepAllowsSkippingWhenNoGamesSelected() {
         let sut = CreateEventViewModel(
             supabase: StubEventEditorService(currentUserId: UUID())
         )
         sut.currentStep = .games
         sut.selectedGames = []
 
-        XCTAssertFalse(sut.canProceed)
+        XCTAssertTrue(sut.canProceed)
 
         sut.selectedGames = [FixtureFactory.makeEventGame()]
 
         XCTAssertTrue(sut.canProceed)
     }
 
-    func testCanProceedInvitesStepRequiresInvitees() {
+    func testCanProceedInvitesStepAllowsSkippingWhenNoInviteesSelected() {
         let sut = CreateEventViewModel(
             supabase: StubEventEditorService(currentUserId: UUID())
         )
         sut.currentStep = .invites
         sut.invitees = []
 
-        XCTAssertFalse(sut.canProceed)
+        XCTAssertTrue(sut.canProceed)
 
         sut.invitees = [
             InviteeEntry(id: UUID(), name: "Jordan", phoneNumber: "+15555550111", userId: nil, tier: 1)
@@ -867,10 +867,10 @@ final class CreateEventViewModelTests: XCTestCase {
             phoneNumber: "+15555550105",
             displayName: "Erin",
             tier: 1,
+            addedAt: Date(),
             status: .accepted,
             role: .member,
-            invitedBy: nil,
-            addedAt: Date()
+            invitedBy: nil
         )
         let group = GameGroup(
             id: UUID(),
