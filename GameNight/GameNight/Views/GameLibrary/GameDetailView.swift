@@ -318,12 +318,17 @@ struct GameDetailView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             HStack(spacing: Theme.Spacing.sm) {
                 Button {
+                    print("[GameDetailActions] Collection tap gameId=\(viewModel.game.id) inCollection=\(viewModel.isInCollection) savingCollection=\(viewModel.isSavingCollection) savingWishlist=\(viewModel.isSavingWishlist)")
                     Task { await viewModel.toggleCollection() }
                 } label: {
-                    Label(
-                        collectionButtonTitle,
-                        systemImage: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle"
-                    )
+                    HStack(spacing: 6) {
+                        Image(systemName: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle")
+                        Text(collectionButtonTitle)
+                        if viewModel.isSavingCollection {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
                     .font(Theme.Typography.calloutMedium)
                     .padding(.vertical, Theme.Spacing.xs)
                     .padding(.horizontal, Theme.Spacing.md)
@@ -334,16 +339,21 @@ struct GameDetailView: View {
                     .foregroundColor(viewModel.isInCollection ? Theme.Colors.primary : Theme.Colors.textPrimary)
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.isSavingCollection || viewModel.isSavingWishlist || viewModel.isLoading)
+                .disabled(viewModel.isSavingCollection || viewModel.isSavingWishlist)
 
                 if !viewModel.isInCollection {
                     Button {
+                        print("[GameDetailActions] Wishlist tap gameId=\(viewModel.game.id) inWishlist=\(viewModel.isInWishlist) inCollection=\(viewModel.isInCollection) savingWishlist=\(viewModel.isSavingWishlist) savingCollection=\(viewModel.isSavingCollection)")
                         Task { await viewModel.toggleWishlist() }
                     } label: {
-                        Label(
-                            wishlistButtonTitle,
-                            systemImage: viewModel.isInWishlist ? "heart.fill" : "heart"
-                        )
+                        HStack(spacing: 6) {
+                            Image(systemName: viewModel.isInWishlist ? "heart.fill" : "heart")
+                            Text(wishlistButtonTitle)
+                            if viewModel.isSavingWishlist {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
                         .font(Theme.Typography.calloutMedium)
                         .padding(.vertical, Theme.Spacing.xs)
                         .padding(.horizontal, Theme.Spacing.md)
@@ -354,7 +364,7 @@ struct GameDetailView: View {
                         .foregroundColor(viewModel.isInWishlist ? Theme.Colors.primary : Theme.Colors.textPrimary)
                     }
                     .buttonStyle(.plain)
-                    .disabled(viewModel.isSavingWishlist || viewModel.isSavingCollection || viewModel.isLoading)
+                    .disabled(viewModel.isSavingWishlist || viewModel.isSavingCollection)
                 }
 
                 Spacer()
@@ -364,6 +374,10 @@ struct GameDetailView: View {
                 Text(actionError)
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.error)
+            } else if let actionMessage = viewModel.actionMessage, !actionMessage.isEmpty {
+                Text(actionMessage)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.success)
             }
         }
     }

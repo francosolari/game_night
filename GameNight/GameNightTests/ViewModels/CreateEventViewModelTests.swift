@@ -1493,6 +1493,22 @@ final class GameDetailViewModelTests: XCTestCase {
         XCTAssertEqual(service.removeWishlistCalls, [wishlistId])
         XCTAssertNil(service.wishlistByGameId[game.id])
     }
+
+    func testLoadRelatedDataStillShowsCollectionWhenWishlistLookupFails() async {
+        let game = makeBGGGame()
+        let service = StubGameDetailDataProvider(
+            upsertResults: [:],
+            libraryByGameId: [game.id: UUID()],
+            shouldFailWishlistLookup: true
+        )
+        let bgg = StubGameDetailBGGProvider(result: BGGGameParseResult(game: game, expansionLinks: [], familyLinks: []))
+        let sut = GameDetailViewModel(game: game, supabase: service, bgg: bgg)
+
+        await sut.loadRelatedData()
+
+        XCTAssertTrue(sut.isInCollection)
+        XCTAssertFalse(sut.isInWishlist)
+    }
 }
 
 private final class StubGameDetailDataProvider: GameDetailDataProviding {
@@ -1504,17 +1520,20 @@ private final class StubGameDetailDataProvider: GameDetailDataProviding {
     var expansionLinkCalls: [(baseGameId: UUID, expansionGameIds: [UUID])] = []
     var familyLinkCalls: [(gameId: UUID, families: [(bggFamilyId: Int, name: String)])] = []
     var removeWishlistCalls: [UUID] = []
+    var shouldFailWishlistLookup: Bool
 
     init(
         upsertResults: [Int: Game],
         expansions: [Game] = [],
         libraryByGameId: [UUID: UUID] = [:],
-        wishlistByGameId: [UUID: UUID] = [:]
+        wishlistByGameId: [UUID: UUID] = [:],
+        shouldFailWishlistLookup: Bool = false
     ) {
         self.upsertResults = upsertResults
         self.expansions = expansions
         self.libraryByGameId = libraryByGameId
         self.wishlistByGameId = wishlistByGameId
+        self.shouldFailWishlistLookup = shouldFailWishlistLookup
     }
 
     func fetchGame(id: UUID) async throws -> Game? {
@@ -1547,11 +1566,14 @@ private final class StubGameDetailDataProvider: GameDetailDataProviding {
     }
 
     func libraryEntryId(gameId: UUID) async throws -> UUID? {
-        libraryByGameId[gameId]
+        return libraryByGameId[gameId]
     }
 
     func isOnWishlist(gameId: UUID) async throws -> UUID? {
-        wishlistByGameId[gameId]
+        if shouldFailWishlistLookup {
+            throw TestError.message("wishlist lookup failed")
+        }
+        return wishlistByGameId[gameId]
     }
 
     func fetchExpansions(gameId: UUID) async throws -> [Game] {
