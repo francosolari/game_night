@@ -17,6 +17,13 @@ final class AppState: ObservableObject {
     @Published var preloadedHomeSnapshot: HomeDataLoadSnapshot?
     @Published var navigateToCalendar = false
 
+    enum RefreshArea: Hashable {
+        case home
+        case groups
+    }
+
+    typealias RefreshHandler = @MainActor () async -> Void
+
     /// Maps digits-only phone number → the current user's contact name for that person.
     /// Used to show contact names instead of app display names for people in your address book.
     var contactNameMap: [String: String] = [:]
@@ -31,6 +38,7 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var notificationChannel: RealtimeChannelV2?
+    private var refreshHandlers: [RefreshArea: RefreshHandler] = [:]
 
     init() {}
 
@@ -193,6 +201,18 @@ final class AppState: ObservableObject {
         contactNameMap = [:]
         unreadNotificationCount = 0
         unreadMessageCount = 0
+        refreshHandlers = [:]
+    }
+
+    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) {
+        refreshHandlers[area] = handler
+    }
+
+    func refresh(_ areas: [RefreshArea]) async {
+        for area in areas {
+            guard let handler = refreshHandlers[area] else { continue }
+            await handler()
+        }
     }
 
     // MARK: - Unread Counts

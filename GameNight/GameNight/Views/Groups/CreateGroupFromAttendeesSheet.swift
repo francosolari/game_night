@@ -3,6 +3,7 @@ import SwiftUI
 struct CreateGroupFromAttendeesSheet: View {
     let invites: [Invite]
     var onResult: ((ToastItem) -> Void)?
+    @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     @StateObject private var groupsViewModel = GroupsViewModel()
     @State private var name = ""
@@ -133,6 +134,7 @@ struct CreateGroupFromAttendeesSheet: View {
                                     )
                                 }
                                 await groupsViewModel.addMembers(to: group.id, contacts: contacts)
+                                await appState.refresh([.home, .groups])
                                 onResult?(ToastItem(style: .success, message: "\(emoji) \(name) created with \(contacts.count) guests"))
                             } else {
                                 onResult?(ToastItem(style: .error, message: groupsViewModel.error ?? "Couldn't create group"))

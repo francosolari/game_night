@@ -13,13 +13,18 @@ final class GroupsViewModel: ObservableObject {
     private var inviteCounts: [UUID: Int] = [:]
 
     func loadGroups() async {
-        isLoading = true
+        let shouldShowLoading = groups.isEmpty && upcomingEvents.isEmpty && recentPlays.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+        }
         do {
             groups = try await supabase.fetchGroups()
         } catch {
             self.error = error.localizedDescription
         }
-        isLoading = false
+        if shouldShowLoading {
+            isLoading = false
+        }
     }
 
     func createGroup(name: String, emoji: String?, description: String?) async -> GameGroup? {
