@@ -16,8 +16,10 @@ xcuserdata/
 # Swift Package Manager
 .build/
 Packages/
-Package.resolved
 .swiftpm/
+
+# Commit Xcode's shared SwiftPM lockfile so Xcode Cloud can resolve packages
+!GameNight.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 
 # CocoaPods
 Pods/
@@ -27,7 +29,7 @@ Pods/
 .env.local
 *.key
 *.pem
-Secrets.swift
+# Secrets.swift
 config.js
 !config.js.example
 
