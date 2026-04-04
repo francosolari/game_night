@@ -2,6 +2,7 @@ import XCTest
 @testable import GameNight
 
 final class SupabaseServiceTests: XCTestCase {
+    @MainActor
     func testEventSelectContainsRequiredRelations() {
         let select = SupabaseService.eventSelect
 
