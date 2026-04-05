@@ -8,7 +8,9 @@ protocol GameDetailDataProviding {
     func addToWishlist(gameId: UUID) async throws
     func removeFromWishlist(entryId: UUID) async throws
     func libraryEntryId(gameId: UUID) async throws -> UUID?
+    func libraryEntryIdByBGGId(_ bggId: Int) async throws -> UUID?
     func isOnWishlist(gameId: UUID) async throws -> UUID?
+    func wishlistEntryIdByBGGId(_ bggId: Int) async throws -> UUID?
     func fetchExpansions(gameId: UUID) async throws -> [Game]
     func fetchBaseGame(expansionGameId: UUID) async throws -> Game?
     func fetchFamilyMembers(gameId: UUID) async throws -> [(family: GameFamily, games: [Game])]
@@ -22,6 +24,169 @@ protocol GameDetailBGGProviding {
 
 extension SupabaseService: GameDetailDataProviding {}
 extension BGGService: GameDetailBGGProviding {}
+
+struct GameMembershipState {
+    let isInCollection: Bool
+    let isInWishlist: Bool
+    let libraryEntryId: UUID?
+    let wishlistEntryId: UUID?
+}
+
+actor GameMembershipCache {
+    static let shared = GameMembershipCache()
+
+    private var knownGameIds = Set<UUID>()
+    private var knownBGGIds = Set<Int>()
+    private var collectionGameIds = Set<UUID>()
+    private var collectionBGGIds = Set<Int>()
+    private var wishlistGameIds = Set<UUID>()
+    private var wishlistBGGIds = Set<Int>()
+    private var libraryEntryIdsByGameId: [UUID: UUID] = [:]
+    private var libraryEntryIdsByBGGId: [Int: UUID] = [:]
+    private var wishlistEntryIdsByGameId: [UUID: UUID] = [:]
+    private var wishlistEntryIdsByBGGId: [Int: UUID] = [:]
+
+    func cachedState(for gameId: UUID, bggId: Int?) -> GameMembershipState? {
+        let knownByGameId = knownGameIds.contains(gameId)
+        let knownByBGG = bggId.map { knownBGGIds.contains($0) } ?? false
+        guard knownByGameId || knownByBGG else { return nil }
+
+        let isInCollection = collectionGameIds.contains(gameId)
+            || (bggId.map { collectionBGGIds.contains($0) } ?? false)
+        let isInWishlist = !isInCollection && (
+            wishlistGameIds.contains(gameId)
+            || (bggId.map { wishlistBGGIds.contains($0) } ?? false)
+        )
+
+        let libraryEntryId = libraryEntryIdsByGameId[gameId]
+            ?? (bggId.flatMap { libraryEntryIdsByBGGId[$0] })
+        let wishlistEntryId = wishlistEntryIdsByGameId[gameId]
+            ?? (bggId.flatMap { wishlistEntryIdsByBGGId[$0] })
+        return GameMembershipState(
+            isInCollection: isInCollection,
+            isInWishlist: isInWishlist,
+            libraryEntryId: libraryEntryId,
+            wishlistEntryId: wishlistEntryId
+        )
+    }
+
+    func warm(libraryEntries: [GameLibraryEntry], wishlistEntries: [GameWishlistEntry]) {
+        knownGameIds = Set(libraryEntries.map(\.gameId)).union(wishlistEntries.map(\.gameId))
+        knownBGGIds = Set(libraryEntries.compactMap { $0.game?.bggId })
+            .union(Set(wishlistEntries.compactMap { $0.game?.bggId }))
+        collectionGameIds = Set(libraryEntries.map(\.gameId))
+        collectionBGGIds = Set(libraryEntries.compactMap { $0.game?.bggId })
+        wishlistGameIds = Set(wishlistEntries.map(\.gameId)).subtracting(collectionGameIds)
+        wishlistBGGIds = Set(wishlistEntries.compactMap { $0.game?.bggId }).subtracting(collectionBGGIds)
+
+        libraryEntryIdsByGameId = Dictionary(
+            uniqueKeysWithValues: libraryEntries.map { ($0.gameId, $0.id) }
+        )
+        libraryEntryIdsByBGGId = Dictionary(
+            uniqueKeysWithValues: libraryEntries.compactMap { entry in
+                guard let bggId = entry.game?.bggId else { return nil }
+                return (bggId, entry.id)
+            }
+        )
+        wishlistEntryIdsByGameId = Dictionary(
+            uniqueKeysWithValues: wishlistEntries.map { ($0.gameId, $0.id) }
+        )
+        wishlistEntryIdsByBGGId = Dictionary(
+            uniqueKeysWithValues: wishlistEntries.compactMap { entry in
+                guard let bggId = entry.game?.bggId else { return nil }
+                return (bggId, entry.id)
+            }
+        )
+        for gameId in collectionGameIds {
+            wishlistEntryIdsByGameId.removeValue(forKey: gameId)
+        }
+        for bggId in collectionBGGIds {
+            wishlistEntryIdsByBGGId.removeValue(forKey: bggId)
+        }
+    }
+
+    func cacheRemoteState(
+        gameId: UUID,
+        bggId: Int?,
+        isInCollection: Bool,
+        isInWishlist: Bool,
+        libraryEntryId: UUID?,
+        wishlistEntryId: UUID?
+    ) {
+        knownGameIds.insert(gameId)
+        if let bggId {
+            knownBGGIds.insert(bggId)
+        }
+
+        if isInCollection {
+            collectionGameIds.insert(gameId)
+            if let bggId {
+                collectionBGGIds.insert(bggId)
+                wishlistBGGIds.remove(bggId)
+                wishlistEntryIdsByBGGId.removeValue(forKey: bggId)
+            }
+            if let libraryEntryId {
+                libraryEntryIdsByGameId[gameId] = libraryEntryId
+                if let bggId {
+                    libraryEntryIdsByBGGId[bggId] = libraryEntryId
+                }
+            } else {
+                libraryEntryIdsByGameId.removeValue(forKey: gameId)
+                if let bggId {
+                    libraryEntryIdsByBGGId.removeValue(forKey: bggId)
+                }
+            }
+            wishlistGameIds.remove(gameId)
+            wishlistEntryIdsByGameId.removeValue(forKey: gameId)
+            return
+        }
+
+        collectionGameIds.remove(gameId)
+        if let bggId {
+            collectionBGGIds.remove(bggId)
+            libraryEntryIdsByBGGId.removeValue(forKey: bggId)
+        }
+        libraryEntryIdsByGameId.removeValue(forKey: gameId)
+
+        if isInWishlist {
+            wishlistGameIds.insert(gameId)
+            if let bggId {
+                wishlistBGGIds.insert(bggId)
+            }
+            if let wishlistEntryId {
+                wishlistEntryIdsByGameId[gameId] = wishlistEntryId
+                if let bggId {
+                    wishlistEntryIdsByBGGId[bggId] = wishlistEntryId
+                }
+            } else {
+                wishlistEntryIdsByGameId.removeValue(forKey: gameId)
+                if let bggId {
+                    wishlistEntryIdsByBGGId.removeValue(forKey: bggId)
+                }
+            }
+        } else {
+            wishlistGameIds.remove(gameId)
+            wishlistEntryIdsByGameId.removeValue(forKey: gameId)
+            if let bggId {
+                wishlistBGGIds.remove(bggId)
+                wishlistEntryIdsByBGGId.removeValue(forKey: bggId)
+            }
+        }
+    }
+
+    func clear() {
+        knownGameIds.removeAll()
+        knownBGGIds.removeAll()
+        collectionGameIds.removeAll()
+        collectionBGGIds.removeAll()
+        wishlistGameIds.removeAll()
+        wishlistBGGIds.removeAll()
+        libraryEntryIdsByGameId.removeAll()
+        libraryEntryIdsByBGGId.removeAll()
+        wishlistEntryIdsByGameId.removeAll()
+        wishlistEntryIdsByBGGId.removeAll()
+    }
+}
 
 @MainActor
 final class GameDetailViewModel: ObservableObject {
@@ -42,20 +207,41 @@ final class GameDetailViewModel: ObservableObject {
 
     private let supabase: GameDetailDataProviding
     private let bgg: GameDetailBGGProviding
+    private let membershipCache: GameMembershipCache
 
     init(
         game: Game,
         supabase: GameDetailDataProviding? = nil,
-        bgg: GameDetailBGGProviding = BGGService.shared
+        bgg: GameDetailBGGProviding = BGGService.shared,
+        membershipCache: GameMembershipCache = .shared,
+        initialMembership: GameMembershipState? = nil
     ) {
         self.game = game
         self.supabase = supabase ?? SupabaseService.shared
         self.bgg = bgg
+        self.membershipCache = membershipCache
+        if let initialMembership {
+            self.isInCollection = initialMembership.isInCollection
+            self.isInWishlist = initialMembership.isInWishlist
+            self.libraryEntryId = initialMembership.libraryEntryId
+            self.wishlistEntryId = initialMembership.wishlistEntryId
+            Task {
+                await membershipCache.cacheRemoteState(
+                    gameId: game.id,
+                    bggId: game.bggId,
+                    isInCollection: initialMembership.isInCollection,
+                    isInWishlist: initialMembership.isInWishlist,
+                    libraryEntryId: initialMembership.libraryEntryId,
+                    wishlistEntryId: initialMembership.wishlistEntryId
+                )
+            }
+        }
     }
 
     func loadRelatedData() async {
         isLoading = true
         actionError = nil
+        await applyCachedLibraryState()
 
         // Search RPC returns a lightweight payload for speed; refresh to full row
         // so detail fields (description/designers/publishers/etc.) render immediately.
@@ -89,6 +275,7 @@ final class GameDetailViewModel: ObservableObject {
 
     func toggleCollection() async {
         guard game.bggId != nil, !isSavingCollection else { return }
+        let previousState = currentMembershipState()
         isSavingCollection = true
         actionError = nil
         defer { isSavingCollection = false }
@@ -97,26 +284,42 @@ final class GameDetailViewModel: ObservableObject {
             if isInCollection {
                 let entryId = try await resolvedLibraryEntryId()
                 guard let entryId else {
-                    isInCollection = false
-                    libraryEntryId = nil
+                    await applyMembershipState(
+                        isInCollection: false,
+                        isInWishlist: false,
+                        libraryEntryId: nil,
+                        wishlistEntryId: nil
+                    )
                     return
                 }
+                await applyMembershipState(
+                    isInCollection: false,
+                    isInWishlist: false,
+                    libraryEntryId: nil,
+                    wishlistEntryId: wishlistEntryId
+                )
                 try await supabase.removeGameFromLibrary(entryId: entryId)
-                isInCollection = false
-                libraryEntryId = nil
                 toast = ToastItem(style: .info, message: "Removed \(game.name) from collection")
             } else {
+                await applyMembershipState(
+                    isInCollection: true,
+                    isInWishlist: false,
+                    libraryEntryId: libraryEntryId,
+                    wishlistEntryId: nil
+                )
                 try await supabase.addGameToLibrary(gameId: game.id, categoryId: nil)
-                libraryEntryId = try await supabase.libraryEntryId(gameId: game.id)
-                isInCollection = true
                 if let wishlistId = try await resolvedWishlistEntryId() {
                     try await supabase.removeFromWishlist(entryId: wishlistId)
                 }
-                isInWishlist = false
-                wishlistEntryId = nil
                 toast = ToastItem(style: .success, message: "\(game.name) is in your collection")
             }
         } catch {
+            await applyMembershipState(
+                isInCollection: previousState.isInCollection,
+                isInWishlist: previousState.isInWishlist,
+                libraryEntryId: previousState.libraryEntryId,
+                wishlistEntryId: previousState.wishlistEntryId
+            )
             await refreshLibraryState()
             if isInCollection {
                 actionError = nil
@@ -129,6 +332,7 @@ final class GameDetailViewModel: ObservableObject {
 
     func toggleWishlist() async {
         guard game.bggId != nil, !isSavingWishlist, !isInCollection else { return }
+        let previousState = currentMembershipState()
         isSavingWishlist = true
         actionError = nil
         defer { isSavingWishlist = false }
@@ -137,21 +341,39 @@ final class GameDetailViewModel: ObservableObject {
             if isInWishlist {
                 let entryId = try await resolvedWishlistEntryId()
                 guard let entryId else {
-                    isInWishlist = false
-                    wishlistEntryId = nil
+                    await applyMembershipState(
+                        isInCollection: false,
+                        isInWishlist: false,
+                        libraryEntryId: libraryEntryId,
+                        wishlistEntryId: nil
+                    )
                     return
                 }
+                await applyMembershipState(
+                    isInCollection: false,
+                    isInWishlist: false,
+                    libraryEntryId: libraryEntryId,
+                    wishlistEntryId: nil
+                )
                 try await supabase.removeFromWishlist(entryId: entryId)
-                isInWishlist = false
-                wishlistEntryId = nil
                 toast = ToastItem(style: .info, message: "Removed \(game.name) from wishlist")
             } else {
+                await applyMembershipState(
+                    isInCollection: false,
+                    isInWishlist: true,
+                    libraryEntryId: nil,
+                    wishlistEntryId: wishlistEntryId
+                )
                 try await supabase.addToWishlist(gameId: game.id)
-                wishlistEntryId = try await supabase.isOnWishlist(gameId: game.id)
-                isInWishlist = true
                 toast = ToastItem(style: .success, message: "\(game.name) is in your wishlist")
             }
         } catch {
+            await applyMembershipState(
+                isInCollection: previousState.isInCollection,
+                isInWishlist: previousState.isInWishlist,
+                libraryEntryId: previousState.libraryEntryId,
+                wishlistEntryId: previousState.wishlistEntryId
+            )
             await refreshLibraryState()
             if isInWishlist {
                 actionError = nil
@@ -164,31 +386,55 @@ final class GameDetailViewModel: ObservableObject {
 
     private func refreshLibraryState() async {
         guard game.bggId != nil else {
-            isInCollection = false
-            isInWishlist = false
-            libraryEntryId = nil
-            wishlistEntryId = nil
+            await applyMembershipState(
+                isInCollection: false,
+                isInWishlist: false,
+                libraryEntryId: nil,
+                wishlistEntryId: nil
+            )
             return
         }
-        // Fetch concurrently but independently — a wishlist failure must not prevent
-        // library state from being set (isInCollection must remain correct).
-        async let libraryIdTask = supabase.libraryEntryId(gameId: game.id)
-        async let wishlistIdTask = supabase.isOnWishlist(gameId: game.id)
 
-        let resolvedLibraryId = try? await libraryIdTask
-        let resolvedWishlistId = try? await wishlistIdTask
+        async let libraryTask: Result<UUID?, Error> = Result {
+            try await resolvedLibraryEntryId()
+        }
+        async let wishlistTask: Result<UUID?, Error> = Result {
+            try await resolvedWishlistEntryId()
+        }
 
-        libraryEntryId = resolvedLibraryId
-        wishlistEntryId = resolvedWishlistId
-        isInCollection = resolvedLibraryId != nil
-        isInWishlist = resolvedLibraryId == nil && resolvedWishlistId != nil
+        let libraryResult = await libraryTask
+        let wishlistResult = await wishlistTask
+
+        var resolvedLibraryId = libraryEntryId
+        var resolvedWishlistId = wishlistEntryId
+        var hasRemoteUpdate = false
+
+        if case let .success(remoteLibraryId) = libraryResult {
+            resolvedLibraryId = remoteLibraryId
+            hasRemoteUpdate = true
+        }
+        if case let .success(remoteWishlistId) = wishlistResult {
+            resolvedWishlistId = remoteWishlistId
+            hasRemoteUpdate = true
+        }
+        guard hasRemoteUpdate else { return }
+
+        await applyMembershipState(
+            isInCollection: resolvedLibraryId != nil,
+            isInWishlist: resolvedLibraryId == nil && resolvedWishlistId != nil,
+            libraryEntryId: resolvedLibraryId,
+            wishlistEntryId: resolvedWishlistId
+        )
     }
 
     private func resolvedLibraryEntryId() async throws -> UUID? {
         if let libraryEntryId {
             return libraryEntryId
         }
-        let fetched = try await supabase.libraryEntryId(gameId: game.id)
+        var fetched = try await supabase.libraryEntryId(gameId: game.id)
+        if fetched == nil, let bggId = game.bggId {
+            fetched = try await supabase.libraryEntryIdByBGGId(bggId)
+        }
         libraryEntryId = fetched
         return fetched
     }
@@ -197,9 +443,51 @@ final class GameDetailViewModel: ObservableObject {
         if let wishlistEntryId {
             return wishlistEntryId
         }
-        let fetched = try await supabase.isOnWishlist(gameId: game.id)
+        var fetched = try await supabase.isOnWishlist(gameId: game.id)
+        if fetched == nil, let bggId = game.bggId {
+            fetched = try await supabase.wishlistEntryIdByBGGId(bggId)
+        }
         wishlistEntryId = fetched
         return fetched
+    }
+
+    private func applyCachedLibraryState() async {
+        guard let cached = await membershipCache.cachedState(for: game.id, bggId: game.bggId) else { return }
+        await applyMembershipState(
+            isInCollection: cached.isInCollection,
+            isInWishlist: cached.isInWishlist,
+            libraryEntryId: cached.libraryEntryId,
+            wishlistEntryId: cached.wishlistEntryId
+        )
+    }
+
+    private func applyMembershipState(
+        isInCollection: Bool,
+        isInWishlist: Bool,
+        libraryEntryId: UUID?,
+        wishlistEntryId: UUID?
+    ) async {
+        self.isInCollection = isInCollection
+        self.isInWishlist = isInWishlist
+        self.libraryEntryId = libraryEntryId
+        self.wishlistEntryId = wishlistEntryId
+        await membershipCache.cacheRemoteState(
+            gameId: game.id,
+            bggId: game.bggId,
+            isInCollection: isInCollection,
+            isInWishlist: isInWishlist,
+            libraryEntryId: libraryEntryId,
+            wishlistEntryId: isInCollection ? nil : wishlistEntryId
+        )
+    }
+
+    private func currentMembershipState() -> GameMembershipState {
+        GameMembershipState(
+            isInCollection: isInCollection,
+            isInWishlist: isInWishlist,
+            libraryEntryId: libraryEntryId,
+            wishlistEntryId: wishlistEntryId
+        )
     }
 
     private func hydrateFromBGGIfNeeded() async throws {

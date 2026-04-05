@@ -7,6 +7,7 @@ struct User: Identifiable, Codable, Hashable {
     var avatarUrl: String?
     var bio: String?
     var bggUsername: String?
+    var timeZoneIdentifier: String?
     // Privacy settings
     var phoneVisible: Bool
     var discoverableByPhone: Bool
@@ -25,6 +26,7 @@ struct User: Identifiable, Codable, Hashable {
         case avatarUrl = "avatar_url"
         case bio
         case bggUsername = "bgg_username"
+        case timeZoneIdentifier = "time_zone_identifier"
         case phoneVisible = "phone_visible"
         case discoverableByPhone = "discoverable_by_phone"
         case gameLibraryPublic = "game_library_public"
@@ -43,6 +45,7 @@ struct User: Identifiable, Codable, Hashable {
         avatarUrl: String? = nil,
         bio: String? = nil,
         bggUsername: String? = nil,
+        timeZoneIdentifier: String? = nil,
         phoneVisible: Bool = false,
         discoverableByPhone: Bool = true,
         gameLibraryPublic: Bool = true,
@@ -59,6 +62,7 @@ struct User: Identifiable, Codable, Hashable {
         self.avatarUrl = avatarUrl
         self.bio = bio
         self.bggUsername = bggUsername
+        self.timeZoneIdentifier = timeZoneIdentifier
         self.phoneVisible = phoneVisible
         self.discoverableByPhone = discoverableByPhone
         self.gameLibraryPublic = gameLibraryPublic

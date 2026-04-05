@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, Download, FolderPlus, X, Dice5, Loader2 } from "lucide-react";
@@ -180,6 +180,7 @@ function AddGameDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
   const [results, setResults] = useState<BGGSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
+  const addGameSearchRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -197,6 +198,18 @@ function AddGameDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
     const t = setTimeout(() => doSearch(query), 400);
     return () => clearTimeout(t);
   }, [query, doSearch]);
+
+  useEffect(() => {
+    const handler = (event: PointerEvent) => {
+      const input = addGameSearchRef.current;
+      if (!input) return;
+      if (document.activeElement !== input) return;
+      if (event.target instanceof Node && input.contains(event.target)) return;
+      input.blur();
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, []);
 
   const handleAdd = async (bggId: number) => {
     setAdding(bggId);
@@ -227,6 +240,7 @@ function AddGameDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
             value={query}
             onChange={e => setQuery(e.target.value)}
             className="pl-10"
+            ref={addGameSearchRef}
             autoFocus
           />
         </div>

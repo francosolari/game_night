@@ -111,7 +111,6 @@ struct CreateEventView: View {
                     .padding(.bottom, 120)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .hideKeyboardOnTap()
                 .background(Theme.Colors.background.ignoresSafeArea())
                 .gesture(
                     DragGesture(minimumDistance: 50, coordinateSpace: .local)
@@ -140,6 +139,7 @@ struct CreateEventView: View {
                             }
                         }
                 )
+                .hideKeyboardOnTap()
 
                 // Bottom action bar
                 VStack(spacing: 0) {
@@ -290,8 +290,10 @@ struct CreateEventView: View {
     private func finishSave(_ savedEvent: GameEvent) async {
         onSaved?(savedEvent)
         let refreshAreas: [AppState.RefreshArea] = savedEvent.status == .draft ? [.home] : [.home, .groups]
-        await appState.refresh(refreshAreas)
         dismiss()
+        Task {
+            await appState.refresh(refreshAreas)
+        }
     }
 }
 

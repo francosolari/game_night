@@ -160,7 +160,17 @@ struct GameLibraryView: View {
                         LazyVStack(spacing: Theme.Spacing.md) {
                             ForEach(viewModel.filteredEntries) { entry in
                                 if let game = entry.game {
-                                    NavigationLink(value: game) {
+                                    NavigationLink {
+                                        GameDetailView(
+                                            game: game,
+                                            initialMembership: GameMembershipState(
+                                                isInCollection: true,
+                                                isInWishlist: false,
+                                                libraryEntryId: entry.id,
+                                                wishlistEntryId: nil
+                                            )
+                                        )
+                                    } label: {
                                         GameCard(game: game)
                                     }
                                     .buttonStyle(.plain)
@@ -180,6 +190,7 @@ struct GameLibraryView: View {
                 }
             }
             .background(Theme.Colors.background.ignoresSafeArea())
+            .hideKeyboardOnTap()
             .sheet(isPresented: $showAddGame) {
                 AddGameSheet(viewModel: viewModel)
             }
@@ -294,7 +305,17 @@ struct LibrarySearchResultsView: View {
                     VStack(spacing: Theme.Spacing.md) {
                         ForEach(viewModel.filteredEntries) { entry in
                             if let game = entry.game {
-                                NavigationLink(value: game) {
+                                NavigationLink {
+                                    GameDetailView(
+                                        game: game,
+                                        initialMembership: GameMembershipState(
+                                            isInCollection: true,
+                                            isInWishlist: false,
+                                            libraryEntryId: entry.id,
+                                            wishlistEntryId: nil
+                                        )
+                                    )
+                                } label: {
                                     GameCard(game: game)
                                 }
                                 .buttonStyle(.plain)
@@ -521,6 +542,7 @@ struct AddGameSheet: View {
                 }
                 .padding(Theme.Spacing.xl)
             }
+            .hideKeyboardOnTap()
             .background(Theme.Colors.background.ignoresSafeArea())
             .navigationTitle("Add Game")
             .navigationBarTitleDisplayMode(.inline)
@@ -648,7 +670,17 @@ struct WishlistSectionView: View {
                 LazyVStack(spacing: Theme.Spacing.md) {
                     ForEach(viewModel.wishlistEntries) { entry in
                         if let game = entry.game {
-                            NavigationLink(value: game) {
+                            NavigationLink {
+                                GameDetailView(
+                                    game: game,
+                                    initialMembership: GameMembershipState(
+                                        isInCollection: false,
+                                        isInWishlist: true,
+                                        libraryEntryId: nil,
+                                        wishlistEntryId: entry.id
+                                    )
+                                )
+                            } label: {
                                 WishlistGameCard(game: game) {
                                     Task { await viewModel.removeFromWishlist(entryId: entry.id) }
                                 }

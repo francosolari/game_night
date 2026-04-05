@@ -121,6 +121,7 @@ struct EventDetailView: View {
                 await viewModel.refreshEventData(eventId: eventId)
                 pollVotes = viewModel.myPollVotes
             }
+            .hideKeyboardOnTap()
             .disabled(viewModel.isDeleting)
 
             // Delete overlay
@@ -232,8 +233,10 @@ struct EventDetailView: View {
             Button("Delete Event", role: .destructive) {
                 Task {
                     if await viewModel.deleteEvent() {
-                        await refreshSharedData()
                         dismiss()
+                        Task {
+                            await refreshSharedData()
+                        }
                     }
                 }
             }

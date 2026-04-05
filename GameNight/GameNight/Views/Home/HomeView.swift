@@ -6,8 +6,10 @@ struct HomeView: View {
     @Binding var navigationPath: NavigationPath
     @State private var draftToResume: GameEvent?
     @State private var eventsNeedingPlayLog: [GameEvent] = []
-    @State private var dismissedPlayLogIds: Set<UUID> = []
+    @State private var dismissedPlayLogIds: Set<UUID> = HomeView.loadDismissedPlayLogIds()
     @State private var playLogEvent: GameEvent?
+    @State private var refreshHandlerToken: UUID?
+    private static let dismissedPlayLogEventIdsKeyPrefix = "dismissedPlayLogEventIds"
 
     private var carouselCardWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -95,7 +97,9 @@ struct HomeView: View {
                     }
 
                     // Log Your Plays banner
-                    let visiblePlayLogEvents = eventsNeedingPlayLog.filter { !dismissedPlayLogIds.contains($0.id) }
+                    let visiblePlayLogEvents = eventsNeedingPlayLog.filter {
+                        $0.deletedAt == nil && !dismissedPlayLogIds.contains($0.id)
+                    }
                     if !visiblePlayLogEvents.isEmpty {
                         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                             SectionHeader(title: "Log Your Plays")
@@ -149,7 +153,7 @@ struct HomeView: View {
                                     .buttonStyle(.plain)
 
                                     Button {
-                                        dismissedPlayLogIds.insert(event.id)
+                                        dismissPlayLogPrompt(for: event.id)
                                     } label: {
                                         Image(systemName: "xmark")
                                             .font(.system(size: 12))
@@ -361,8 +365,10 @@ struct HomeView: View {
             appState.preloadedHomeSnapshot = nil
             await viewModel.loadData(preloadedSnapshot: preloaded)
             await loadEventsNeedingPlayLog()
-            appState.registerRefreshHandler(for: .home) {
-                await viewModel.loadData()
+            if refreshHandlerToken == nil {
+                refreshHandlerToken = appState.registerRefreshHandler(for: .home) {
+                    await viewModel.loadData()
+                }
             }
         }
         .sheet(item: $draftToResume) { draft in
@@ -381,6 +387,31 @@ struct HomeView: View {
     private func loadEventsNeedingPlayLog() async {
         guard let userId = SupabaseService.shared.client.auth.currentSession?.user.id else { return }
         eventsNeedingPlayLog = (try? await SupabaseService.shared.fetchCompletedEventsNeedingPlayLog(userId: userId)) ?? []
+    }
+
+    private func dismissPlayLogPrompt(for eventId: UUID) {
+        dismissedPlayLogIds.insert(eventId)
+        persistDismissedPlayLogIds()
+    }
+
+    private func persistDismissedPlayLogIds() {
+        let values = dismissedPlayLogIds.map(\.uuidString)
+        let userId = SupabaseService.shared.client.auth.currentSession?.user.id
+        UserDefaults.standard.set(values, forKey: Self.dismissedPlayLogEventIdsKey(for: userId))
+    }
+
+    private static func loadDismissedPlayLogIds() -> Set<UUID> {
+        let userId = SupabaseService.shared.client.auth.currentSession?.user.id
+        let values = UserDefaults.standard.array(
+            forKey: dismissedPlayLogEventIdsKey(for: userId)
+        ) as? [String] ?? []
+        let ids = values.compactMap(UUID.init(uuidString:))
+        return Set(ids)
+    }
+
+    private static func dismissedPlayLogEventIdsKey(for userId: UUID?) -> String {
+        guard let userId else { return dismissedPlayLogEventIdsKeyPrefix }
+        return "\(dismissedPlayLogEventIdsKeyPrefix).\(userId.uuidString)"
     }
 }
 

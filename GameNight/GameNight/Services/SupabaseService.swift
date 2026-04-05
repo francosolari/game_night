@@ -30,6 +30,7 @@ protocol EventEditingProviding: AnyObject {
     func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
     func fetchGameLibrary() async throws -> [GameLibraryEntry]
+    func searchCachedGames(query: String) async throws -> [Game]
     func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws
     func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws
 }
@@ -231,6 +232,16 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         try await client
             .from("users")
             .upsert(user, onConflict: "id")
+            .execute()
+    }
+
+    func updateCurrentUserTimeZoneIdentifier(_ timeZoneIdentifier: String) async throws {
+        let session = try await client.auth.session
+        let updates: [String: AnyJSON] = ["time_zone_identifier": .string(timeZoneIdentifier)]
+        try await client
+            .from("users")
+            .update(updates)
+            .eq("id", value: session.user.id.uuidString)
             .execute()
     }
 
@@ -469,7 +480,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let created: GameEvent = try await client
             .from("events")
             .insert(event)
-            .select(Self.eventSelect)
+            .select()
             .single()
             .execute()
             .value
@@ -505,6 +516,12 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     /// Marks past events as completed server-side. Call on app launch / home load.
     func completePastEvents() async {
         _ = try? await client.rpc("complete_past_events").execute()
+    }
+
+    /// Inserts reminder notifications for completed events with no play log yet.
+    /// The reminder threshold is next-day noon in each recipient user's local timezone.
+    func sendPendingPlayLogReminders() async {
+        _ = try? await client.rpc("notify_unlogged_play_reminders").execute()
     }
 
     func softDeleteEvent(id: UUID) async throws {
@@ -553,11 +570,24 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         }
     }
 
+    private struct EventGameCreateInsert: Encodable {
+        let eventId: UUID
+        let gameId: UUID
+        let isPrimary: Bool
+        let sortOrder: Int
+
+        enum CodingKeys: String, CodingKey {
+            case eventId = "event_id"
+            case gameId = "game_id"
+            case isPrimary = "is_primary"
+            case sortOrder = "sort_order"
+        }
+    }
+
     func createEventGames(eventId: UUID, games: [EventGame]) async throws {
         guard !games.isEmpty else { return }
         let inserts = games.map { game in
-            EventGameInsert(
-                id: game.id,
+            EventGameCreateInsert(
                 eventId: eventId,
                 gameId: game.gameId,
                 isPrimary: game.isPrimary,
@@ -750,12 +780,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             }
         }
 
-        // Trigger tiered invite processing on decline
+        // Trigger tiered invite processing on decline without blocking RSVP UI.
         if status == .declined {
-            try await invokeAuthenticatedFunction(
-                "process-tiered-invites",
-                body: ["invite_id": inviteId.uuidString]
-            )
+            Task {
+                try? await self.invokeAuthenticatedFunction(
+                    "process-tiered-invites",
+                    body: ["invite_id": inviteId.uuidString]
+                )
+            }
         }
     }
 
@@ -965,6 +997,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return entries.first?.id
     }
 
+    func libraryEntryIdByBGGId(_ bggId: Int) async throws -> UUID? {
+        let entries = try await fetchGameLibrary()
+        return entries.first(where: { $0.game?.bggId == bggId })?.id
+    }
+
     // MARK: - Wishlist
 
     func fetchWishlist() async throws -> [GameWishlistEntry] {
@@ -1007,6 +1044,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
         return entries.first?.id
+    }
+
+    func wishlistEntryIdByBGGId(_ bggId: Int) async throws -> UUID? {
+        let entries = try await fetchWishlist()
+        return entries.first(where: { $0.game?.bggId == bggId })?.id
     }
 
     func updateLibraryEntryCategory(entryId: UUID, categoryId: UUID?) async throws {
@@ -2137,11 +2179,26 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func deletePlay(id: UUID) async throws {
-        try await client
+        struct DeletedPlayRow: Decodable { let id: UUID }
+        let deleted: [DeletedPlayRow] = try await client
             .from("plays")
             .delete()
             .eq("id", value: id.uuidString)
+            .select("id")
             .execute()
+            .value
+
+        guard deleted.contains(where: { $0.id == id }) else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: 403,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "You don't have permission to delete this play."
+                ]
+            )
+        }
+
+        // Keep current method behavior: callers rely on throw/no-throw only.
     }
 
     /// Fetches avatar URLs for a list of user IDs.
@@ -2262,14 +2319,21 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         for e in invitedEvents { byId[e.id] = e }
         let allCompleted = Array(byId.values)
 
-        // Filter out events where this user already logged a play
+        // Filter out events where anyone already logged a play for that event.
         let eventIds = allCompleted.map(\.id)
         guard !eventIds.isEmpty else { return [] }
 
-        let existingPlays: [Play] = try await client
+        struct EventPlayRow: Decodable {
+            let eventId: UUID?
+
+            enum CodingKeys: String, CodingKey {
+                case eventId = "event_id"
+            }
+        }
+
+        let existingPlays: [EventPlayRow] = try await client
             .from("plays")
-            .select("id, event_id")
-            .eq("logged_by", value: userId.uuidString)
+            .select("event_id")
             .in("event_id", values: eventIds.map(\.uuidString))
             .execute()
             .value

@@ -51,6 +51,9 @@ enum HomeDataLoader {
             } catch is CancellationError {
                 // Task cancelled (e.g. SwiftUI .refreshable releasing) — not a real failure
                 return CapturedResult(value: nil, errorDescription: nil)
+            } catch let error as URLError where error.code == .cancelled {
+                // URLSession cancellation (NSURLErrorCancelled / -999) is expected under refresh overlap.
+                return CapturedResult(value: nil, errorDescription: nil)
             } catch {
                 if shouldRetryAfter(error), attempt < maxRetryAttempts {
                     attempt += 1
@@ -70,11 +73,17 @@ enum HomeDataLoader {
     }
 
     private static func shouldRetryAfter(_ error: Error) -> Bool {
-        if error is URLError {
+        if let urlError = error as? URLError {
+            if urlError.code == .cancelled {
+                return false
+            }
             return true
         }
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
+            if nsError.code == NSURLErrorCancelled {
+                return false
+            }
             return true
         }
 

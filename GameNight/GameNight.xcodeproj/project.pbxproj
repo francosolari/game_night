@@ -56,6 +56,7 @@
 		3B3AAF49083F969723DC1F35 /* CreateEventViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE44D563D71CBA8608FAF99 /* CreateEventViewModel.swift */; };
 		3F3994F8C6F4D707F816DF50 /* NotificationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69561F42236C03A9796EB809 /* NotificationRow.swift */; };
 		41A54D714306E3CB73F95521 /* powered_by_BGG_03_LG.png in Resources */ = {isa = PBXBuildFile; fileRef = 6852E86714F3CA49E98367D3 /* powered_by_BGG_03_LG.png */; };
+		47A528751356D3EDB060B36B /* UnifiedGameSearchSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039710F64B5F5F225372266C /* UnifiedGameSearchSection.swift */; };
 		48FB09F253EA3D13A22D5D3B /* Play.swift in Sources */ = {isa = PBXBuildFile; fileRef = D017EC525728B9B8D9291412 /* Play.swift */; };
 		4982AD9960217BBC3F7C9B26 /* CreateEventInvitesStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F19B2EBE4FA39FFF00CB52 /* CreateEventInvitesStep.swift */; };
 		4A1723223C6DAEE61DFF0741 /* CreateEventReviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56CDA418C3C4E5AC101F1657 /* CreateEventReviewStep.swift */; };
@@ -210,6 +211,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		039710F64B5F5F225372266C /* UnifiedGameSearchSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedGameSearchSection.swift; sourceTree = "<group>"; };
 		04110B31ED9823F8D8CB1290 /* GameNightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameNightApp.swift; sourceTree = "<group>"; };
 		056DCF17A5CC08E893A25FFA /* GameVotingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameVotingView.swift; sourceTree = "<group>"; };
 		0588B6B3F9D68470EFE31748 /* powered_by_logo_02_MED.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = powered_by_logo_02_MED.jpg; sourceTree = "<group>"; };
@@ -608,6 +610,7 @@
 				DE775436CE0D6B71DDF782A0 /* TimeOptionPicker.swift */,
 				07F39EDF744F365C61B43544 /* ToastView.swift */,
 				226FE07F8DE92E91EB72AFF7 /* TriStateVoteButton.swift */,
+				039710F64B5F5F225372266C /* UnifiedGameSearchSection.swift */,
 				1C0328B731FA36656D48902F /* VerticalEventCard.swift */,
 				26D9B1C9AEC52DFAFCEEC893 /* VoterAvatarStack.swift */,
 				FF658C0F3B75E0AC6A5A628C /* EventCardBlocks */,
@@ -1232,6 +1235,7 @@
 				C2389378196778C4EB09366D /* TimePollDetailSheet.swift in Sources */,
 				A830ED73A705ED199878F0A6 /* ToastView.swift in Sources */,
 				69A66D4BC0C5C14C12D41F6F /* TriStateVoteButton.swift in Sources */,
+				47A528751356D3EDB060B36B /* UnifiedGameSearchSection.swift in Sources */,
 				E4229164F87DF49778D2BAFF /* User.swift in Sources */,
 				5856F38C7AADFFEC6311D458 /* VerticalEventCard.swift in Sources */,
 				9E72702398FD0A62ABC50C5B /* ViewModifiers.swift in Sources */,
@@ -1425,7 +1429,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.entitlements;
+				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.Debug.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8AGP3ZJ77K;
@@ -1504,7 +1508,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.entitlements;
+				CODE_SIGN_ENTITLEMENTS = GameNight/GameNight.Release.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8AGP3ZJ77K;

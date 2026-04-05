@@ -1276,6 +1276,10 @@ private final class StubEventEditorService: EventEditingProviding {
         []
     }
 
+    func searchCachedGames(query: String) async throws -> [Game] {
+        []
+    }
+
     func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws {
         expansionLinkCalls.append((baseGameId: baseGameId, expansionGameIds: expansionGameIds))
     }
@@ -1569,11 +1573,19 @@ private final class StubGameDetailDataProvider: GameDetailDataProviding {
         return libraryByGameId[gameId]
     }
 
+    func libraryEntryIdByBGGId(_ bggId: Int) async throws -> UUID? {
+        nil
+    }
+
     func isOnWishlist(gameId: UUID) async throws -> UUID? {
         if shouldFailWishlistLookup {
             throw TestError.message("wishlist lookup failed")
         }
         return wishlistByGameId[gameId]
+    }
+
+    func wishlistEntryIdByBGGId(_ bggId: Int) async throws -> UUID? {
+        nil
     }
 
     func fetchExpansions(gameId: UUID) async throws -> [Game] {

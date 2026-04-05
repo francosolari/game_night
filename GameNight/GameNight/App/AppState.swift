@@ -39,7 +39,7 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var notificationChannel: RealtimeChannelV2?
-    private var refreshHandlers: [RefreshArea: RefreshHandler] = [:]
+    private var refreshHandlers: [RefreshArea: [UUID: RefreshHandler]] = [:]
 
     init() {}
 
@@ -83,6 +83,14 @@ final class AppState: ObservableObject {
         Task {
             if let user = try? await SupabaseService.shared.fetchCurrentUser() {
                 self.currentUser = user
+
+                let currentTimeZoneIdentifier = TimeZone.current.identifier
+                if user.timeZoneIdentifier != currentTimeZoneIdentifier {
+                    try? await SupabaseService.shared.updateCurrentUserTimeZoneIdentifier(currentTimeZoneIdentifier)
+                    var updatedUser = user
+                    updatedUser.timeZoneIdentifier = currentTimeZoneIdentifier
+                    self.currentUser = updatedUser
+                }
             }
         }
         refreshContactNames()
@@ -135,6 +143,7 @@ final class AppState: ObservableObject {
         supabase: SupabaseService
     ) async -> HomeDataLoadSnapshot {
         await supabase.completePastEvents()
+        await supabase.sendPendingPlayLogReminders()
 
         var upcomingEvents = base.upcomingEvents
 
@@ -222,6 +231,7 @@ final class AppState: ObservableObject {
         stopNotificationSubscription()
         try? await SupabaseService.shared.client.auth.signOut()
         SupabaseService.shared.clearFrequentContactsCache()
+        await GameMembershipCache.shared.clear()
         isAuthenticated = false
         currentUser = nil
         contactNameMap = [:]
@@ -230,14 +240,33 @@ final class AppState: ObservableObject {
         refreshHandlers = [:]
     }
 
-    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) {
-        refreshHandlers[area] = handler
+    @discardableResult
+    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) -> UUID {
+        let token = UUID()
+        refreshHandlers[area, default: [:]][token] = handler
+        return token
+    }
+
+    func unregisterRefreshHandler(for area: RefreshArea, token: UUID) {
+        guard var handlersByToken = refreshHandlers[area] else { return }
+        handlersByToken.removeValue(forKey: token)
+        if handlersByToken.isEmpty {
+            refreshHandlers.removeValue(forKey: area)
+        } else {
+            refreshHandlers[area] = handlersByToken
+        }
     }
 
     func refresh(_ areas: [RefreshArea]) async {
-        for area in areas {
-            guard let handler = refreshHandlers[area] else { continue }
-            await handler()
+        await withTaskGroup(of: Void.self) { group in
+            for area in areas {
+                guard let handlersByToken = refreshHandlers[area] else { continue }
+                for handler in handlersByToken.values {
+                    group.addTask {
+                        await handler()
+                    }
+                }
+            }
         }
     }
 

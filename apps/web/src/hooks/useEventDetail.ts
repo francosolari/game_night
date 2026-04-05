@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import {
@@ -34,6 +34,7 @@ import { buildAccessPolicy, buildInviteSummary } from "@/lib/types";
 
 export function useEventDetail(eventId: string | undefined) {
   const { user } = useAuth();
+  const refreshInFlightRef = useRef(false);
   const [event, setEvent] = useState<GameEvent | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [myInvite, setMyInvite] = useState<Invite | null>(null);
@@ -185,6 +186,8 @@ export function useEventDetail(eventId: string | undefined) {
 
   const refreshData = useCallback(async () => {
     if (!eventId) return;
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     try {
       const [ev, inv, feedItems, gVotes, tvResult, gvResult] = await Promise.allSettled([
         fetchEventById(eventId),
@@ -223,6 +226,8 @@ export function useEventDetail(eventId: string | undefined) {
       }
     } catch {
       // Non-critical for refresh
+    } finally {
+      refreshInFlightRef.current = false;
     }
   }, [eventId, user]);
 
@@ -254,11 +259,22 @@ export function useEventDetail(eventId: string | undefined) {
   const respondToInvite = useCallback(async (status: string, votes: { time_option_id: string; vote_type: string }[] = []) => {
     if (!myInvite) return;
     setIsSending(true);
+    const prevMyInvite = myInvite;
+    const nextStatus = status as Invite["status"];
+    // Optimistic RSVP update: reflect status immediately and reconcile in background.
+    setMyInvite(prev => prev ? { ...prev, status: nextStatus } : null);
+    setInvites(prev =>
+      prev.map(invite => (invite.id === myInvite.id ? { ...invite, status: nextStatus } : invite))
+    );
     try {
       await respondToInviteRPC(myInvite.id, status, votes);
-      setMyInvite(prev => prev ? { ...prev, status: status as Invite["status"] } : null);
-      await refreshData();
+      void refreshData();
     } catch (err) {
+      // Roll back optimistic state on failure.
+      setMyInvite(prevMyInvite);
+      setInvites(prev =>
+        prev.map(invite => (invite.id === prevMyInvite.id ? prevMyInvite : invite))
+      );
       setError((err as Error).message);
       throw err;
     } finally {
