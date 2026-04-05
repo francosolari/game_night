@@ -469,7 +469,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let created: GameEvent = try await client
             .from("events")
             .insert(event)
-            .select(Self.eventSelect)
+            .select()
             .single()
             .execute()
             .value
@@ -553,11 +553,24 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         }
     }
 
+    private struct EventGameCreateInsert: Encodable {
+        let eventId: UUID
+        let gameId: UUID
+        let isPrimary: Bool
+        let sortOrder: Int
+
+        enum CodingKeys: String, CodingKey {
+            case eventId = "event_id"
+            case gameId = "game_id"
+            case isPrimary = "is_primary"
+            case sortOrder = "sort_order"
+        }
+    }
+
     func createEventGames(eventId: UUID, games: [EventGame]) async throws {
         guard !games.isEmpty else { return }
         let inserts = games.map { game in
-            EventGameInsert(
-                id: game.id,
+            EventGameCreateInsert(
                 eventId: eventId,
                 gameId: game.gameId,
                 isPrimary: game.isPrimary,
@@ -2137,11 +2150,26 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     }
 
     func deletePlay(id: UUID) async throws {
-        try await client
+        struct DeletedPlayRow: Decodable { let id: UUID }
+        let deleted: [DeletedPlayRow] = try await client
             .from("plays")
             .delete()
             .eq("id", value: id.uuidString)
+            .select("id")
             .execute()
+            .value
+
+        guard deleted.contains(where: { $0.id == id }) else {
+            throw NSError(
+                domain: "SupabaseService",
+                code: 403,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "You don't have permission to delete this play."
+                ]
+            )
+        }
+
+        // Keep current method behavior: callers rely on throw/no-throw only.
     }
 
     /// Fetches avatar URLs for a list of user IDs.
