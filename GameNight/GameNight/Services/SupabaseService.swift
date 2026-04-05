@@ -968,14 +968,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     // MARK: - Wishlist
 
     func fetchWishlist() async throws -> [GameWishlistEntry] {
-        let session = try await client.auth.session
-        return try await client
-            .from("game_wishlist")
-            .select("*, game:games(*)")
-            .eq("user_id", value: session.user.id.uuidString)
-            .order("added_at", ascending: false)
+        let entries: [GameWishlistEntry] = try await client
+            .rpc("get_user_wishlist")
             .execute()
             .value
+        return entries
     }
 
     func addToWishlist(gameId: UUID) async throws {
@@ -2156,11 +2153,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchEventsForGroup(groupId: UUID) async throws -> [GameEvent] {
         let events: [GameEvent] = try await client
-            .from("events")
-            .select(Self.eventSelect)
-            .eq("group_id", value: groupId.uuidString)
-            .is("deleted_at", value: nil)
-            .order("created_at", ascending: false)
+            .rpc("get_group_events", params: ["p_group_id": groupId.uuidString])
             .execute()
             .value
         return events

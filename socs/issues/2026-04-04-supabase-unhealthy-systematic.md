@@ -273,3 +273,84 @@
 ### Conclusion
 - Plays path hardening is effective and materially improves concurrent reliability.
 - Remaining instability target is now `events`, then `game_wishlist`.
+
+## 2026-04-05 fix: SECURITY DEFINER RPCs for events and wishlist
+
+### Root cause (events)
+- `events` stress query joins 6 tables with RLS: events, users, event_games, games, time_options, groups
+- `games_select` RLS has nested EXISTS (`event_games → events → invites`)
+- `event_games_select` and `time_options_select` both do EXISTS on events + event_participants
+- Under concurrency, compound per-row RLS evaluation across all joined tables exceeds 8s timeout
+
+### Root cause (wishlist)
+- `game_wishlist` itself has simple RLS (`auth.uid() = user_id`)
+- But the `games(*)` join triggers `games_select` with nested EXISTS chain
+- Collateral: events saturating connection pool made wishlist queries contend for slots
+
+### Fix applied
+1. **Migration**: `20260405013000_get_group_events_and_wishlist_rpc.sql`
+   - `get_group_events(p_group_id uuid)` — validates group membership once, returns events with host/games(game)/time_options/group as JSONB
+   - `get_user_wishlist()` — returns calling user's wishlist with game as JSONB (no params needed, uses `auth.uid()`)
+   - Both use SECURITY DEFINER with `SET search_path = public, pg_temp`, `SET jit = off`, REVOKE from anon/public
+
+2. **iOS**: `SupabaseService.swift`
+   - `fetchEventsForGroup` → calls `get_group_events` RPC
+   - `fetchWishlist` → calls `get_user_wishlist` RPC
+   - `fetchWishlistForUser` left as direct PostgREST (used for viewing other users' profiles)
+
+3. **Stress test**: `stress_supabase_ios.sh`
+   - Added `STRESS_EVENTS_QUERY=rpc|legacy` (default: rpc)
+   - Added `STRESS_WISHLIST_QUERY=rpc|legacy` (default: rpc)
+
+### Build status
+- xcodegen + xcodebuild: **BUILD SUCCEEDED**
+
+### All four hot-path endpoints now use SECURITY DEFINER RPCs
+| Endpoint | RPC | Migration |
+|----------|-----|-----------|
+| plays | `get_group_plays` | `20260405010000` |
+| plays (event) | `get_event_plays` | `20260405010000` |
+| events | `get_group_events` | `20260405013000` |
+| wishlist | `get_user_wishlist` | `20260405013000` |
+| invites | N/A (already stable with lightweight select) | — |
+
+## 2026-04-05 follow-up: high-concurrency rerun + log correlation
+
+### What was run
+- Stress command (fresh disposable auth user): `./socs/issues/stress_supabase_ios.sh -m mixed -n 120 -p 16`
+- Artifact: `socs/issues/results/stress-20260404-213800.log`
+- Initial result showed `events:400` and `plays:400` late in the run while `invites` and `wishlist` stayed `200`.
+
+### Root cause of the 400s (not backend timeout)
+- Postgres logs for that window reported repeated `Not a member of this group`.
+- The stress-user seeding step had inserted into `group_members` without `phone_number`.
+- In this schema, `group_members.phone_number` is `NOT NULL`, so membership insert failed and RPC membership gates correctly rejected the user.
+
+### Corrected rerun
+- Re-seeded fresh user with valid group membership row including:
+  - `group_id`
+  - `user_id`
+  - `phone_number = pending_<user_uuid>`
+  - `status = accepted`
+  - `role = member`
+- Stress command repeated at same load:
+  - Artifact: `socs/issues/results/stress-20260404-213927.log`
+  - Summary:
+    - `events:200 = 120`
+    - `invites:200 = 120`
+    - `plays:200 = 120`
+    - `wishlist:200 = 120`
+    - no non-2xx
+
+### Log correlation after corrected run
+- API logs show only `200` on:
+  - `POST /rest/v1/rpc/get_group_events`
+  - `POST /rest/v1/rpc/get_group_plays`
+  - `POST /rest/v1/rpc/get_user_wishlist`
+  - `GET /rest/v1/invites?select=*...`
+- Postgres logs in-window do **not** show statement-timeout bursts for this run.
+- Remaining nearby Postgres errors were from earlier mis-seeded run (`Not a member of this group`) and local ad-hoc SQL probes (column-name mistakes), not production app traffic.
+
+### Updated conclusion
+- With correct test-user membership seeding, the current RPC-backed iOS read paths hold at `120 rounds x parallel 16` without errors.
+- Latest failed run signature (`400 Not a member`) was a stress harness setup issue, not JWT corruption and not backend instability.

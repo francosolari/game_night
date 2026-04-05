@@ -24,9 +24,15 @@ Optional env vars:
   STRESS_INVITES_QUERY    one of: light|heavy (default: light)
                           light = select=* (current iOS app query path)
                           heavy = select with nested event graph (legacy/worst-case)
+  STRESS_EVENTS_QUERY     one of: rpc|legacy (default: rpc)
+                          rpc = POST to get_group_events RPC (current iOS app path)
+                          legacy = GET with nested joins via PostgREST (old path)
   STRESS_PLAYS_QUERY      one of: rpc|legacy (default: rpc)
                           rpc = POST to get_group_plays RPC (current iOS app path)
                           legacy = GET with nested joins via PostgREST (old path)
+  STRESS_WISHLIST_QUERY   one of: rpc|legacy (default: rpc)
+                          rpc = POST to get_user_wishlist RPC (current iOS app path)
+                          legacy = GET with game join via PostgREST (old path)
 
 Examples:
   export SUPABASE_URL="https://yourproj.supabase.co"
@@ -84,13 +90,22 @@ fi
 BASE_URL="${SUPABASE_URL%/}"
 STRESS_INVITES_QUERY="${STRESS_INVITES_QUERY:-light}"
 
-EVENTS_PATH="/rest/v1/events?select=*,host:users(*),games:event_games(*,game:games(*)),time_options!event_id(*),groups(id,name,emoji)&group_id=eq.${STRESS_GROUP_ID}&deleted_at=is.NULL&order=created_at.desc.nullslast"
+EVENTS_LEGACY_PATH="/rest/v1/events?select=*,host:users(*),games:event_games(*,game:games(*)),time_options!event_id(*),groups(id,name,emoji)&group_id=eq.${STRESS_GROUP_ID}&deleted_at=is.NULL&order=created_at.desc.nullslast"
+EVENTS_RPC_PATH="/rest/v1/rpc/get_group_events"
+EVENTS_RPC_BODY="{\"p_group_id\":\"${STRESS_GROUP_ID}\"}"
+STRESS_EVENTS_QUERY="${STRESS_EVENTS_QUERY:-rpc}"
+
 INVITES_LIGHT_PATH="/rest/v1/invites?select=*&user_id=eq.${STRESS_USER_ID}"
 INVITES_HEAVY_PATH="/rest/v1/invites?select=*,event:events(*,host:users(*),games:event_games(*,game:games(*)),time_options!event_id(*),groups(id,name,emoji))&user_id=eq.${STRESS_USER_ID}"
+
 PLAYS_LEGACY_PATH="/rest/v1/plays?select=*,game:games(*),play_participants(*),logged_by_user:users!logged_by(*)&group_id=eq.${STRESS_GROUP_ID}&order=played_at.desc.nullslast"
 PLAYS_RPC_PATH="/rest/v1/rpc/get_group_plays"
 PLAYS_RPC_BODY="{\"p_group_id\":\"${STRESS_GROUP_ID}\"}"
 STRESS_PLAYS_QUERY="${STRESS_PLAYS_QUERY:-rpc}"
+
+WISHLIST_LEGACY_PATH="/rest/v1/game_wishlist?select=*,game:games(*)&user_id=eq.${STRESS_USER_ID}&order=added_at.desc.nullslast"
+WISHLIST_RPC_PATH="/rest/v1/rpc/get_user_wishlist"
+STRESS_WISHLIST_QUERY="${STRESS_WISHLIST_QUERY:-rpc}"
 WISHLIST_PATH="/rest/v1/game_wishlist?select=*,game:games(*)&user_id=eq.${STRESS_USER_ID}&order=added_at.desc.nullslast"
 
 case "$STRESS_INVITES_QUERY" in
@@ -147,7 +162,11 @@ run_one_round() {
 
   case "$MODE" in
     events)
-      endpoint="events"; code="$(curl_code "$EVENTS_PATH")"
+      if [[ "$STRESS_EVENTS_QUERY" == "rpc" ]]; then
+        endpoint="events"; code="$(curl_post_code "$EVENTS_RPC_PATH" "$EVENTS_RPC_BODY")"
+      else
+        endpoint="events"; code="$(curl_code "$EVENTS_LEGACY_PATH")"
+      fi
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
       ;;
     invites)
@@ -163,11 +182,19 @@ run_one_round() {
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
       ;;
     wishlist)
-      endpoint="wishlist"; code="$(curl_code "$WISHLIST_PATH")"
+      if [[ "$STRESS_WISHLIST_QUERY" == "rpc" ]]; then
+        endpoint="wishlist"; code="$(curl_post_code "$WISHLIST_RPC_PATH" '{}')"
+      else
+        endpoint="wishlist"; code="$(curl_code "$WISHLIST_LEGACY_PATH")"
+      fi
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
       ;;
     mixed)
-      endpoint="events"; code="$(curl_code "$EVENTS_PATH")"
+      if [[ "$STRESS_EVENTS_QUERY" == "rpc" ]]; then
+        endpoint="events"; code="$(curl_post_code "$EVENTS_RPC_PATH" "$EVENTS_RPC_BODY")"
+      else
+        endpoint="events"; code="$(curl_code "$EVENTS_LEGACY_PATH")"
+      fi
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
       endpoint="invites"; code="$(curl_code "$INVITES_PATH")"
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
@@ -177,7 +204,11 @@ run_one_round() {
         endpoint="plays"; code="$(curl_code "$PLAYS_LEGACY_PATH")"
       fi
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
-      endpoint="wishlist"; code="$(curl_code "$WISHLIST_PATH")"
+      if [[ "$STRESS_WISHLIST_QUERY" == "rpc" ]]; then
+        endpoint="wishlist"; code="$(curl_post_code "$WISHLIST_RPC_PATH" '{}')"
+      else
+        endpoint="wishlist"; code="$(curl_code "$WISHLIST_LEGACY_PATH")"
+      fi
       printf "%s round=%s endpoint=%s code=%s\n" "$ts" "$i" "$endpoint" "$code"
       ;;
   esac
@@ -189,11 +220,14 @@ run_one_round() {
 
 export -f run_one_round curl_code curl_post_code
 export MODE COUNT PAR SLEEP_SEC BASE_URL SUPABASE_ANON_KEY SUPABASE_ACCESS_TOKEN
-export EVENTS_PATH INVITES_PATH PLAYS_LEGACY_PATH PLAYS_RPC_PATH PLAYS_RPC_BODY STRESS_PLAYS_QUERY WISHLIST_PATH
+export EVENTS_LEGACY_PATH EVENTS_RPC_PATH EVENTS_RPC_BODY STRESS_EVENTS_QUERY
+export INVITES_PATH
+export PLAYS_LEGACY_PATH PLAYS_RPC_PATH PLAYS_RPC_BODY STRESS_PLAYS_QUERY
+export WISHLIST_LEGACY_PATH WISHLIST_RPC_PATH STRESS_WISHLIST_QUERY
 
 echo "Starting stress test:"
 echo "  mode=$MODE rounds=$COUNT parallel=$PAR sleep=$SLEEP_SEC out=$OUT"
-echo "  invites_query=$STRESS_INVITES_QUERY plays_query=$STRESS_PLAYS_QUERY"
+echo "  events_query=$STRESS_EVENTS_QUERY invites_query=$STRESS_INVITES_QUERY plays_query=$STRESS_PLAYS_QUERY wishlist_query=$STRESS_WISHLIST_QUERY"
 echo "  url=$BASE_URL user=$STRESS_USER_ID group=$STRESS_GROUP_ID"
 
 seq 1 "$COUNT" | xargs -n1 -P"$PAR" -I{} bash -lc 'run_one_round "$@"' _ {} >> "$OUT"
