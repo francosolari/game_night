@@ -2138,6 +2138,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func fetchPublicPlaysForUser(userId: UUID) async throws -> [Play] {
+        let plays: [Play] = try await client
+            .rpc("get_user_public_plays", params: ["p_user_id": userId.uuidString])
+            .execute()
+            .value
+        return plays
+    }
+
     func fetchPlaysForEvent(eventId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
             .rpc("get_event_plays", params: ["p_event_id": eventId.uuidString])

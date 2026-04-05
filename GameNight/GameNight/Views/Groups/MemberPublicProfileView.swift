@@ -8,6 +8,7 @@ struct MemberPublicProfileView: View {
     @State private var user: User?
     @State private var gameLibrary: [GameLibraryEntry] = []
     @State private var wishlist: [GameWishlistEntry] = []
+    @State private var publicPlays: [Play] = []
     @State private var isLoading = true
 
     private var currentUserId: UUID? { appState.currentUser?.id }
@@ -38,6 +39,7 @@ struct MemberPublicProfileView: View {
                     eventsTogetherSection
                     gameCollectionSection
                     wishlistSection
+                    playsSection
                 }
                 .padding(Theme.Spacing.xl)
                 .padding(.bottom, 100)
@@ -220,43 +222,16 @@ struct MemberPublicProfileView: View {
         if let u = user {
             if u.gameLibraryPublic {
                 if !gameLibrary.isEmpty {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        SectionHeader(title: "Game Collection (\(gameLibrary.count))")
-
-                        LazyVGrid(
-                            columns: [GridItem(.flexible()), GridItem(.flexible())],
-                            spacing: Theme.Spacing.md
-                        ) {
-                            ForEach(gameLibrary.prefix(20)) { entry in
-                                if let game = entry.game {
-                                    NavigationLink {
-                                        GameDetailView(game: game)
-                                    } label: {
-                                        GameCollectionCell(game: game, rating: entry.rating)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
+                    HorizontalGameScrollSection(
+                        title: "Game Collection",
+                        entries: gameLibrary.compactMap { entry in
+                            guard let game = entry.game else { return nil }
+                            return (game: game, rating: entry.rating)
                         }
-
-                        if gameLibrary.count > 20 {
-                            Text("\(gameLibrary.count - 20) more games")
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.Colors.textTertiary)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
+                    )
                 }
             } else if !isViewingSelf {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 13))
-                    Text("Game library is private")
-                        .font(Theme.Typography.callout)
-                }
-                .foregroundColor(Theme.Colors.textTertiary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.xxl)
+                profilePrivateBanner(label: "Game collection is private")
             }
         }
     }
@@ -265,37 +240,64 @@ struct MemberPublicProfileView: View {
 
     @ViewBuilder
     private var wishlistSection: some View {
-        if let u = user, u.gameLibraryPublic, !wishlist.isEmpty {
-            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                SectionHeader(title: "Wishlist (\(wishlist.count))")
-
-                LazyVGrid(
-                    columns: [GridItem(.flexible()), GridItem(.flexible())],
-                    spacing: Theme.Spacing.md
-                ) {
-                    ForEach(wishlist.prefix(20)) { entry in
-                        if let game = entry.game {
-                            NavigationLink {
-                                GameDetailView(game: game)
-                            } label: {
-                                GameCollectionCell(game: game, rating: nil)
-                            }
-                            .buttonStyle(.plain)
+        if let u = user {
+            if u.wishlistPublic {
+                if !wishlist.isEmpty {
+                    HorizontalGameScrollSection(
+                        title: "Wishlist",
+                        entries: wishlist.compactMap { entry in
+                            guard let game = entry.game else { return nil }
+                            return (game: game, rating: nil)
                         }
+                    )
+                }
+            } else if !isViewingSelf {
+                profilePrivateBanner(label: "Wishlist is private")
+            }
+        }
+    }
+
+    // MARK: - Plays
+
+    @ViewBuilder
+    private var playsSection: some View {
+        if let u = user {
+            if u.playsPublic {
+                if !publicPlays.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        SectionHeader(title: "Play History (\(publicPlays.count))")
+
+                        VStack(spacing: 0) {
+                            ForEach(Array(publicPlays.enumerated()), id: \.element.id) { index, play in
+                                PlayLogRow(play: play, targetUserId: targetUserId)
+
+                                if index < publicPlays.count - 1 {
+                                    Divider().padding(.leading, 56)
+                                }
+                            }
+                        }
+                        .cardStyle()
                     }
                 }
-
-                if wishlist.count > 20 {
-                    Text("\(wishlist.count - 20) more games")
-                        .font(Theme.Typography.caption)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                        .frame(maxWidth: .infinity)
-                }
+            } else if !isViewingSelf {
+                profilePrivateBanner(label: "Play history is private")
             }
         }
     }
 
     // MARK: - Helpers
+
+    private func profilePrivateBanner(label: String) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 13))
+            Text(label)
+                .font(Theme.Typography.callout)
+        }
+        .foregroundColor(Theme.Colors.textTertiary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.xxl)
+    }
 
     private func groupEventCount(for userId: UUID) -> Int {
         let eventIds = Set(viewModel.plays.filter { play in
@@ -314,17 +316,116 @@ struct MemberPublicProfileView: View {
             async let userFetch = SupabaseService.shared.fetchUserById(userId)
             async let libraryFetch = SupabaseService.shared.fetchGameLibraryForUser(userId: userId)
             async let wishlistFetch = SupabaseService.shared.fetchWishlistForUser(userId: userId)
-            let (fetchedUser, fetchedLibrary, fetchedWishlist) = try await (userFetch, libraryFetch, wishlistFetch)
+            async let playsFetch = SupabaseService.shared.fetchPublicPlaysForUser(userId: userId)
+            let (fetchedUser, fetchedLibrary, fetchedWishlist, fetchedPlays) = try await (
+                userFetch, libraryFetch, wishlistFetch, playsFetch
+            )
             user = fetchedUser
-            if fetchedUser.gameLibraryPublic {
-                gameLibrary = fetchedLibrary
-                wishlist = fetchedWishlist
-            }
+            if fetchedUser.gameLibraryPublic { gameLibrary = fetchedLibrary }
+            if fetchedUser.wishlistPublic { wishlist = fetchedWishlist }
+            publicPlays = fetchedPlays
         } catch {
-            // Library/wishlist fetch may fail due to RLS — try user only
             user = try? await SupabaseService.shared.fetchUserById(userId)
         }
         isLoading = false
+    }
+}
+
+// MARK: - Play Log Row
+
+private struct PlayLogRow: View {
+    let play: Play
+    let targetUserId: UUID?
+
+    private var winnerParticipant: PlayParticipant? {
+        guard let uid = targetUserId else { return nil }
+        return play.participants.first(where: { $0.userId == uid && $0.isWinner })
+    }
+
+    private var userParticipant: PlayParticipant? {
+        guard let uid = targetUserId else { return nil }
+        return play.participants.first(where: { $0.userId == uid })
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            // Game cover thumbnail
+            Group {
+                if let urlStr = play.game?.thumbnailUrl ?? play.game?.imageUrl,
+                   let url = URL(string: urlStr) {
+                    AsyncImage(url: url) { img in
+                        img.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        playPlaceholder
+                    }
+                } else {
+                    playPlaceholder
+                }
+            }
+            .frame(width: 40, height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(play.game?.name ?? "Unknown Game")
+                    .font(Theme.Typography.bodyMedium)
+                    .foregroundColor(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                Text(play.playedAt, style: .date)
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+
+            Spacer()
+
+            // Result badge
+            resultBadge
+        }
+        .padding(.vertical, Theme.Spacing.sm)
+    }
+
+    @ViewBuilder
+    private var resultBadge: some View {
+        if play.isCooperative {
+            if let result = play.cooperativeResult {
+                Text(result == .won ? "Won" : "Lost")
+                    .font(Theme.Typography.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(result == .won ? Theme.Colors.success : Theme.Colors.error)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill((result == .won ? Theme.Colors.success : Theme.Colors.error).opacity(0.12))
+                    )
+            }
+        } else if let participant = userParticipant {
+            if participant.isWinner {
+                Text("Won")
+                    .font(Theme.Typography.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Theme.Colors.success)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Theme.Colors.success.opacity(0.12)))
+            } else if let placement = participant.placement {
+                Text("#\(placement)")
+                    .font(Theme.Typography.caption2)
+                    .foregroundColor(Theme.Colors.textTertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Theme.Colors.cardBackground))
+            }
+        }
+    }
+
+    private var playPlaceholder: some View {
+        ZStack {
+            Theme.Colors.primary.opacity(0.08)
+            Image(systemName: "gamecontroller.fill")
+                .font(.system(size: 16))
+                .foregroundColor(Theme.Colors.primary.opacity(0.4))
+        }
     }
 }
 
@@ -376,66 +477,5 @@ private struct H2HColumn: View {
                 .foregroundColor(Theme.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-private struct GameCollectionCell: View {
-    let game: Game
-    let rating: Int?
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            // Image
-            Group {
-                if let urlStr = game.imageUrl ?? game.thumbnailUrl, let url = URL(string: urlStr) {
-                    AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        gamePlaceholder
-                    }
-                } else {
-                    gamePlaceholder
-                }
-            }
-            .frame(height: 80)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
-
-            Text(game.name)
-                .font(Theme.Typography.caption)
-                .foregroundColor(Theme.Colors.textPrimary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-
-            if let r = rating {
-                HStack(spacing: 2) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 9))
-                        .foregroundColor(Theme.Colors.accentWarm)
-                    Text("\(r)/10")
-                        .font(Theme.Typography.caption2)
-                        .foregroundColor(Theme.Colors.textTertiary)
-                }
-            }
-        }
-        .padding(Theme.Spacing.sm)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .fill(Theme.Colors.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.md)
-                .stroke(Theme.Colors.divider, lineWidth: 1)
-        )
-    }
-
-    private var gamePlaceholder: some View {
-        ZStack {
-            Theme.Colors.primary.opacity(0.08)
-            Image(systemName: "gamecontroller.fill")
-                .font(.system(size: 24))
-                .foregroundColor(Theme.Colors.primary.opacity(0.4))
-        }
     }
 }
