@@ -76,6 +76,8 @@ private struct EventSoftDeletePatch: Encodable {
 final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingProviding {
     static let shared = SupabaseService()
     static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*), groups(id, name, emoji)"
+    static let gameSummarySelect = "id, bgg_id, owner_id, name, year_published, thumbnail_url, image_url, min_players, max_players, min_playtime, max_playtime, complexity, bgg_rating, bgg_rank"
+    static let librarySelect = "*, game:games(\(gameSummarySelect))"
 
     let client: SupabaseClient
     private struct FrequentContactsCacheEntry: Codable {
@@ -922,7 +924,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let session = try await client.auth.session
         let entries: [GameLibraryEntry] = try await client
             .from("game_library")
-            .select("*, game:games(*)")
+            .select(Self.librarySelect)
             .eq("user_id", value: session.user.id.uuidString)
             .order("added_at", ascending: false)
             .execute()
@@ -933,7 +935,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchGameLibraryForUser(userId: UUID) async throws -> [GameLibraryEntry] {
         let entries: [GameLibraryEntry] = try await client
             .from("game_library")
-            .select("*, game:games(*)")
+            .select(Self.librarySelect)
             .eq("user_id", value: userId.uuidString)
             .order("added_at", ascending: false)
             .execute()
