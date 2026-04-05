@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ interface Props {
 export function GamesStep({ form }: Props) {
   const [libraryGames, setLibraryGames] = useState<Game[]>([]);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const manualSearchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchGameLibrary()
@@ -35,6 +36,18 @@ export function GamesStep({ form }: Props) {
       form.searchGames("");
     }
   };
+
+  useEffect(() => {
+    const handler = (event: PointerEvent) => {
+      const input = manualSearchRef.current;
+      if (!input) return;
+      if (document.activeElement !== input) return;
+      if (event.target instanceof Node && input.contains(event.target)) return;
+      input.blur();
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, []);
 
   const libraryMatches = form.manualGameName.trim()
     ? libraryGames.filter(g =>
@@ -59,6 +72,7 @@ export function GamesStep({ form }: Props) {
             value={form.manualGameName}
             onChange={e => handleSearchChange(e.target.value)}
             className="pl-9 text-sm"
+            ref={manualSearchRef}
           />
           {form.isSearchingGames && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
