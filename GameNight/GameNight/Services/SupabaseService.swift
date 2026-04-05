@@ -2146,6 +2146,25 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return plays
     }
 
+    func fetchPublicWishlistForUser(userId: UUID) async throws -> [GameWishlistEntry] {
+        let entries: [GameWishlistEntry] = try await client
+            .rpc("get_user_public_wishlist", params: ["p_user_id": userId.uuidString])
+            .execute()
+            .value
+        return entries
+    }
+
+    func fetchProfileSummaryForUser(userId: UUID) async throws -> UserProfileSummary {
+        let results: [UserProfileSummary] = try await client
+            .rpc("get_user_profile_summary", params: ["p_user_id": userId.uuidString])
+            .execute()
+            .value
+        guard let summary = results.first else {
+            throw NSError(domain: "SupabaseService", code: 404)
+        }
+        return summary
+    }
+
     func fetchPlaysForEvent(eventId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
             .rpc("get_event_plays", params: ["p_event_id": eventId.uuidString])

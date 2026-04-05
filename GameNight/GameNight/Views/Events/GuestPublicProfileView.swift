@@ -8,10 +8,12 @@ struct GuestPublicProfileView: View {
     let avatarUrl: String?
 
     @State private var user: User?
+    @State private var profileSummary: UserProfileSummary?
     @State private var gameLibrary: [GameLibraryEntry] = []
     @State private var wishlist: [GameWishlistEntry] = []
     @State private var publicPlays: [Play] = []
     @State private var isLoading = true
+    @State private var playsExpanded = false
 
     var body: some View {
         ScrollView {
@@ -27,40 +29,8 @@ struct GuestPublicProfileView: View {
                 .padding(Theme.Spacing.xl)
             } else {
                 VStack(spacing: Theme.Spacing.xxl) {
-                    // Header
-                    VStack(spacing: Theme.Spacing.md) {
-                        AvatarView(url: user?.avatarUrl ?? avatarUrl, size: 80)
-
-                        Text(user?.displayName ?? name)
-                            .font(Theme.Typography.displaySmall)
-                            .foregroundColor(Theme.Colors.textPrimary)
-
-                        if let bio = user?.bio, !bio.isEmpty {
-                            Text(bio)
-                                .font(Theme.Typography.body)
-                                .foregroundColor(Theme.Colors.textSecondary)
-                                .multilineTextAlignment(.center)
-                        }
-
-                        if let joinDate = user?.createdAt {
-                            Text("On Game Night since \(joinDate.formatted(.dateTime.month(.wide).year()))")
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.Colors.textTertiary)
-                        }
-                    }
-
-                    // Stats
-                    if user?.gameLibraryPublic == true {
-                        HStack(spacing: Theme.Spacing.md) {
-                            GuestStatCapsule(
-                                value: "\(gameLibrary.count)",
-                                label: "Games",
-                                icon: "gamecontroller.fill",
-                                color: Theme.Colors.primary
-                            )
-                        }
-                    }
-
+                    headerSection
+                    statsGrid
                     gameCollectionSection
                     wishlistSection
                     playsSection
@@ -75,12 +45,70 @@ struct GuestPublicProfileView: View {
         .task { await loadProfile() }
     }
 
+    // MARK: - Header
+
+    private var headerSection: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            AvatarView(url: user?.avatarUrl ?? avatarUrl, size: 80)
+
+            Text(user?.displayName ?? name)
+                .font(Theme.Typography.displaySmall)
+                .foregroundColor(Theme.Colors.textPrimary)
+
+            if let bio = user?.bio, !bio.isEmpty {
+                Text(bio)
+                    .font(Theme.Typography.body)
+                    .foregroundColor(Theme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if let joinDate = user?.createdAt {
+                Text("On Game Night since \(joinDate.formatted(.dateTime.month(.wide).year()))")
+                    .font(Theme.Typography.caption)
+                    .foregroundColor(Theme.Colors.textTertiary)
+            }
+        }
+    }
+
+    // MARK: - Stats Grid
+
+    private var statsGrid: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            StatCard(
+                icon: "bolt.fill",
+                value: profileSummary?.hostedEventCount ?? 0,
+                label: "HOSTED",
+                color: Theme.Colors.dateAccent
+            )
+            StatCard(
+                icon: "calendar.badge.checkmark",
+                value: profileSummary?.attendedEventCount ?? 0,
+                label: "ATTENDED",
+                color: Theme.Colors.primaryAction
+            )
+            if user?.gameLibraryPublic == true {
+                StatCard(
+                    icon: "dice.fill",
+                    value: gameLibrary.count,
+                    label: "GAMES",
+                    color: Theme.Colors.accentWarm
+                )
+            }
+            StatCard(
+                icon: "person.2.fill",
+                value: profileSummary?.groupCount ?? 0,
+                label: "GROUPS",
+                color: Theme.Colors.textSecondary
+            )
+        }
+    }
+
     // MARK: - Game Collection
 
     @ViewBuilder
     private var gameCollectionSection: some View {
         if let u = user {
-            if u.gameLibraryPublic && !gameLibrary.isEmpty {
+            if u.gameLibraryPublic, !gameLibrary.isEmpty {
                 HorizontalGameScrollSection(
                     title: "Game Collection",
                     entries: gameLibrary.compactMap { entry in
@@ -99,7 +127,7 @@ struct GuestPublicProfileView: View {
     @ViewBuilder
     private var wishlistSection: some View {
         if let u = user {
-            if u.wishlistPublic && !wishlist.isEmpty {
+            if u.wishlistPublic, !wishlist.isEmpty {
                 HorizontalGameScrollSection(
                     title: "Wishlist",
                     entries: wishlist.compactMap { entry in
@@ -118,17 +146,38 @@ struct GuestPublicProfileView: View {
     @ViewBuilder
     private var playsSection: some View {
         if let u = user {
-            if u.playsPublic && !publicPlays.isEmpty {
+            if u.playsPublic, !publicPlays.isEmpty {
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                     SectionHeader(title: "Play History (\(publicPlays.count))")
 
+                    let visiblePlays = playsExpanded ? publicPlays : Array(publicPlays.prefix(3))
                     VStack(spacing: 0) {
-                        ForEach(Array(publicPlays.enumerated()), id: \.element.id) { index, play in
+                        ForEach(Array(visiblePlays.enumerated()), id: \.element.id) { index, play in
                             GuestPlayLogRow(play: play)
-
-                            if index < publicPlays.count - 1 {
+                            if index < visiblePlays.count - 1 {
                                 Divider().padding(.leading, 56)
                             }
+                        }
+
+                        if publicPlays.count > 3 {
+                            Divider()
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    playsExpanded.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: Theme.Spacing.xs) {
+                                    Text(playsExpanded ? "Show less" : "Show \(publicPlays.count - 3) more")
+                                        .font(Theme.Typography.calloutMedium)
+                                        .foregroundColor(Theme.Colors.primary)
+                                    Image(systemName: playsExpanded ? "chevron.up" : "chevron.down")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.Colors.primary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, Theme.Spacing.sm)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .cardStyle()
@@ -141,10 +190,8 @@ struct GuestPublicProfileView: View {
 
     private func privacyBanner(label: String) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 13))
-            Text(label)
-                .font(Theme.Typography.callout)
+            Image(systemName: "lock.fill").font(.system(size: 13))
+            Text(label).font(Theme.Typography.callout)
         }
         .foregroundColor(Theme.Colors.textTertiary)
         .frame(maxWidth: .infinity)
@@ -154,18 +201,21 @@ struct GuestPublicProfileView: View {
     private func loadProfile() async {
         do {
             async let userFetch = SupabaseService.shared.fetchUserById(userId)
+            async let summaryFetch = SupabaseService.shared.fetchProfileSummaryForUser(userId: userId)
             async let libraryFetch = SupabaseService.shared.fetchGameLibraryForUser(userId: userId)
-            async let wishlistFetch = SupabaseService.shared.fetchWishlistForUser(userId: userId)
+            async let wishlistFetch = SupabaseService.shared.fetchPublicWishlistForUser(userId: userId)
             async let playsFetch = SupabaseService.shared.fetchPublicPlaysForUser(userId: userId)
-            let (fetchedUser, fetchedLibrary, fetchedWishlist, fetchedPlays) = try await (
-                userFetch, libraryFetch, wishlistFetch, playsFetch
+            let (fetchedUser, fetchedSummary, fetchedLibrary, fetchedWishlist, fetchedPlays) = try await (
+                userFetch, summaryFetch, libraryFetch, wishlistFetch, playsFetch
             )
             user = fetchedUser
+            profileSummary = fetchedSummary
             if fetchedUser.gameLibraryPublic { gameLibrary = fetchedLibrary }
-            if fetchedUser.wishlistPublic { wishlist = fetchedWishlist }
+            wishlist = fetchedWishlist
             publicPlays = fetchedPlays
         } catch {
             user = try? await SupabaseService.shared.fetchUserById(userId)
+            profileSummary = try? await SupabaseService.shared.fetchProfileSummaryForUser(userId: userId)
         }
         isLoading = false
     }
@@ -183,12 +233,8 @@ private struct GuestPlayLogRow: View {
                    let url = URL(string: urlStr) {
                     AsyncImage(url: url) { img in
                         img.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        playPlaceholder
-                    }
-                } else {
-                    playPlaceholder
-                }
+                    } placeholder: { playPlaceholder }
+                } else { playPlaceholder }
             }
             .frame(width: 40, height: 40)
             .clipShape(RoundedRectangle(cornerRadius: Theme.CornerRadius.sm))
@@ -198,7 +244,6 @@ private struct GuestPlayLogRow: View {
                     .font(Theme.Typography.bodyMedium)
                     .foregroundColor(Theme.Colors.textPrimary)
                     .lineLimit(1)
-
                 Text(play.playedAt, style: .date)
                     .font(Theme.Typography.caption)
                     .foregroundColor(Theme.Colors.textTertiary)
@@ -207,16 +252,14 @@ private struct GuestPlayLogRow: View {
             Spacer()
 
             if play.isCooperative, let result = play.cooperativeResult {
-                Text(result == .won ? "Won" : "Lost")
+                let isWon = result == .won
+                Text(isWon ? "Won" : "Lost")
                     .font(Theme.Typography.caption2)
                     .fontWeight(.semibold)
-                    .foregroundColor(result == .won ? Theme.Colors.success : Theme.Colors.error)
+                    .foregroundColor(isWon ? Theme.Colors.success : Theme.Colors.error)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(
-                        Capsule()
-                            .fill((result == .won ? Theme.Colors.success : Theme.Colors.error).opacity(0.12))
-                    )
+                    .background(Capsule().fill((isWon ? Theme.Colors.success : Theme.Colors.error).opacity(0.12)))
             }
         }
         .padding(.vertical, Theme.Spacing.sm)

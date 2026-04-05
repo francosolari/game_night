@@ -323,47 +323,6 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Stat Card
-
-private struct StatCard: View {
-    let icon: String
-    let value: Int
-    let label: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            ZStack {
-                Circle()
-                    .fill(color.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(color)
-            }
-
-            Text("\(value)")
-                .font(Theme.Typography.displaySmall)
-                .foregroundColor(Theme.Colors.textPrimary)
-
-            Text(label)
-                .font(Theme.Typography.caption2)
-                .foregroundColor(Theme.Colors.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.md)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                .fill(Theme.Colors.cardBackground)
-                .shadow(color: Color.black.opacity(ThemeManager.shared.isDark ? 0.3 : 0.06), radius: 4, x: 0, y: 2)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.CornerRadius.lg)
-                        .stroke(Theme.Colors.divider, lineWidth: 1)
-                )
-        )
-    }
-}
-
 // MARK: - Profile Event Row
 
 private struct ProfileEventRow: View {
