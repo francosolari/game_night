@@ -156,8 +156,10 @@ struct GroupDetailView: View {
                 Task {
                     do {
                         try await SupabaseService.shared.deleteGroup(id: viewModel.group.id)
-                        await appState.refresh([.home, .groups])
                         dismiss()
+                        Task {
+                            await appState.refresh([.home, .groups])
+                        }
                     } catch {
                         toast = ToastItem(style: .error, message: "Failed to delete group")
                     }

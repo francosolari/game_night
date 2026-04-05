@@ -83,6 +83,14 @@ final class AppState: ObservableObject {
         Task {
             if let user = try? await SupabaseService.shared.fetchCurrentUser() {
                 self.currentUser = user
+
+                let currentTimeZoneIdentifier = TimeZone.current.identifier
+                if user.timeZoneIdentifier != currentTimeZoneIdentifier {
+                    try? await SupabaseService.shared.updateCurrentUserTimeZoneIdentifier(currentTimeZoneIdentifier)
+                    var updatedUser = user
+                    updatedUser.timeZoneIdentifier = currentTimeZoneIdentifier
+                    self.currentUser = updatedUser
+                }
             }
         }
         refreshContactNames()
@@ -135,6 +143,7 @@ final class AppState: ObservableObject {
         supabase: SupabaseService
     ) async -> HomeDataLoadSnapshot {
         await supabase.completePastEvents()
+        await supabase.sendPendingPlayLogReminders()
 
         var upcomingEvents = base.upcomingEvents
 
@@ -248,10 +257,14 @@ final class AppState: ObservableObject {
     }
 
     func refresh(_ areas: [RefreshArea]) async {
-        for area in areas {
-            guard let handlersByToken = refreshHandlers[area] else { continue }
-            for handler in handlersByToken.values {
-                await handler()
+        await withTaskGroup(of: Void.self) { group in
+            for area in areas {
+                guard let handlersByToken = refreshHandlers[area] else { continue }
+                for handler in handlersByToken.values {
+                    group.addTask {
+                        await handler()
+                    }
+                }
             }
         }
     }

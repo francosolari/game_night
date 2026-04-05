@@ -45,6 +45,7 @@ const TYPE_TO_PREFERENCE: Record<string, string> = {
   text_blast: "text_blasts_enabled",
   game_confirmed: "invites_enabled",
   event_cancelled: "invites_enabled",
+  play_log_reminder: "invites_enabled",
 };
 
 // Pick best available image from event data
@@ -167,6 +168,7 @@ async function buildEnrichment(
 
       case "bench_promoted":
       case "event_cancelled":
+      case "play_log_reminder":
       case "text_blast":
         return {
           subtitle: event.title,

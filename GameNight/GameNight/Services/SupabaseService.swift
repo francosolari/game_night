@@ -234,6 +234,16 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func updateCurrentUserTimeZoneIdentifier(_ timeZoneIdentifier: String) async throws {
+        let session = try await client.auth.session
+        let updates: [String: AnyJSON] = ["time_zone_identifier": .string(timeZoneIdentifier)]
+        try await client
+            .from("users")
+            .update(updates)
+            .eq("id", value: session.user.id.uuidString)
+            .execute()
+    }
+
     func fetchMyProfileSummary() async throws -> UserProfileSummary {
         let summaries: [UserProfileSummary] = try await client
             .rpc("get_my_profile_summary")
@@ -505,6 +515,12 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     /// Marks past events as completed server-side. Call on app launch / home load.
     func completePastEvents() async {
         _ = try? await client.rpc("complete_past_events").execute()
+    }
+
+    /// Inserts reminder notifications for completed events with no play log yet.
+    /// The reminder threshold is next-day noon in each recipient user's local timezone.
+    func sendPendingPlayLogReminders() async {
+        _ = try? await client.rpc("notify_unlogged_play_reminders").execute()
     }
 
     func softDeleteEvent(id: UUID) async throws {
@@ -2290,14 +2306,21 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         for e in invitedEvents { byId[e.id] = e }
         let allCompleted = Array(byId.values)
 
-        // Filter out events where this user already logged a play
+        // Filter out events where anyone already logged a play for that event.
         let eventIds = allCompleted.map(\.id)
         guard !eventIds.isEmpty else { return [] }
 
-        let existingPlays: [Play] = try await client
+        struct EventPlayRow: Decodable {
+            let eventId: UUID?
+
+            enum CodingKeys: String, CodingKey {
+                case eventId = "event_id"
+            }
+        }
+
+        let existingPlays: [EventPlayRow] = try await client
             .from("plays")
-            .select("id, event_id")
-            .eq("logged_by", value: userId.uuidString)
+            .select("event_id")
             .in("event_id", values: eventIds.map(\.uuidString))
             .execute()
             .value

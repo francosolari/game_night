@@ -290,8 +290,10 @@ struct CreateEventView: View {
     private func finishSave(_ savedEvent: GameEvent) async {
         onSaved?(savedEvent)
         let refreshAreas: [AppState.RefreshArea] = savedEvent.status == .draft ? [.home] : [.home, .groups]
-        await appState.refresh(refreshAreas)
         dismiss()
+        Task {
+            await appState.refresh(refreshAreas)
+        }
     }
 }
 

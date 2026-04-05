@@ -27,6 +27,7 @@ struct AppNotification: Identifiable, Codable {
         case textBlast = "text_blast"
         case gameConfirmed = "game_confirmed"
         case eventCancelled = "event_cancelled"
+        case playLogReminder = "play_log_reminder"
 
         var icon: String {
             switch self {
@@ -39,6 +40,7 @@ struct AppNotification: Identifiable, Codable {
             case .textBlast: return "megaphone.fill"
             case .gameConfirmed: return "gamecontroller.fill"
             case .eventCancelled: return "xmark.circle.fill"
+            case .playLogReminder: return "list.bullet"
             }
         }
     }

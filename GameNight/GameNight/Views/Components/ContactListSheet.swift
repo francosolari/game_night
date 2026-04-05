@@ -12,7 +12,7 @@ struct ContactListSheet: View {
     @State private var currentUserPhone: String?
     @State private var isLoading = true
     @State private var showDevicePicker = false
-    @State private var selectedIds = Set<UUID>()
+    @State private var selectedPhones = Set<String>()
     @State private var importedContacts: [UserContact] = []
 
     /// Phone numbers already in the invite list — these contacts won't be shown
@@ -173,9 +173,9 @@ struct ContactListSheet: View {
                                 ForEach(appUserContacts) { contact in
                                     ContactRow(
                                         contact: contact,
-                                        isSelected: selectedIds.contains(contact.id)
+                                        isSelected: selectedPhones.contains(selectionKey(for: contact))
                                     ) {
-                                        toggleSelection(contact.id)
+                                        toggleSelection(contact)
                                     }
                                 }
                             }
@@ -185,9 +185,9 @@ struct ContactListSheet: View {
                                 ForEach(otherContacts) { contact in
                                     ContactRow(
                                         contact: contact,
-                                        isSelected: selectedIds.contains(contact.id)
+                                        isSelected: selectedPhones.contains(selectionKey(for: contact))
                                     ) {
-                                        toggleSelection(contact.id)
+                                        toggleSelection(contact)
                                     }
                                 }
                             }
@@ -213,14 +213,14 @@ struct ContactListSheet: View {
                         .foregroundColor(Theme.Colors.textSecondary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add (\(selectedIds.count))") {
-                        let selected = allContacts.filter { selectedIds.contains($0.id) }
+                    Button("Add (\(selectedPhones.count))") {
+                        let selected = allContacts.filter { selectedPhones.contains(selectionKey(for: $0)) }
                         onSelect(selected)
                         dismiss()
                     }
                     .font(Theme.Typography.bodySemibold)
-                    .foregroundColor(selectedIds.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.primary)
-                    .disabled(selectedIds.isEmpty)
+                    .foregroundColor(selectedPhones.isEmpty ? Theme.Colors.textTertiary : Theme.Colors.primary)
+                    .disabled(selectedPhones.isEmpty)
                 }
             }
         }
@@ -238,7 +238,7 @@ struct ContactListSheet: View {
                     if !importedContacts.contains(where: { $0.phoneNumber == contact.phoneNumber }) {
                         importedContacts.append(contact)
                     }
-                    selectedIds.insert(contact.id)
+                    selectedPhones.insert(selectionKey(for: contact))
                 }
             }
         }
@@ -290,12 +290,17 @@ struct ContactListSheet: View {
         .padding(.bottom, Theme.Spacing.xs)
     }
 
-    private func toggleSelection(_ id: UUID) {
-        if selectedIds.contains(id) {
-            selectedIds.remove(id)
+    private func toggleSelection(_ contact: UserContact) {
+        let key = selectionKey(for: contact)
+        if selectedPhones.contains(key) {
+            selectedPhones.remove(key)
         } else {
-            selectedIds.insert(id)
+            selectedPhones.insert(key)
         }
+    }
+
+    private func selectionKey(for contact: UserContact) -> String {
+        PhoneNumberFormatter.normalizedForComparison(contact.phoneNumber)
     }
 
     // MARK: - Data

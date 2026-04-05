@@ -232,8 +232,10 @@ struct EventDetailView: View {
             Button("Delete Event", role: .destructive) {
                 Task {
                     if await viewModel.deleteEvent() {
-                        await refreshSharedData()
                         dismiss()
+                        Task {
+                            await refreshSharedData()
+                        }
                     }
                 }
             }
