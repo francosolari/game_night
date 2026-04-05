@@ -3,6 +3,7 @@ import XCTest
 
 /// Tests for the session validation logic introduced to prevent bad_jwt cascades
 /// on app launch when a stale keychain token is present.
+@MainActor
 final class SessionValidationTests: XCTestCase {
 
     // MARK: - isDefinitiveAuthRejection

@@ -1268,16 +1268,72 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Groups
 
+    nonisolated static func mergeOwnedAndAcceptedGroups(
+        ownedGroups: [GameGroup],
+        acceptedMembershipGroupIds: Set<UUID>,
+        memberGroups: [GameGroup]
+    ) -> [GameGroup] {
+        var groupsById = Dictionary(uniqueKeysWithValues: ownedGroups.map { ($0.id, $0) })
+
+        let memberGroupsById = Dictionary(uniqueKeysWithValues: memberGroups.map { ($0.id, $0) })
+        for groupId in acceptedMembershipGroupIds where groupsById[groupId] == nil {
+            if let group = memberGroupsById[groupId] {
+                groupsById[groupId] = group
+            }
+        }
+
+        return groupsById.values.sorted { $0.createdAt > $1.createdAt }
+    }
+
     func fetchGroups() async throws -> [GameGroup] {
+        struct GroupMembershipRow: Decodable {
+            let groupId: UUID
+
+            enum CodingKeys: String, CodingKey {
+                case groupId = "group_id"
+            }
+        }
+
         let session = try await client.auth.session
-        let groups: [GameGroup] = try await client
+
+        // Groups the user owns.
+        let ownedGroups: [GameGroup] = try await client
             .from("groups")
             .select("*, members:group_members(*)")
             .eq("owner_id", value: session.user.id.uuidString)
             .order("created_at", ascending: false)
             .execute()
             .value
-        return groups
+
+        // Groups where the user has accepted membership but is not necessarily the owner.
+        let acceptedMemberships: [GroupMembershipRow] = try await client
+            .from("group_members")
+            .select("group_id")
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("status", value: GroupMemberStatus.accepted.rawValue)
+            .execute()
+            .value
+
+        let acceptedMembershipGroupIds = Set(acceptedMemberships.map(\.groupId))
+        let ownedGroupIds = Set(ownedGroups.map(\.id))
+        let missingGroupIds = acceptedMembershipGroupIds.subtracting(ownedGroupIds)
+
+        var memberGroups: [GameGroup] = []
+        if !missingGroupIds.isEmpty {
+            memberGroups = try await client
+                .from("groups")
+                .select("*, members:group_members(*)")
+                .in("id", values: missingGroupIds.map(\.uuidString))
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+        }
+
+        return Self.mergeOwnedAndAcceptedGroups(
+            ownedGroups: ownedGroups,
+            acceptedMembershipGroupIds: acceptedMembershipGroupIds,
+            memberGroups: memberGroups
+        )
     }
 
     func fetchGroupById(_ id: UUID) async throws -> GameGroup {

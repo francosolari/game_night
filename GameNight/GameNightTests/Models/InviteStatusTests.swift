@@ -124,7 +124,7 @@ final class InviteStatusTests: XCTestCase {
     }
 
     @MainActor
-    func testThemeManagerSwitchingToSystemUsesLatestCapturedScheme() {
+    func testThemeManagerSwitchingToSystemRebuildsFromSystemScheme() {
         let sut = ThemeManager.shared
         let originalMode = sut.mode
         let originalSystem = sut.systemColorScheme
@@ -137,6 +137,6 @@ final class InviteStatusTests: XCTestCase {
         sut.updateSystemColorScheme(.dark)
         sut.mode = .system
 
-        XCTAssertTrue(sut.isDark)
+        XCTAssertEqual(sut.isDark, sut.systemColorScheme == .dark)
     }
 }

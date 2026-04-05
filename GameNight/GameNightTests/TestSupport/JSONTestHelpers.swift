@@ -17,6 +17,11 @@ enum JSONTestHelpers {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
+            if let timestamp = try? container.decode(Double.self) {
+                // Matches JSONEncoder's default Date strategy (.deferredToDate).
+                return Date(timeIntervalSinceReferenceDate: timestamp)
+            }
+
             let value = try container.decode(String.self)
 
             if let date = iso8601WithFractionalSeconds.date(from: value)
