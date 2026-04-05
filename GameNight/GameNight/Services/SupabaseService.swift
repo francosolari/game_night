@@ -76,6 +76,8 @@ private struct EventSoftDeletePatch: Encodable {
 final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingProviding {
     static let shared = SupabaseService()
     static let eventSelect = "*, host:users(*), games:event_games(*, game:games(*)), time_options!event_id(*), groups(id, name, emoji)"
+    static let gameSummarySelect = "id, bgg_id, owner_id, name, year_published, thumbnail_url, image_url, min_players, max_players, min_playtime, max_playtime, complexity, bgg_rating, bgg_rank"
+    static let librarySelect = "*, game:games(\(gameSummarySelect))"
 
     let client: SupabaseClient
     private struct FrequentContactsCacheEntry: Codable {
@@ -922,7 +924,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         let session = try await client.auth.session
         let entries: [GameLibraryEntry] = try await client
             .from("game_library")
-            .select("*, game:games(*)")
+            .select(Self.librarySelect)
             .eq("user_id", value: session.user.id.uuidString)
             .order("added_at", ascending: false)
             .execute()
@@ -933,7 +935,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchGameLibraryForUser(userId: UUID) async throws -> [GameLibraryEntry] {
         let entries: [GameLibraryEntry] = try await client
             .from("game_library")
-            .select("*, game:games(*)")
+            .select(Self.librarySelect)
             .eq("user_id", value: userId.uuidString)
             .order("added_at", ascending: false)
             .execute()
@@ -2138,6 +2140,33 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
     }
 
+    func fetchPublicPlaysForUser(userId: UUID) async throws -> [Play] {
+        let plays: [Play] = try await client
+            .rpc("get_user_public_plays", params: ["p_user_id": userId.uuidString])
+            .execute()
+            .value
+        return plays
+    }
+
+    func fetchPublicWishlistForUser(userId: UUID) async throws -> [GameWishlistEntry] {
+        let entries: [GameWishlistEntry] = try await client
+            .rpc("get_user_public_wishlist", params: ["p_user_id": userId.uuidString])
+            .execute()
+            .value
+        return entries
+    }
+
+    func fetchProfileSummaryForUser(userId: UUID) async throws -> UserProfileSummary {
+        let results: [UserProfileSummary] = try await client
+            .rpc("get_user_profile_summary", params: ["p_user_id": userId.uuidString])
+            .execute()
+            .value
+        guard let summary = results.first else {
+            throw NSError(domain: "SupabaseService", code: 404)
+        }
+        return summary
+    }
+
     func fetchPlaysForEvent(eventId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
             .rpc("get_event_plays", params: ["p_event_id": eventId.uuidString])
@@ -2149,6 +2178,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchPlaysForGroup(groupId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
             .rpc("get_group_plays", params: ["p_group_id": groupId.uuidString])
+            .execute()
+            .value
+        return plays
+    }
+
+    func fetchPlaysForGroups(groupIds: [UUID]) async throws -> [Play] {
+        guard !groupIds.isEmpty else { return [] }
+        let plays: [Play] = try await client
+            .rpc("get_dashboard_plays", params: ["p_group_ids": groupIds.map(\.uuidString)])
             .execute()
             .value
         return plays
@@ -2267,6 +2305,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchEventsForGroup(groupId: UUID) async throws -> [GameEvent] {
         let events: [GameEvent] = try await client
             .rpc("get_group_events", params: ["p_group_id": groupId.uuidString])
+            .execute()
+            .value
+        return events
+    }
+
+    func fetchEventsForGroups(groupIds: [UUID]) async throws -> [GameEvent] {
+        guard !groupIds.isEmpty else { return [] }
+        let events: [GameEvent] = try await client
+            .rpc("get_dashboard_events", params: ["p_group_ids": groupIds.map(\.uuidString)])
             .execute()
             .value
         return events
