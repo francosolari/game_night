@@ -344,7 +344,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let activeStatuses = "status.eq.published,status.eq.confirmed,status.eq.completed"
 
-        async let publicEventsTask: [GameEvent] = client
+        let publicEvents: [GameEvent] = try await client
             .from("events")
             .select(Self.eventSelect)
             .eq("visibility", value: EventVisibility.public.rawValue)
@@ -354,7 +354,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
 
-        async let hostedEventsTask: [GameEvent] = client
+        let hostedEvents: [GameEvent] = try await client
             .from("events")
             .select(Self.eventSelect)
             .eq("host_id", value: userId)
@@ -363,8 +363,6 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .order("created_at", ascending: false)
             .execute()
             .value
-
-        let (publicEvents, hostedEvents) = try await (publicEventsTask, hostedEventsTask)
 
         var mergedById = Dictionary(uniqueKeysWithValues: publicEvents.map { ($0.id, $0) })
         for event in hostedEvents {
@@ -642,7 +640,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let invites: [Invite] = try await client
             .from("invites")
-            .select("*, event:events(\(Self.eventSelect))")
+            .select()
             .eq("user_id", value: userId)
             .execute()
             .value
@@ -970,14 +968,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     // MARK: - Wishlist
 
     func fetchWishlist() async throws -> [GameWishlistEntry] {
-        let session = try await client.auth.session
-        return try await client
-            .from("game_wishlist")
-            .select("*, game:games(*)")
-            .eq("user_id", value: session.user.id.uuidString)
-            .order("added_at", ascending: false)
+        let entries: [GameWishlistEntry] = try await client
+            .rpc("get_user_wishlist")
             .execute()
             .value
+        return entries
     }
 
     func addToWishlist(gameId: UUID) async throws {
@@ -1273,16 +1268,72 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     // MARK: - Groups
 
+    nonisolated static func mergeOwnedAndAcceptedGroups(
+        ownedGroups: [GameGroup],
+        acceptedMembershipGroupIds: Set<UUID>,
+        memberGroups: [GameGroup]
+    ) -> [GameGroup] {
+        var groupsById = Dictionary(uniqueKeysWithValues: ownedGroups.map { ($0.id, $0) })
+
+        let memberGroupsById = Dictionary(uniqueKeysWithValues: memberGroups.map { ($0.id, $0) })
+        for groupId in acceptedMembershipGroupIds where groupsById[groupId] == nil {
+            if let group = memberGroupsById[groupId] {
+                groupsById[groupId] = group
+            }
+        }
+
+        return groupsById.values.sorted { $0.createdAt > $1.createdAt }
+    }
+
     func fetchGroups() async throws -> [GameGroup] {
+        struct GroupMembershipRow: Decodable {
+            let groupId: UUID
+
+            enum CodingKeys: String, CodingKey {
+                case groupId = "group_id"
+            }
+        }
+
         let session = try await client.auth.session
-        let groups: [GameGroup] = try await client
+
+        // Groups the user owns.
+        let ownedGroups: [GameGroup] = try await client
             .from("groups")
             .select("*, members:group_members(*)")
             .eq("owner_id", value: session.user.id.uuidString)
             .order("created_at", ascending: false)
             .execute()
             .value
-        return groups
+
+        // Groups where the user has accepted membership but is not necessarily the owner.
+        let acceptedMemberships: [GroupMembershipRow] = try await client
+            .from("group_members")
+            .select("group_id")
+            .eq("user_id", value: session.user.id.uuidString)
+            .eq("status", value: GroupMemberStatus.accepted.rawValue)
+            .execute()
+            .value
+
+        let acceptedMembershipGroupIds = Set(acceptedMemberships.map(\.groupId))
+        let ownedGroupIds = Set(ownedGroups.map(\.id))
+        let missingGroupIds = acceptedMembershipGroupIds.subtracting(ownedGroupIds)
+
+        var memberGroups: [GameGroup] = []
+        if !missingGroupIds.isEmpty {
+            memberGroups = try await client
+                .from("groups")
+                .select("*, members:group_members(*)")
+                .in("id", values: missingGroupIds.map(\.uuidString))
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+        }
+
+        return Self.mergeOwnedAndAcceptedGroups(
+            ownedGroups: ownedGroups,
+            acceptedMembershipGroupIds: acceptedMembershipGroupIds,
+            memberGroups: memberGroups
+        )
     }
 
     func fetchGroupById(_ id: UUID) async throws -> GameGroup {
@@ -2047,10 +2098,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchPlaysForEvent(eventId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
-            .from("plays")
-            .select(Self.playSelect)
-            .eq("event_id", value: eventId.uuidString)
-            .order("played_at", ascending: false)
+            .rpc("get_event_plays", params: ["p_event_id": eventId.uuidString])
             .execute()
             .value
         return plays
@@ -2058,10 +2106,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchPlaysForGroup(groupId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
-            .from("plays")
-            .select(Self.playSelect)
-            .eq("group_id", value: groupId.uuidString)
-            .order("played_at", ascending: false)
+            .rpc("get_group_plays", params: ["p_group_id": groupId.uuidString])
             .execute()
             .value
         return plays
@@ -2164,11 +2209,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchEventsForGroup(groupId: UUID) async throws -> [GameEvent] {
         let events: [GameEvent] = try await client
-            .from("events")
-            .select(Self.eventSelect)
-            .eq("group_id", value: groupId.uuidString)
-            .is("deleted_at", value: nil)
-            .order("created_at", ascending: false)
+            .rpc("get_group_events", params: ["p_group_id": groupId.uuidString])
             .execute()
             .value
         return events

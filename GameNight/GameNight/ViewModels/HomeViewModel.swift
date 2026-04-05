@@ -32,10 +32,7 @@ final class HomeViewModel: ObservableObject {
         }
         error = nil
 
-        // Housekeeping should not block the first paint of home content.
-        Task {
-            await SupabaseService.shared.completePastEvents()
-        }
+        // Housekeeping runs during AppState preload. Avoid duplicate RPC load here.
 
         let snapshot: HomeDataLoadSnapshot
         if let preloaded = preloadedSnapshot {
@@ -178,7 +175,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func refreshPendingGroupInvites() async {
-        try? await SupabaseService.shared.expireStaleGroupInvites()
+        // Keep this read-only on refresh; stale-expiry runs during AppState preload.
         if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
             pendingGroupInvites = groupInvites
         }
