@@ -28,7 +28,9 @@ struct ExpandableGameGrid: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.sm) {
             ForEach(displayedGames) { game in
-                NavigationLink(value: game) {
+                NavigationLink {
+                    GameDetailView(game: game)
+                } label: {
                     HStack(spacing: Theme.Spacing.md) {
                         GameThumbnail(url: game.thumbnailUrl, size: 48)
 

@@ -231,6 +231,7 @@ final class AppState: ObservableObject {
         stopNotificationSubscription()
         try? await SupabaseService.shared.client.auth.signOut()
         SupabaseService.shared.clearFrequentContactsCache()
+        await GameMembershipCache.shared.clear()
         isAuthenticated = false
         currentUser = nil
         contactNameMap = [:]

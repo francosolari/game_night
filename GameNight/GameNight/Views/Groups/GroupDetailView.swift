@@ -248,7 +248,9 @@ struct GroupDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     SectionHeader(title: "Upcoming Events")
                     ForEach(viewModel.upcomingLinkedEvents) { event in
-                        NavigationLink(value: event) {
+                        NavigationLink {
+                            EventDetailView(eventId: event.id)
+                        } label: {
                             HStack(spacing: Theme.Spacing.md) {
                                 Image(systemName: "calendar")
                                     .font(.system(size: 14))

@@ -779,12 +779,14 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             }
         }
 
-        // Trigger tiered invite processing on decline
+        // Trigger tiered invite processing on decline without blocking RSVP UI.
         if status == .declined {
-            try await invokeAuthenticatedFunction(
-                "process-tiered-invites",
-                body: ["invite_id": inviteId.uuidString]
-            )
+            Task {
+                try? await self.invokeAuthenticatedFunction(
+                    "process-tiered-invites",
+                    body: ["invite_id": inviteId.uuidString]
+                )
+            }
         }
     }
 
@@ -994,6 +996,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return entries.first?.id
     }
 
+    func libraryEntryIdByBGGId(_ bggId: Int) async throws -> UUID? {
+        let entries = try await fetchGameLibrary()
+        return entries.first(where: { $0.game?.bggId == bggId })?.id
+    }
+
     // MARK: - Wishlist
 
     func fetchWishlist() async throws -> [GameWishlistEntry] {
@@ -1036,6 +1043,11 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
         return entries.first?.id
+    }
+
+    func wishlistEntryIdByBGGId(_ bggId: Int) async throws -> UUID? {
+        let entries = try await fetchWishlist()
+        return entries.first(where: { $0.game?.bggId == bggId })?.id
     }
 
     func updateLibraryEntryCategory(entryId: UUID, categoryId: UUID?) async throws {

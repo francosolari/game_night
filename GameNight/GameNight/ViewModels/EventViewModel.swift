@@ -37,6 +37,7 @@ final class EventViewModel: ObservableObject {
     private var activityChannel: RealtimeChannelV2?
     private var subscribedEventId: UUID?
     private var subscribedActivityEventId: UUID?
+    private var isRefreshingEventData = false
 
     var hasRSVPd: Bool {
         guard let status = myInvite?.status else { return false }
@@ -212,6 +213,9 @@ final class EventViewModel: ObservableObject {
 
     /// Silently refresh event, invites, and poll voter details without flashing loading state.
     func refreshEventData(eventId: UUID) async {
+        if isRefreshingEventData { return }
+        isRefreshingEventData = true
+        defer { isRefreshingEventData = false }
         do {
             async let eventResult = supabase.fetchEvent(id: eventId)
             async let invitesResult = supabase.fetchInvites(eventId: eventId)
@@ -426,7 +430,9 @@ final class EventViewModel: ObservableObject {
                 suggestedTimes: suggestedTimes
             )
             if let eventId = event?.id {
-                await refreshEventData(eventId: eventId)
+                Task { [weak self] in
+                    await self?.refreshEventData(eventId: eventId)
+                }
             }
         } catch {
             // Rollback on failure

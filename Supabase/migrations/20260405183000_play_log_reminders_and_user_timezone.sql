@@ -133,7 +133,7 @@ revoke execute on function notify_unlogged_play_reminders() from public, anon;
 grant execute on function notify_unlogged_play_reminders() to authenticated, service_role;
 
 -- Best-effort scheduling: run every 10 minutes if pg_cron is available.
-do $$
+do $do$
 begin
     if exists (select 1 from pg_extension where extname = 'pg_cron') then
         begin
@@ -148,7 +148,7 @@ begin
         perform cron.schedule(
             'notify-unlogged-play-reminders',
             '*/10 * * * *',
-            $$select public.notify_unlogged_play_reminders();$$
+            $sql$select public.notify_unlogged_play_reminders();$sql$
         );
     end if;
 exception
@@ -157,4 +157,4 @@ exception
     when undefined_function then
         raise notice 'Skipping pg_cron schedule for play-log reminders: cron functions unavailable';
 end;
-$$;
+$do$;

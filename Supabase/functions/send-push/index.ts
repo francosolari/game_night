@@ -93,6 +93,26 @@ function formatDate(iso: string): string {
   }
 }
 
+function formatDateInTimeZone(iso: string, timeZone?: string | null): string {
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: timeZone || "UTC",
+    });
+    const time = d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: timeZone || "UTC",
+    });
+    return `${date} at ${time}`;
+  } catch {
+    return formatDate(iso);
+  }
+}
+
 // Build enrichment data for each notification type
 async function buildEnrichment(
   supabase: ReturnType<typeof createServiceClient>,
@@ -148,9 +168,15 @@ async function buildEnrichment(
         const confirmedOptionId = (event as { confirmed_time_option_id?: string | null }).confirmed_time_option_id;
         const timeOptions = (event as { time_options?: Array<{ id: string; start_time: string }> | null }).time_options ?? [];
         const confirmedOption = timeOptions.find((t) => t.id === confirmedOptionId);
+        const { data: recipientUser } = await supabase
+          .from("users")
+          .select("time_zone_identifier")
+          .eq("id", notification.user_id)
+          .maybeSingle();
+        const recipientTimeZone = (recipientUser as { time_zone_identifier?: string | null } | null)?.time_zone_identifier ?? null;
         return {
           subtitle: event.title,
-          body: confirmedOption ? formatDate(confirmedOption.start_time) : undefined,
+          body: confirmedOption ? formatDateInTimeZone(confirmedOption.start_time, recipientTimeZone) : undefined,
           image_url: imageUrl,
           category: "EVENT_UPDATE",
         };

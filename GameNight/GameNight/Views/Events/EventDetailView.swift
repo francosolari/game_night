@@ -121,6 +121,7 @@ struct EventDetailView: View {
                 await viewModel.refreshEventData(eventId: eventId)
                 pollVotes = viewModel.myPollVotes
             }
+            .hideKeyboardOnTap()
             .disabled(viewModel.isDeleting)
 
             // Delete overlay
