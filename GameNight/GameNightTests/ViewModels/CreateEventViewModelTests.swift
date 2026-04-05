@@ -1333,6 +1333,10 @@ private final class StubEventGameBGGProvider: EventGameBGGProviding {
 
 @MainActor
 final class GameDetailViewModelTests: XCTestCase {
+    override func setUp() async throws {
+        await GameMembershipCache.shared.clear()
+    }
+
     private func makeBGGGame(name: String = "Dune: Imperium") -> Game {
         Game(
             id: UUID(),
