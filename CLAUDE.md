@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - For interactive elements be sure to add toasts where necessary
 - When doing any RLS policies reference (`.agents/skills/supabase-audit-rls/`) to validate 
 - Verify iOS changes with xcodegen and xcodebuild and xcodetest -- ensure all passing tests and no build issues
-
+- Prefer RPC over direct database access
 
 ## Project Overview
 
