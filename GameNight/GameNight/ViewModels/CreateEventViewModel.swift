@@ -291,14 +291,9 @@ final class CreateEventViewModel: ObservableObject {
             }
 
             guard !Task.isCancelled else { return }
-            libraryGameSearchResults = Array(libraryMatches.prefix(8))
+            libraryGameSearchResults = Array(libraryMatches.prefix(5))
 
-            if !libraryMatches.isEmpty {
-                cachedGameSearchResults = []
-                gameSearchResults = []
-                isSearchingGames = false
-                return
-            }
+            let libraryBggIds = Set(libraryMatches.compactMap { $0.bggId })
 
             isSearchingGames = true
             do {
@@ -307,11 +302,12 @@ final class CreateEventViewModel: ObservableObject {
 
                 let filteredCached = cachedMatches.filter { game in
                     !selectedIds.contains(game.id) &&
+                    !libraryBggIds.contains(game.bggId ?? -1) &&
                     (game.bggId == nil || !selectedBggIds.contains(game.bggId!))
                 }
 
                 if !filteredCached.isEmpty {
-                    cachedGameSearchResults = Array(filteredCached.prefix(12))
+                    cachedGameSearchResults = Array(filteredCached.prefix(8))
                     gameSearchResults = []
                     isSearchingGames = false
                     return
@@ -319,7 +315,7 @@ final class CreateEventViewModel: ObservableObject {
 
                 cachedGameSearchResults = []
                 gameSearchResults = try await bgg.searchGames(query: query)
-                    .filter { !selectedBggIds.contains($0.id) }
+                    .filter { !selectedBggIds.contains($0.id) && !libraryBggIds.contains($0.id) }
                 isSearchingGames = false
             } catch {
                 if Task.isCancelled { return }
