@@ -128,7 +128,8 @@ struct Invite: Identifiable, Codable {
         try container.encode(isActive, forKey: .isActive)
         try container.encodeIfPresent(respondedAt, forKey: .respondedAt)
         try container.encode(selectedTimeOptionIds, forKey: .selectedTimeOptionIds)
-        try container.encodeIfPresent(suggestedTimes, forKey: .suggestedTimes)
+        // suggestedTimes is not a column on the invites table — it's derived from time_options
+        // and must never be written directly; omit from all encode paths.
         try container.encodeIfPresent(inviteToken, forKey: .inviteToken)
         try container.encodeIfPresent(promotedAt, forKey: .promotedAt)
         try container.encodeIfPresent(promotedFromTier, forKey: .promotedFromTier)
