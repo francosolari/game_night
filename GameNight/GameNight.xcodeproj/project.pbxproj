@@ -271,7 +271,7 @@
 		46283920F6B72D92A4A3F332 /* PlayLoggingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayLoggingViewModel.swift; sourceTree = "<group>"; };
 		46C66541A70C31BA98A29D18 /* Group.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Group.swift; sourceTree = "<group>"; };
 		472C82A47603B0D5E3E81260 /* GameNight.Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GameNight.Release.entitlements; sourceTree = "<group>"; };
-		473E2A3C9AF8B901328B9FB3 /* powered-by-bgg-reversed-rgb.svg */ = {isa = PBXFileReference; path = "powered-by-bgg-reversed-rgb.svg"; sourceTree = "<group>"; };
+		473E2A3C9AF8B901328B9FB3 /* powered-by-bgg-reversed-rgb.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = "powered-by-bgg-reversed-rgb.svg"; sourceTree = "<group>"; };
 		475EA5D2D276767BCB3F5408 /* CalendarGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarGridView.swift; sourceTree = "<group>"; };
 		47E207E78E030FF6873F81D8 /* AccentBorderCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccentBorderCard.swift; sourceTree = "<group>"; };
 		487DE2C3FE34F385AF85AEB8 /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
@@ -342,7 +342,7 @@
 		A52FDC7F7A3AA667F78FB725 /* GameNightNSE.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = GameNightNSE.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A748A48151992F1F8336ACE7 /* UserModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserModelTests.swift; sourceTree = "<group>"; };
 		AB3A8170D6B33687C74DE346 /* JSONTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTestHelpers.swift; sourceTree = "<group>"; };
-		ABF14C370F1450519DA68373 /* powered-by-bgg-rgb.svg */ = {isa = PBXFileReference; path = "powered-by-bgg-rgb.svg"; sourceTree = "<group>"; };
+		ABF14C370F1450519DA68373 /* powered-by-bgg-rgb.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = "powered-by-bgg-rgb.svg"; sourceTree = "<group>"; };
 		AC348B1DF846B0EA1FED19F6 /* CommonComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonComponents.swift; sourceTree = "<group>"; };
 		ACB83C739BF047B0D25687FA /* GroupInvitePreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupInvitePreviewSheet.swift; sourceTree = "<group>"; };
 		AFAFBC98FCB83FD971A6F753 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -355,7 +355,7 @@
 		BA929ACDD2447D825A52AFCF /* PhoneNumberFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberFormatter.swift; sourceTree = "<group>"; };
 		BF42D07B22BEA961ACC27216 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		BF66335DE47AC248FA2EC911 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
-		BFCE44DB7F63902750892756 /* Secrets.swift.example */ = {isa = PBXFileReference; path = Secrets.swift.example; sourceTree = "<group>"; };
+		BFCE44DB7F63902750892756 /* Secrets.swift.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Secrets.swift.example; sourceTree = "<group>"; };
 		C120C5454EC83E50CE3906BE /* powered_by_K_01_SM.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = powered_by_K_01_SM.jpg; sourceTree = "<group>"; };
 		C545563F575388D3D5C55CE1 /* GroupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupsView.swift; sourceTree = "<group>"; };
 		C67A83C0C5E8696650B89FD0 /* GameNight.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GameNight.entitlements; sourceTree = "<group>"; };

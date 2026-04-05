@@ -2154,6 +2154,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
         return plays
     }
 
+    func fetchPlaysForGroups(groupIds: [UUID]) async throws -> [Play] {
+        guard !groupIds.isEmpty else { return [] }
+        let plays: [Play] = try await client
+            .rpc("get_dashboard_plays", params: ["p_group_ids": groupIds.map(\.uuidString)])
+            .execute()
+            .value
+        return plays
+    }
+
     func fetchPlaysForGameAmongUsers(gameId: UUID, userIds: [UUID]) async throws -> [Play] {
         let plays: [Play] = try await client
             .from("plays")
@@ -2267,6 +2276,15 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
     func fetchEventsForGroup(groupId: UUID) async throws -> [GameEvent] {
         let events: [GameEvent] = try await client
             .rpc("get_group_events", params: ["p_group_id": groupId.uuidString])
+            .execute()
+            .value
+        return events
+    }
+
+    func fetchEventsForGroups(groupIds: [UUID]) async throws -> [GameEvent] {
+        guard !groupIds.isEmpty else { return [] }
+        let events: [GameEvent] = try await client
+            .rpc("get_dashboard_events", params: ["p_group_ids": groupIds.map(\.uuidString)])
             .execute()
             .value
         return events

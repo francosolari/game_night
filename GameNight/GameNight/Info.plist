@@ -34,6 +34,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>CardboardWithMe can add game night events to your calendar so you never miss a session.</string>
 	<key>NSContactsUsageDescription</key>
