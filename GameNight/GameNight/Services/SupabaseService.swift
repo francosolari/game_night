@@ -344,7 +344,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let activeStatuses = "status.eq.published,status.eq.confirmed,status.eq.completed"
 
-        async let publicEventsTask: [GameEvent] = client
+        let publicEvents: [GameEvent] = try await client
             .from("events")
             .select(Self.eventSelect)
             .eq("visibility", value: EventVisibility.public.rawValue)
@@ -354,7 +354,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .execute()
             .value
 
-        async let hostedEventsTask: [GameEvent] = client
+        let hostedEvents: [GameEvent] = try await client
             .from("events")
             .select(Self.eventSelect)
             .eq("host_id", value: userId)
@@ -363,8 +363,6 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
             .order("created_at", ascending: false)
             .execute()
             .value
-
-        let (publicEvents, hostedEvents) = try await (publicEventsTask, hostedEventsTask)
 
         var mergedById = Dictionary(uniqueKeysWithValues: publicEvents.map { ($0.id, $0) })
         for event in hostedEvents {
@@ -642,7 +640,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
         let invites: [Invite] = try await client
             .from("invites")
-            .select("*, event:events(\(Self.eventSelect))")
+            .select()
             .eq("user_id", value: userId)
             .execute()
             .value
@@ -2047,10 +2045,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchPlaysForEvent(eventId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
-            .from("plays")
-            .select(Self.playSelect)
-            .eq("event_id", value: eventId.uuidString)
-            .order("played_at", ascending: false)
+            .rpc("get_event_plays", params: ["p_event_id": eventId.uuidString])
             .execute()
             .value
         return plays
@@ -2058,10 +2053,7 @@ final class SupabaseService: ObservableObject, HomeDataProviding, EventEditingPr
 
     func fetchPlaysForGroup(groupId: UUID) async throws -> [Play] {
         let plays: [Play] = try await client
-            .from("plays")
-            .select(Self.playSelect)
-            .eq("group_id", value: groupId.uuidString)
-            .order("played_at", ascending: false)
+            .rpc("get_group_plays", params: ["p_group_id": groupId.uuidString])
             .execute()
             .value
         return plays

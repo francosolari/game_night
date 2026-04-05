@@ -118,10 +118,10 @@ final class AppState: ObservableObject {
 
     private func preloadImages(for snapshot: HomeDataLoadSnapshot) {
         let upcomingUrls = snapshot.upcomingEvents.compactMap { $0.preferredCoverImageURLString }
-        let inviteUrls = snapshot.myInvites.compactMap { $0.event?.preferredCoverImageURLString }
+        let awaitingResponseUrls = snapshot.awaitingResponseEvents.compactMap { $0.event.preferredCoverImageURLString }
         let draftUrls = snapshot.drafts.compactMap { $0.preferredCoverImageURLString }
-        
-        let urls = Set(upcomingUrls + inviteUrls + draftUrls)
+
+        let urls = Set(upcomingUrls + awaitingResponseUrls + draftUrls)
         
         for urlString in urls {
             guard let url = URL(string: urlString) else { continue }
