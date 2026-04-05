@@ -30,6 +30,7 @@ protocol EventEditingProviding: AnyObject {
     func updateGameImageUrl(gameId: UUID, imageUrl: String) async throws
     func addGameToLibrary(gameId: UUID, categoryId: UUID?) async throws
     func fetchGameLibrary() async throws -> [GameLibraryEntry]
+    func searchCachedGames(query: String) async throws -> [Game]
     func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws
     func upsertFamilyLinks(gameId: UUID, families: [(bggFamilyId: Int, name: String)]) async throws
 }

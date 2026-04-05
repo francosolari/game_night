@@ -55,8 +55,9 @@ final class CreateEventViewModel: ObservableObject {
 
     @Published var gameSearchQuery = ""
     @Published var gameSearchResults: [BGGSearchResult] = []
+    @Published var cachedGameSearchResults: [Game] = []
+    @Published var libraryGameSearchResults: [Game] = []
     @Published var isSearchingGames = false
-    @Published var manualGameName = ""
     @Published var libraryGames: [Game] = []
 
     @Published var suggestedContacts: [UserContact] = []
@@ -84,6 +85,7 @@ final class CreateEventViewModel: ObservableObject {
     private let supabase: EventEditingProviding
     private let bgg: EventGameBGGProviding
     private let userDefaults: UserDefaults
+    private var gameSearchTask: Task<Void, Never>?
 
     private enum LocalCoverPreviewStorage {
         static let previewEventIdKey = "create_event.preview_event_id"
@@ -266,18 +268,67 @@ final class CreateEventViewModel: ObservableObject {
         completedSteps.insert(currentStep)
     }
 
-    func searchGames() async {
-        guard !gameSearchQuery.isEmpty else {
+    func searchGames() {
+        gameSearchTask?.cancel()
+        let query = gameSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
             gameSearchResults = []
+            cachedGameSearchResults = []
+            libraryGameSearchResults = []
+            isSearchingGames = false
             return
         }
-        isSearchingGames = true
-        do {
-            gameSearchResults = try await bgg.searchGames(query: gameSearchQuery)
-        } catch {
-            self.error = error.localizedDescription
+
+        gameSearchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+
+            let selectedIds = Set(selectedGames.map(\.gameId))
+            let selectedBggIds = Set(selectedGames.compactMap { $0.game?.bggId })
+
+            let libraryMatches = libraryGames.filter { game in
+                game.name.localizedCaseInsensitiveContains(query) && !selectedIds.contains(game.id)
+            }
+
+            guard !Task.isCancelled else { return }
+            libraryGameSearchResults = Array(libraryMatches.prefix(8))
+
+            if !libraryMatches.isEmpty {
+                cachedGameSearchResults = []
+                gameSearchResults = []
+                isSearchingGames = false
+                return
+            }
+
+            isSearchingGames = true
+            do {
+                let cachedMatches = try await supabase.searchCachedGames(query: query)
+                guard !Task.isCancelled else { return }
+
+                let filteredCached = cachedMatches.filter { game in
+                    !selectedIds.contains(game.id) &&
+                    (game.bggId == nil || !selectedBggIds.contains(game.bggId!))
+                }
+
+                if !filteredCached.isEmpty {
+                    cachedGameSearchResults = Array(filteredCached.prefix(12))
+                    gameSearchResults = []
+                    isSearchingGames = false
+                    return
+                }
+
+                cachedGameSearchResults = []
+                gameSearchResults = try await bgg.searchGames(query: query)
+                    .filter { !selectedBggIds.contains($0.id) }
+                isSearchingGames = false
+            } catch {
+                if Task.isCancelled { return }
+                cachedGameSearchResults = []
+                gameSearchResults = []
+                isSearchingGames = false
+                self.error = error.localizedDescription
+            }
         }
-        isSearchingGames = false
     }
 
     func addGame(bggId: Int, isPrimary: Bool = false) async {
@@ -334,48 +385,20 @@ final class CreateEventViewModel: ObservableObject {
         return savedGame
     }
 
-    func addManualGame(name: String) async {
-        let game = Game(
+    func addExistingGame(_ game: Game) {
+        guard !selectedGames.contains(where: { $0.gameId == game.id }) else { return }
+        let eventGame = EventGame(
             id: UUID(),
-            bggId: nil,
-            name: name,
-            yearPublished: nil,
-            thumbnailUrl: nil,
-            imageUrl: nil,
-            minPlayers: 2,
-            maxPlayers: 4,
-            recommendedPlayers: nil,
-            minPlaytime: 60,
-            maxPlaytime: 120,
-            complexity: 0,
-            bggRating: nil,
-            description: nil,
-            categories: [],
-            mechanics: [],
-            designers: [],
-            publishers: [],
-            artists: [],
-            minAge: nil,
-            bggRank: nil
+            gameId: game.id,
+            game: game,
+            isPrimary: selectedGames.isEmpty,
+            sortOrder: selectedGames.count
         )
-
-        do {
-            let saved = try await supabase.upsertGame(game)
-            let eventGame = EventGame(
-                id: UUID(),
-                gameId: saved.id,
-                game: saved,
-                isPrimary: selectedGames.isEmpty,
-                sortOrder: selectedGames.count
-            )
-            selectedGames.append(eventGame)
-            manualGameName = ""
-
-            // Persist to user's game library
-            try? await supabase.addGameToLibrary(gameId: saved.id, categoryId: nil)
-        } catch {
-            self.error = error.localizedDescription
-        }
+        selectedGames.append(eventGame)
+        gameSearchQuery = ""
+        gameSearchResults = []
+        cachedGameSearchResults = []
+        libraryGameSearchResults = []
     }
 
     func updateManualGameSettings(at index: Int, game: Game) async {
@@ -496,12 +519,6 @@ final class CreateEventViewModel: ObservableObject {
         } catch {
             // Non-critical
         }
-    }
-
-    var libraryAutocompleteResults: [Game] {
-        guard !manualGameName.isEmpty else { return [] }
-        let query = manualGameName.lowercased()
-        return libraryGames.filter { $0.name.lowercased().contains(query) }
     }
 
     var topSuggestions: [UserContact] {

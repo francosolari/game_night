@@ -1276,6 +1276,10 @@ private final class StubEventEditorService: EventEditingProviding {
         []
     }
 
+    func searchCachedGames(query: String) async throws -> [Game] {
+        []
+    }
+
     func upsertExpansionLinks(baseGameId: UUID, expansionGameIds: [UUID]) async throws {
         expansionLinkCalls.append((baseGameId: baseGameId, expansionGameIds: expansionGameIds))
     }
