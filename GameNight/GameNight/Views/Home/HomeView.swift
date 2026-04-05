@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var eventsNeedingPlayLog: [GameEvent] = []
     @State private var dismissedPlayLogIds: Set<UUID> = []
     @State private var playLogEvent: GameEvent?
+    @State private var refreshHandlerToken: UUID?
 
     private var carouselCardWidth: CGFloat {
         let screenWidth = UIScreen.main.bounds.width
@@ -361,8 +362,10 @@ struct HomeView: View {
             appState.preloadedHomeSnapshot = nil
             await viewModel.loadData(preloadedSnapshot: preloaded)
             await loadEventsNeedingPlayLog()
-            appState.registerRefreshHandler(for: .home) {
-                await viewModel.loadData()
+            if refreshHandlerToken == nil {
+                refreshHandlerToken = appState.registerRefreshHandler(for: .home) {
+                    await viewModel.loadData()
+                }
             }
         }
         .sheet(item: $draftToResume) { draft in

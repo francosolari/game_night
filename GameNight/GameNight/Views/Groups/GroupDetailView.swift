@@ -8,6 +8,7 @@ struct GroupDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var toast: ToastItem?
     @State private var hasLoadedData = false
+    @State private var hasRegisteredRefreshHandler = false
     @Environment(\.dismiss) private var dismiss
 
     init(group: GameGroup) {
@@ -166,6 +167,12 @@ struct GroupDetailView: View {
             Text("This will permanently delete the group, all members, and chat history. This can't be undone.")
         }
         .task {
+            if !hasRegisteredRefreshHandler {
+                hasRegisteredRefreshHandler = true
+                appState.registerRefreshHandler(for: .groups) { [weak viewModel] in
+                    await viewModel?.loadLinkedEvents()
+                }
+            }
             guard !hasLoadedData else { return }
             hasLoadedData = true
             await viewModel.loadAllData()

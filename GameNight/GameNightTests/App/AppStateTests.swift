@@ -33,4 +33,22 @@ final class AppStateTests: XCTestCase {
         let sut = AppState()
         XCTAssertEqual(sut.selectedTab, .home)
     }
+
+    // MARK: - Refresh Handlers
+
+    func testRefresh_whenMultipleHandlersRegisteredForSameArea_invokesAllHandlers() async {
+        let sut = AppState()
+        var callCount = 0
+
+        sut.registerRefreshHandler(for: .groups) {
+            callCount += 1
+        }
+        sut.registerRefreshHandler(for: .groups) {
+            callCount += 1
+        }
+
+        await sut.refresh([.groups])
+
+        XCTAssertEqual(callCount, 2)
+    }
 }

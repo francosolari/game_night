@@ -39,7 +39,7 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var notificationChannel: RealtimeChannelV2?
-    private var refreshHandlers: [RefreshArea: RefreshHandler] = [:]
+    private var refreshHandlers: [RefreshArea: [UUID: RefreshHandler]] = [:]
 
     init() {}
 
@@ -230,14 +230,29 @@ final class AppState: ObservableObject {
         refreshHandlers = [:]
     }
 
-    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) {
-        refreshHandlers[area] = handler
+    @discardableResult
+    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) -> UUID {
+        let token = UUID()
+        refreshHandlers[area, default: [:]][token] = handler
+        return token
+    }
+
+    func unregisterRefreshHandler(for area: RefreshArea, token: UUID) {
+        guard var handlersByToken = refreshHandlers[area] else { return }
+        handlersByToken.removeValue(forKey: token)
+        if handlersByToken.isEmpty {
+            refreshHandlers.removeValue(forKey: area)
+        } else {
+            refreshHandlers[area] = handlersByToken
+        }
     }
 
     func refresh(_ areas: [RefreshArea]) async {
         for area in areas {
-            guard let handler = refreshHandlers[area] else { continue }
-            await handler()
+            guard let handlersByToken = refreshHandlers[area] else { continue }
+            for handler in handlersByToken.values {
+                await handler()
+            }
         }
     }
 

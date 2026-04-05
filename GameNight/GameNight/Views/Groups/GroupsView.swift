@@ -6,6 +6,7 @@ struct GroupsView: View {
     @State private var showCreateGroup = false
     @State private var toast: ToastItem?
     @State private var navigationPath = NavigationPath()
+    @State private var refreshHandlerToken: UUID?
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -183,9 +184,11 @@ struct GroupsView: View {
         .task {
             await viewModel.loadGroups()
             await viewModel.loadDashboardData()
-            appState.registerRefreshHandler(for: .groups) {
-                await viewModel.loadGroups()
-                await viewModel.loadDashboardData()
+            if refreshHandlerToken == nil {
+                refreshHandlerToken = appState.registerRefreshHandler(for: .groups) {
+                    await viewModel.loadGroups()
+                    await viewModel.loadDashboardData()
+                }
             }
         }
     }
