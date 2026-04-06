@@ -37,10 +37,11 @@ final class EventViewModel: ObservableObject {
     private var activityChannel: RealtimeChannelV2?
     private var subscribedEventId: UUID?
     private var subscribedActivityEventId: UUID?
+    private var isRefreshingEventData = false
 
     var hasRSVPd: Bool {
         guard let status = myInvite?.status else { return false }
-        return status == .accepted || status == .maybe
+        return status == .accepted || status == .maybe || status == .voted
     }
 
     var viewerRole: EventViewerRole {
@@ -98,7 +99,7 @@ final class EventViewModel: ObservableObject {
         guard let invite = myInvite else { return false }
         if !myPollVotes.isEmpty { return true }
         let status = invite.status
-        return status == .accepted || status == .maybe
+        return status == .accepted || status == .maybe || status == .voted
     }
 
     var canSeeActivityFeed: Bool {
@@ -130,6 +131,7 @@ final class EventViewModel: ObservableObject {
         let pending = nonHostInvites.filter { $0.status == .pending }
         let maybe = nonHostInvites.filter { $0.status == .maybe }
         let waitlisted = nonHostInvites.filter { $0.status == .waitlisted }
+        let voted = nonHostInvites.filter { $0.status == .voted }
 
         func mapUsers(_ list: [Invite]) -> [InviteSummary.InviteUser] {
             list.map { .init(id: $0.id, userId: $0.userId, name: $0.displayName ?? "Unknown", phoneNumber: $0.phoneNumber, avatarUrl: nil, status: $0.status, tier: $0.tier, inviteToken: $0.inviteToken, promotedAt: $0.promotedAt) }
@@ -151,11 +153,13 @@ final class EventViewModel: ObservableObject {
             pending: pending.count,
             maybe: maybe.count,
             waitlisted: waitlisted.count,
+            voted: voted.count,
             acceptedUsers: acceptedUsers,
             pendingUsers: mapUsers(pending),
             maybeUsers: mapUsers(maybe),
             declinedUsers: mapUsers(declined),
-            waitlistedUsers: mapUsers(waitlisted)
+            waitlistedUsers: mapUsers(waitlisted),
+            votedUsers: mapUsers(voted)
         )
     }
 
@@ -209,6 +213,9 @@ final class EventViewModel: ObservableObject {
 
     /// Silently refresh event, invites, and poll voter details without flashing loading state.
     func refreshEventData(eventId: UUID) async {
+        if isRefreshingEventData { return }
+        isRefreshingEventData = true
+        defer { isRefreshingEventData = false }
         do {
             async let eventResult = supabase.fetchEvent(id: eventId)
             async let invitesResult = supabase.fetchInvites(eventId: eventId)
@@ -338,7 +345,7 @@ final class EventViewModel: ObservableObject {
             // Re-submit all current votes with this one updated
             myPollVotes[optionId] = voteType
             let allVotes = myPollVotes.map { TimeOptionVote(timeOptionId: $0.key, voteType: $0.value) }
-            let statusToPersist: InviteStatus = event?.scheduleMode == .poll ? .pending : invite.status
+            let statusToPersist: InviteStatus = event?.scheduleMode == .poll ? .voted : invite.status
             try await supabase.respondToInvite(
                 inviteId: invite.id,
                 status: statusToPersist,
@@ -423,7 +430,9 @@ final class EventViewModel: ObservableObject {
                 suggestedTimes: suggestedTimes
             )
             if let eventId = event?.id {
-                await refreshEventData(eventId: eventId)
+                Task { [weak self] in
+                    await self?.refreshEventData(eventId: eventId)
+                }
             }
         } catch {
             // Rollback on failure

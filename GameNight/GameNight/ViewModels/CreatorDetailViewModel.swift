@@ -55,10 +55,10 @@ final class CreatorDetailViewModel: ObservableObject {
         return weights.reduce(0, +) / Double(weights.count)
     }
 
-    init(name: String, role: CreatorRole, supabase: SupabaseService = .shared) {
+    init(name: String, role: CreatorRole, supabase: SupabaseService? = nil) {
         self.name = name
         self.role = role
-        self.supabase = supabase
+        self.supabase = supabase ?? .shared
     }
 
     func loadGames() async {

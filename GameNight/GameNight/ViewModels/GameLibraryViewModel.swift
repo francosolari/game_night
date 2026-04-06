@@ -32,6 +32,7 @@ final class GameLibraryViewModel: ObservableObject {
 
     private let supabase = SupabaseService.shared
     private let bgg = BGGService.shared
+    private let membershipCache = GameMembershipCache.shared
     private var searchTask: Task<Void, Never>?
     private var cacheSearchTask: Task<Void, Never>?
     private var selectedGameParseResult: BGGGameParseResult?
@@ -81,19 +82,37 @@ final class GameLibraryViewModel: ObservableObject {
     }
 
     func loadLibrary() async {
-        isLoading = true
+        // Only show spinner if we have NO data yet (first load)
+        let shouldShowLoading = libraryEntries.isEmpty && categories.isEmpty && wishlistEntries.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+        }
+        
         do {
-            async let entriesResult = supabase.fetchGameLibrary()
+            // 1. Fetch library entries first as they are the main content
+            self.libraryEntries = try await supabase.fetchGameLibrary()
+            
+            // If we were showing a spinner, we can stop now to show the games
+            if shouldShowLoading {
+                isLoading = false
+            }
+            
+            // 2. Fetch the rest concurrently to populate filters and badges
             async let catsResult = supabase.fetchCategories()
             async let wishlistResult = supabase.fetchWishlist()
-
-            self.libraryEntries = try await entriesResult
+            
             self.categories = try await catsResult
             self.wishlistEntries = try await wishlistResult
+            
+            // 3. Warm the membership cache once we have everything
+            await membershipCache.warm(
+                libraryEntries: self.libraryEntries,
+                wishlistEntries: self.wishlistEntries
+            )
         } catch {
             self.error = error.localizedDescription
+            isLoading = false
         }
-        isLoading = false
     }
 
     func addToWishlist(game: Game) async {
@@ -109,6 +128,14 @@ final class GameLibraryViewModel: ObservableObject {
                 notes: nil
             )
             wishlistEntries.insert(entry, at: 0)
+            await membershipCache.cacheRemoteState(
+                gameId: saved.id,
+                bggId: saved.bggId,
+                isInCollection: false,
+                isInWishlist: true,
+                libraryEntryId: nil,
+                wishlistEntryId: entry.id
+            )
             toast = ToastItem(style: .success, message: "Added \(game.name) to wishlist")
         } catch {
             toast = ToastItem(style: .error, message: error.localizedDescription)
@@ -116,9 +143,22 @@ final class GameLibraryViewModel: ObservableObject {
     }
 
     func removeFromWishlist(entryId: UUID) async {
+        let removedEntry = wishlistEntries.first(where: { $0.id == entryId })
+        let removedGameId = removedEntry?.gameId
+        let removedBGGId = removedEntry?.game?.bggId
         do {
             try await supabase.removeFromWishlist(entryId: entryId)
             wishlistEntries.removeAll { $0.id == entryId }
+            if let removedGameId {
+                await membershipCache.cacheRemoteState(
+                    gameId: removedGameId,
+                    bggId: removedBGGId,
+                    isInCollection: false,
+                    isInWishlist: false,
+                    libraryEntryId: nil,
+                    wishlistEntryId: nil
+                )
+            }
         } catch {
             toast = ToastItem(style: .error, message: error.localizedDescription)
         }
@@ -225,9 +265,22 @@ final class GameLibraryViewModel: ObservableObject {
     }
 
     func removeFromLibrary(entryId: UUID) async {
+        let removedEntry = libraryEntries.first(where: { $0.id == entryId })
+        let removedGameId = removedEntry?.gameId
+        let removedBGGId = removedEntry?.game?.bggId
         do {
             try await supabase.removeGameFromLibrary(entryId: entryId)
             libraryEntries.removeAll { $0.id == entryId }
+            if let removedGameId {
+                await membershipCache.cacheRemoteState(
+                    gameId: removedGameId,
+                    bggId: removedBGGId,
+                    isInCollection: false,
+                    isInWishlist: false,
+                    libraryEntryId: nil,
+                    wishlistEntryId: nil
+                )
+            }
         } catch {
             self.error = error.localizedDescription
         }

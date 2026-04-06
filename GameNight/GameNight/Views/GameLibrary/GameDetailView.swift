@@ -11,6 +11,7 @@ struct GameDetailView: View {
     @State private var isUploadingImage = false
     @State private var imageUploadError: String?
     @State private var expandedCreatorRoles: Set<CreatorRole> = []
+    @State private var hasLoadedRelatedData = false
 
     private var isManualGame: Bool {
         displayedGame.isManual
@@ -25,6 +26,10 @@ struct GameDetailView: View {
             return manualDraftGame
         }
         return viewModel.game
+    }
+
+    private var canShowLibraryActions: Bool {
+        !isEditingManualGame && displayedGame.bggId != nil
     }
 
     private var gameInitials: String {
@@ -65,8 +70,13 @@ struct GameDetailView: View {
         max(relevantFamilies.count - visibleFamilies.count, 0)
     }
 
-    init(game: Game) {
-        _viewModel = StateObject(wrappedValue: GameDetailViewModel(game: game))
+    init(game: Game, initialMembership: GameMembershipState? = nil) {
+        _viewModel = StateObject(
+            wrappedValue: GameDetailViewModel(
+                game: game,
+                initialMembership: initialMembership
+            )
+        )
     }
 
     var body: some View {
@@ -164,6 +174,7 @@ struct GameDetailView: View {
                         }
 
                         titleMetadata
+
                     }
 
                     // 3. Info rows
@@ -299,9 +310,26 @@ struct GameDetailView: View {
                 }
             }
         }
-        .task {
-            await viewModel.loadRelatedData()
+        .onAppear {
+            guard !hasLoadedRelatedData else { return }
+            hasLoadedRelatedData = true
+            Task { await viewModel.loadRelatedData() }
         }
+        .toast($viewModel.toast)
+    }
+
+    private var collectionButtonTitle: String {
+        if viewModel.isSavingCollection {
+            return viewModel.isInCollection ? "Saving..." : "Adding..."
+        }
+        return viewModel.isInCollection ? "In Collection" : "Add to Collection"
+    }
+
+    private var wishlistButtonTitle: String {
+        if viewModel.isSavingWishlist {
+            return viewModel.isInWishlist ? "Saving..." : "Adding..."
+        }
+        return viewModel.isInWishlist ? "In Wishlist" : "Add to Wishlist"
     }
 
     @ViewBuilder
@@ -333,13 +361,75 @@ struct GameDetailView: View {
                 if !publisherLinks.isEmpty {
                     creatorRow(links: publisherLinks, maxVisible: 1, role: .publisher)
                 }
-                if let year = displayedGame.yearPublished {
-                    Label(String(year), systemImage: "calendar")
-                        .font(Theme.Typography.callout)
-                        .foregroundColor(Theme.Colors.textTertiary)
+                if displayedGame.yearPublished != nil || canShowLibraryActions {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        if let year = displayedGame.yearPublished {
+                            Label(String(year), systemImage: "calendar")
+                                .font(Theme.Typography.callout)
+                                .foregroundColor(Theme.Colors.textTertiary)
+                        }
+                        Spacer(minLength: Theme.Spacing.sm)
+                        if canShowLibraryActions {
+                            compactLibraryActions
+                        }
+                    }
+                }
+
+                if let actionError = viewModel.actionError, !actionError.isEmpty {
+                    Text(actionError)
+                        .font(Theme.Typography.caption)
+                        .foregroundColor(Theme.Colors.error)
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var compactLibraryActions: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            compactMembershipButton(
+                title: collectionButtonTitle,
+                systemImage: viewModel.isInCollection ? "checkmark.circle.fill" : "plus.circle",
+                isActive: viewModel.isInCollection,
+                isDisabled: viewModel.isSavingCollection || viewModel.isSavingWishlist
+            ) {
+                Task { await viewModel.toggleCollection() }
+            }
+
+            if !viewModel.isInCollection {
+                compactMembershipButton(
+                    title: wishlistButtonTitle,
+                    systemImage: viewModel.isInWishlist ? "heart.fill" : "heart",
+                    isActive: viewModel.isInWishlist,
+                    isDisabled: viewModel.isSavingWishlist || viewModel.isSavingCollection
+                ) {
+                    Task { await viewModel.toggleWishlist() }
+                }
+            }
+        }
+    }
+
+    private func compactMembershipButton(
+        title: String,
+        systemImage: String,
+        isActive: Bool,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(Theme.Typography.caption)
+                .lineLimit(1)
+                .padding(.vertical, 4)
+                .padding(.horizontal, Theme.Spacing.sm)
+                .background(
+                    Capsule()
+                        .fill(isActive ? Theme.Colors.primary.opacity(0.16) : Theme.Colors.backgroundElevated)
+                )
+                .foregroundColor(isActive ? Theme.Colors.primary : Theme.Colors.textPrimary)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
     }
 
     private func creatorLinks(names: [String], role: CreatorRole) -> [(name: String, destination: CreatorDestination)] {
@@ -971,7 +1061,13 @@ private struct ExpandableCreatorRow: View {
                         Text("\u{00B7}")
                             .foregroundColor(Theme.Colors.textTertiary)
                     }
-                    NavigationLink(value: item.destination) {
+                    NavigationLink {
+                        if item.destination.role == .designer {
+                            DesignerDetailView(name: item.name)
+                        } else {
+                            PublisherDetailView(name: item.name)
+                        }
+                    } label: {
                         Text(item.name)
                             .font(Theme.Typography.callout)
                             .foregroundColor(Theme.Colors.accent)

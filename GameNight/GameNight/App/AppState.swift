@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import Supabase
+import UserNotifications
 
 @MainActor
 final class AppState: ObservableObject {
@@ -17,6 +18,13 @@ final class AppState: ObservableObject {
     @Published var preloadedHomeSnapshot: HomeDataLoadSnapshot?
     @Published var navigateToCalendar = false
 
+    enum RefreshArea: Hashable {
+        case home
+        case groups
+    }
+
+    typealias RefreshHandler = @MainActor () async -> Void
+
     /// Maps digits-only phone number → the current user's contact name for that person.
     /// Used to show contact names instead of app display names for people in your address book.
     var contactNameMap: [String: String] = [:]
@@ -31,6 +39,7 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var notificationChannel: RealtimeChannelV2?
+    private var refreshHandlers: [RefreshArea: [UUID: RefreshHandler]] = [:]
 
     init() {}
 
@@ -38,35 +47,71 @@ final class AppState: ObservableObject {
         let startTime = Date()
         self.isLoading = true
 
-        // 1. Quick check for session
-        if let session = try? await SupabaseService.shared.client.auth.session {
-            self.isAuthenticated = true
-            
-            // Start background warm-up
-            Task {
-                if let user = try? await SupabaseService.shared.fetchCurrentUser() {
-                    self.currentUser = user
-                }
-            }
-            refreshContactNames()
-            startNotificationSubscription()
-            refreshUnreadCounts()
-
-            // 2. Preload Home Data while splash is visible
-            let supabase = SupabaseService.shared
-            let snapshot = await HomeDataLoader.load(
-                fetchUpcomingEvents: { try await supabase.fetchUpcomingEvents() },
-                fetchMyInvites: { try await supabase.fetchMyInvites() },
-                fetchDrafts: { try await supabase.fetchDrafts() }
-            )
-            let hydratedSnapshot = await hydrateHomeSnapshot(snapshot, supabase: supabase)
-            self.preloadedHomeSnapshot = hydratedSnapshot
-            preloadImages(for: hydratedSnapshot)
-        } else {
+        // 1. Local session check (handles token refresh automatically)
+        guard (try? await SupabaseService.shared.client.auth.session) != nil else {
             self.isAuthenticated = false
+            let elapsed = Date().timeIntervalSince(startTime)
+            let minimumTime: TimeInterval = 2.0
+            if elapsed < minimumTime {
+                let delay = UInt64((minimumTime - elapsed) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            self.isLoading = false
+            return
         }
 
-        // 3. Minimum splash time (2 seconds for a polished feel, or until preload finishes)
+        // 2. Server-validate the session with one real DB call before firing all
+        //    background tasks. Catches stale/cross-env tokens that pass the local
+        //    keychain check but are rejected by the server (bad_jwt).
+        guard await SupabaseService.shared.validateSession() else {
+            self.isAuthenticated = false
+            let elapsed = Date().timeIntervalSince(startTime)
+            let minimumTime: TimeInterval = 2.0
+            if elapsed < minimumTime {
+                let delay = UInt64((minimumTime - elapsed) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            self.isLoading = false
+            return
+        }
+
+        self.isAuthenticated = true
+
+        // 3. Background warm-up (session is confirmed valid)
+        Task {
+            if let user = try? await SupabaseService.shared.fetchCurrentUser() {
+                self.currentUser = user
+
+                let currentTimeZoneIdentifier = TimeZone.current.identifier
+                if user.timeZoneIdentifier != currentTimeZoneIdentifier {
+                    try? await SupabaseService.shared.updateCurrentUserTimeZoneIdentifier(currentTimeZoneIdentifier)
+                    var updatedUser = user
+                    updatedUser.timeZoneIdentifier = currentTimeZoneIdentifier
+                    self.currentUser = updatedUser
+                }
+            }
+        }
+        refreshContactNames()
+        startNotificationSubscription()
+        refreshUnreadCounts()
+        Task {
+            _ = try? await SupabaseService.shared.fetchFrequentContacts(limit: 200)
+        }
+
+        // 4. Preload Home Data while splash is visible
+        let supabase = SupabaseService.shared
+        let snapshot = await HomeDataLoader.load(
+            fetchUpcomingEvents: { try await supabase.fetchUpcomingEvents() },
+            fetchMyInvites: { try await supabase.fetchMyInvites() },
+            fetchDrafts: { try await supabase.fetchDrafts() }
+        )
+        let hydratedSnapshot = await hydrateHomeSnapshot(snapshot, supabase: supabase)
+        self.preloadedHomeSnapshot = hydratedSnapshot
+        preloadImages(for: hydratedSnapshot)
+
+        // 5. Minimum splash time (2 seconds for a polished feel, or until preload finishes)
         let elapsed = Date().timeIntervalSince(startTime)
         let minimumTime: TimeInterval = 2.0
         
@@ -81,10 +126,10 @@ final class AppState: ObservableObject {
 
     private func preloadImages(for snapshot: HomeDataLoadSnapshot) {
         let upcomingUrls = snapshot.upcomingEvents.compactMap { $0.preferredCoverImageURLString }
-        let inviteUrls = snapshot.myInvites.compactMap { $0.event?.preferredCoverImageURLString }
+        let awaitingResponseUrls = snapshot.awaitingResponseEvents.compactMap { $0.event.preferredCoverImageURLString }
         let draftUrls = snapshot.drafts.compactMap { $0.preferredCoverImageURLString }
-        
-        let urls = Set(upcomingUrls + inviteUrls + draftUrls)
+
+        let urls = Set(upcomingUrls + awaitingResponseUrls + draftUrls)
         
         for urlString in urls {
             guard let url = URL(string: urlString) else { continue }
@@ -98,6 +143,7 @@ final class AppState: ObservableObject {
         supabase: SupabaseService
     ) async -> HomeDataLoadSnapshot {
         await supabase.completePastEvents()
+        await supabase.sendPendingPlayLogReminders()
 
         var upcomingEvents = base.upcomingEvents
 
@@ -120,7 +166,7 @@ final class AppState: ObservableObject {
         let existingEventIds = Set(upcomingEvents.map(\.id))
         let acceptedInviteEventIds = Set(
             base.myInvites
-                .filter { $0.status == .accepted || $0.status == .maybe }
+                .filter { $0.status == .accepted || $0.status == .maybe || $0.status == .voted }
                 .map(\.eventId)
         )
         let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
@@ -184,11 +230,44 @@ final class AppState: ObservableObject {
         await PushNotificationManager.shared.unregisterCurrentToken()
         stopNotificationSubscription()
         try? await SupabaseService.shared.client.auth.signOut()
+        SupabaseService.shared.clearFrequentContactsCache()
+        await GameMembershipCache.shared.clear()
         isAuthenticated = false
         currentUser = nil
         contactNameMap = [:]
         unreadNotificationCount = 0
         unreadMessageCount = 0
+        refreshHandlers = [:]
+    }
+
+    @discardableResult
+    func registerRefreshHandler(for area: RefreshArea, handler: @escaping RefreshHandler) -> UUID {
+        let token = UUID()
+        refreshHandlers[area, default: [:]][token] = handler
+        return token
+    }
+
+    func unregisterRefreshHandler(for area: RefreshArea, token: UUID) {
+        guard var handlersByToken = refreshHandlers[area] else { return }
+        handlersByToken.removeValue(forKey: token)
+        if handlersByToken.isEmpty {
+            refreshHandlers.removeValue(forKey: area)
+        } else {
+            refreshHandlers[area] = handlersByToken
+        }
+    }
+
+    func refresh(_ areas: [RefreshArea]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for area in areas {
+                guard let handlersByToken = refreshHandlers[area] else { continue }
+                for handler in handlersByToken.values {
+                    group.addTask {
+                        await handler()
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Unread Counts
@@ -201,7 +280,11 @@ final class AppState: ObservableObject {
                 await MainActor.run {
                     self.unreadNotificationCount = notifCount
                     self.unreadMessageCount = msgCount
-                    UIApplication.shared.applicationIconBadgeNumber = notifCount
+                    if #available(iOS 17.0, *) {
+                        UNUserNotificationCenter.current().setBadgeCount(notifCount)
+                    } else {
+                        UIApplication.shared.applicationIconBadgeNumber = notifCount
+                    }
                 }
             } catch {
                 print("Failed to refresh unread counts: \(error)")

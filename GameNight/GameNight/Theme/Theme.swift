@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Theme Mode
 enum ThemeMode: String, CaseIterable {
@@ -185,6 +188,10 @@ final class ThemeManager: ObservableObject {
     @Published var mode: ThemeMode = .light {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: "themeMode")
+            if mode == .system {
+                // Re-sync immediately when user selects "System" so we don't keep a stale forced value.
+                systemColorScheme = Self.currentSystemColorScheme()
+            }
             rebuildPalette()
         }
     }
@@ -235,8 +242,19 @@ final class ThemeManager: ObservableObject {
 
     private static func currentSystemColorScheme() -> ColorScheme {
         #if canImport(UIKit)
-        let style = UITraitCollection.current.userInterfaceStyle
-        return style == .dark ? .dark : .light
+        let activeStyle =
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .first(where: \.isKeyWindow)?
+                .traitCollection.userInterfaceStyle
+
+        switch activeStyle ?? UIScreen.main.traitCollection.userInterfaceStyle {
+        case .dark:
+            return .dark
+        default:
+            return .light
+        }
         #else
         return .light
         #endif

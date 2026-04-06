@@ -14,6 +14,7 @@ private extension AppNotification.NotificationType {
         case .textBlast:        return Theme.Colors.accentWarm
         case .gameConfirmed:    return Theme.Colors.success
         case .eventCancelled:   return Theme.Colors.error
+        case .playLogReminder:  return Theme.Colors.primary
         }
     }
 }

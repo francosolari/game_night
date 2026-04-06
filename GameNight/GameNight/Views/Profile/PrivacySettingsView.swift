@@ -5,6 +5,8 @@ struct PrivacySettingsView: View {
     @State private var phoneVisible: Bool = false
     @State private var discoverableByPhone: Bool = true
     @State private var gameLibraryPublic: Bool = true
+    @State private var wishlistPublic: Bool = true
+    @State private var playsPublic: Bool = true
     @State private var marketingOptIn: Bool = false
     @State private var showBlockedUsers = false
     @State private var showDeleteConfirm = false
@@ -57,15 +59,33 @@ struct PrivacySettingsView: View {
                 }
                 .cardStyle()
 
-                // Game Library
+                // Profile Content Privacy
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                    SectionHeader(title: "Game Library")
+                    SectionHeader(title: "Profile Content")
 
                     PrivacyToggle(
                         icon: "books.vertical.fill",
-                        title: "Game library visible to others",
-                        description: "Group members can see your game collection on your profile",
+                        title: "Game collection visible to others",
+                        description: "Others can see your game library on your profile",
                         isOn: $gameLibraryPublic
+                    )
+
+                    Divider().background(Theme.Colors.divider)
+
+                    PrivacyToggle(
+                        icon: "heart.fill",
+                        title: "Wishlist visible to others",
+                        description: "Others can see your game wishlist on your profile",
+                        isOn: $wishlistPublic
+                    )
+
+                    Divider().background(Theme.Colors.divider)
+
+                    PrivacyToggle(
+                        icon: "trophy.fill",
+                        title: "Play history visible to others",
+                        description: "Others can see your recent play log on your profile",
+                        isOn: $playsPublic
                     )
                 }
                 .cardStyle()
@@ -226,6 +246,8 @@ struct PrivacySettingsView: View {
             phoneVisible = appState.currentUser?.phoneVisible ?? false
             discoverableByPhone = appState.currentUser?.discoverableByPhone ?? true
             gameLibraryPublic = appState.currentUser?.gameLibraryPublic ?? true
+            wishlistPublic = appState.currentUser?.wishlistPublic ?? true
+            playsPublic = appState.currentUser?.playsPublic ?? true
             marketingOptIn = appState.currentUser?.marketingOptIn ?? false
         }
     }
@@ -236,6 +258,8 @@ struct PrivacySettingsView: View {
         user.phoneVisible = phoneVisible
         user.discoverableByPhone = discoverableByPhone
         user.gameLibraryPublic = gameLibraryPublic
+        user.wishlistPublic = wishlistPublic
+        user.playsPublic = playsPublic
         user.marketingOptIn = marketingOptIn
         try? await SupabaseService.shared.updateUser(user)
         appState.currentUser = user

@@ -8,6 +8,7 @@ struct GroupDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var toast: ToastItem?
     @State private var hasLoadedData = false
+    @State private var hasRegisteredRefreshHandler = false
     @Environment(\.dismiss) private var dismiss
 
     init(group: GameGroup) {
@@ -111,6 +112,7 @@ struct GroupDetailView: View {
                 onSelect: { contacts in
                     Task {
                         await viewModel.addMembers(contacts: contacts)
+                        await appState.refresh([.home, .groups])
                         toast = ToastItem(style: .success, message: "Added \(contacts.count) member\(contacts.count == 1 ? "" : "s")")
                     }
                 }
@@ -121,7 +123,10 @@ struct GroupDetailView: View {
         }
         .onChange(of: showPlayLogging) { _, isPresented in
             if !isPresented {
-                Task { await viewModel.loadPlays() }
+                Task {
+                    await viewModel.loadPlays()
+                    await appState.refresh([.home, .groups])
+                }
             }
         }
         .toast($toast)
@@ -152,6 +157,9 @@ struct GroupDetailView: View {
                     do {
                         try await SupabaseService.shared.deleteGroup(id: viewModel.group.id)
                         dismiss()
+                        Task {
+                            await appState.refresh([.home, .groups])
+                        }
                     } catch {
                         toast = ToastItem(style: .error, message: "Failed to delete group")
                     }
@@ -161,6 +169,12 @@ struct GroupDetailView: View {
             Text("This will permanently delete the group, all members, and chat history. This can't be undone.")
         }
         .task {
+            if !hasRegisteredRefreshHandler {
+                hasRegisteredRefreshHandler = true
+                appState.registerRefreshHandler(for: .groups) { [weak viewModel] in
+                    await viewModel?.loadLinkedEvents()
+                }
+            }
             guard !hasLoadedData else { return }
             hasLoadedData = true
             await viewModel.loadAllData()
@@ -234,7 +248,9 @@ struct GroupDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     SectionHeader(title: "Upcoming Events")
                     ForEach(viewModel.upcomingLinkedEvents) { event in
-                        NavigationLink(value: event) {
+                        NavigationLink {
+                            EventDetailView(eventId: event.id)
+                        } label: {
                             HStack(spacing: Theme.Spacing.md) {
                                 Image(systemName: "calendar")
                                     .font(.system(size: 14))

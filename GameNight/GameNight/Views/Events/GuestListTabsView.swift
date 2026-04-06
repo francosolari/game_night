@@ -22,6 +22,9 @@ struct GuestListTabsView: View {
             ("Maybe", Theme.Colors.warning, summary.maybeUsers),
         ]
         if isHost {
+            if !summary.votedUsers.isEmpty {
+                result.append(("Voted", Theme.Colors.accent, summary.votedUsers))
+            }
             result.append(("Pending", Theme.Colors.textTertiary, summary.pendingUsers))
             result.append(("Can't Go", Theme.Colors.error, summary.declinedUsers))
         }
@@ -309,6 +312,9 @@ struct GuestListFullPageView: View {
             ("Maybe", Theme.Colors.warning, summary.maybeUsers),
         ]
         if isHost {
+            if !summary.votedUsers.isEmpty {
+                result.append(("Voted", Theme.Colors.accent, summary.votedUsers))
+            }
             result.append(("Pending", Theme.Colors.textTertiary, summary.pendingUsers))
             result.append(("Can't Go", Theme.Colors.error, summary.declinedUsers))
         }

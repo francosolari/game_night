@@ -13,13 +13,18 @@ final class GroupsViewModel: ObservableObject {
     private var inviteCounts: [UUID: Int] = [:]
 
     func loadGroups() async {
-        isLoading = true
+        let shouldShowLoading = groups.isEmpty && upcomingEvents.isEmpty && recentPlays.isEmpty
+        if shouldShowLoading {
+            isLoading = true
+        }
         do {
             groups = try await supabase.fetchGroups()
         } catch {
             self.error = error.localizedDescription
         }
-        isLoading = false
+        if shouldShowLoading {
+            isLoading = false
+        }
     }
 
     func createGroup(name: String, emoji: String?, description: String?) async -> GameGroup? {
@@ -138,17 +143,14 @@ final class GroupsViewModel: ObservableObject {
     }
 
     func loadDashboardData() async {
-        var allEvents: [GameEvent] = []
-        var allPlays: [Play] = []
+        let groupIds = groups.map(\.id)
 
-        for group in groups {
-            if let events = try? await supabase.fetchEventsForGroup(groupId: group.id) {
-                allEvents.append(contentsOf: events)
-            }
-            if let plays = try? await supabase.fetchPlaysForGroup(groupId: group.id) {
-                allPlays.append(contentsOf: plays)
-            }
-        }
+        // Single batch RPC per type — 2 round trips regardless of group count
+        async let eventFetch = supabase.fetchEventsForGroups(groupIds: groupIds)
+        async let playFetch  = supabase.fetchPlaysForGroups(groupIds: groupIds)
+
+        let allEvents = (try? await eventFetch) ?? []
+        let allPlays  = (try? await playFetch)  ?? []
 
         let now = Date()
         upcomingEvents = allEvents

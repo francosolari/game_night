@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, CalendarPlus, Gamepad2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +17,9 @@ import type { GameGroup, Play } from "@/lib/groupTypes";
 export default function GroupDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [group, setGroup] = useState<GameGroup | null>(null);
+  const isOwner = !!(user && group && group.owner_id === user.id);
   const [plays, setPlays] = useState<Play[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogPlay, setShowLogPlay] = useState(false);
@@ -142,7 +145,7 @@ export default function GroupDetail() {
           <TabsTrigger value="chat" className="text-xs">Chat</TabsTrigger>
         </TabsList>
         <TabsContent value="members" className="mt-4">
-          <MembersTab group={group} onMemberRemoved={handleRemoveMember} onMemberAdded={loadGroup} />
+          <MembersTab group={group} onMemberRemoved={handleRemoveMember} onMemberAdded={loadGroup} isOwner={isOwner} />
         </TabsContent>
         <TabsContent value="history" className="mt-4">
           <PlayHistoryTab plays={plays} members={group.members} onDelete={handleDeletePlay} />

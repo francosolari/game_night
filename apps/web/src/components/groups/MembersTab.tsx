@@ -11,9 +11,10 @@ interface MembersTabProps {
   group: GameGroup;
   onMemberRemoved: (memberId: string) => void;
   onMemberAdded: () => void;
+  isOwner?: boolean;
 }
 
-export function MembersTab({ group, onMemberRemoved, onMemberAdded }: MembersTabProps) {
+export function MembersTab({ group, onMemberRemoved, onMemberAdded, isOwner }: MembersTabProps) {
   const [showContacts, setShowContacts] = useState(false);
 
   const excludedPhones = useMemo(
@@ -49,7 +50,7 @@ export function MembersTab({ group, onMemberRemoved, onMemberAdded }: MembersTab
           <p className="text-sm text-muted-foreground text-center py-8">No members yet</p>
         ) : (
           group.members.map(m => (
-            <MemberRow key={m.id} member={m} onRemove={onMemberRemoved} canRemove />
+            <MemberRow key={m.id} member={m} onRemove={onMemberRemoved} canRemove={!!isOwner} />
           ))
         )}
       </div>

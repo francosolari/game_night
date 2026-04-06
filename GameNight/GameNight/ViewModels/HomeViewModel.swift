@@ -32,10 +32,7 @@ final class HomeViewModel: ObservableObject {
         }
         error = nil
 
-        // Housekeeping should not block the first paint of home content.
-        Task {
-            await SupabaseService.shared.completePastEvents()
-        }
+        // Housekeeping runs during AppState preload. Avoid duplicate RPC load here.
 
         let snapshot: HomeDataLoadSnapshot
         if let preloaded = preloadedSnapshot {
@@ -61,8 +58,15 @@ final class HomeViewModel: ObservableObject {
             return
         }
 
-        var upcomingEvents = snapshot.upcomingEvents
         let errorMessage = snapshot.errorMessage
+        let failedUpcoming = errorMessage?.contains("Upcoming Events:") == true
+        let failedInvites = errorMessage?.contains("Invites:") == true
+        let failedDrafts = errorMessage?.contains("Drafts:") == true
+
+        // Preserve last known-good data for sections that failed this refresh.
+        var upcomingEvents = failedUpcoming ? self.upcomingEvents : snapshot.upcomingEvents
+        let effectiveInvites = failedInvites ? self.myInvites : snapshot.myInvites
+        let effectiveDrafts = failedDrafts ? self.drafts : snapshot.drafts
 
         if snapshot.isHydratedForHome {
             self.awaitingResponseEvents = snapshot.awaitingResponseEvents
@@ -71,7 +75,7 @@ final class HomeViewModel: ObservableObject {
             upcomingEvents = snapshot.upcomingEvents
             print("🏠 [HomeViewModel] using hydrated preloaded home snapshot")
         } else {
-            let pendingInvites = snapshot.myInvites.filter { $0.status == .pending }
+            let pendingInvites = effectiveInvites.filter { $0.status == .pending }
             print("🏠 [HomeViewModel] pending invites count: \(pendingInvites.count)")
             var pendingEvents: [(event: GameEvent, invite: Invite)] = []
             if !pendingInvites.isEmpty {
@@ -88,6 +92,8 @@ final class HomeViewModel: ObservableObject {
                     }
                 } catch is CancellationError {
                     // Ignore cancellations — pending list can stay empty
+                } catch let error as URLError where error.code == .cancelled {
+                    // Expected during overlapping refreshes/navigation updates.
                 } catch {
                     print("🏠 [HomeViewModel] Pending invite fetch failed: \(error)")
                 }
@@ -97,8 +103,8 @@ final class HomeViewModel: ObservableObject {
 
             let existingEventIds = Set(upcomingEvents.map(\.id))
             let acceptedInviteEventIds = Set(
-                snapshot.myInvites
-                    .filter { $0.status == .accepted || $0.status == .maybe }
+                effectiveInvites
+                    .filter { $0.status == .accepted || $0.status == .maybe || $0.status == .voted }
                     .map(\.eventId)
             )
             let missingInviteEventIds = acceptedInviteEventIds.subtracting(existingEventIds)
@@ -109,6 +115,8 @@ final class HomeViewModel: ObservableObject {
                     upcomingEvents = mergeUpcomingEvents(upcomingEvents, with: inviteEvents)
                 } catch is CancellationError {
                     // Ignore — don't treat cancellation as a failure
+                } catch let error as URLError where error.code == .cancelled {
+                    // Expected during overlapping refreshes/navigation updates.
                 } catch {
                     // Non-fatal — accepted invite events are supplemental data
                     print("🏠 [HomeViewModel] Invite events fetch failed: \(error)")
@@ -127,8 +135,8 @@ final class HomeViewModel: ObservableObject {
 
         // Sort by event date ascending (soonest first)
         self.upcomingEvents = sortByEventDate(upcomingEvents)
-        self.myInvites = snapshot.myInvites
-        self.drafts = snapshot.drafts
+        self.myInvites = effectiveInvites
+        self.drafts = effectiveDrafts
         self.error = errorMessage
 
         if isInitialLoad {
@@ -178,7 +186,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func refreshPendingGroupInvites() async {
-        try? await SupabaseService.shared.expireStaleGroupInvites()
+        // Keep this read-only on refresh; stale-expiry runs during AppState preload.
         if let groupInvites = try? await SupabaseService.shared.fetchMyPendingGroupInvites() {
             pendingGroupInvites = groupInvites
         }

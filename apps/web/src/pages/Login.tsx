@@ -3,15 +3,52 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Dice5, ArrowLeft, Lock, Phone, KeyRound, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext.tsx";
 import { useToast } from "@/hooks/use-toast.ts";
 import { supabase } from "@/lib/supabase.ts";
 
 const BETA_PASSWORD = "francosfriend";
-const BETA_SHARED_SECRET = "YwxGHvb)MX1pV0eG";
+
+async function hashBetaPassword(password: string): Promise<string> {
+  const data = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 type Step = "beta-password" | "phone" | "account-password" | "display-name";
+
+const PHONE_FORMAT_GROUPS: Record<string, number[]> = {
+  "+1": [3, 3, 4],
+  "+44": [4, 3, 4],
+  "+61": [1, 4, 4],
+  "+49": [3, 3, 4],
+  "+33": [1, 2, 2, 2, 2],
+  "+81": [2, 4, 4],
+};
+
+export function formatPhoneForDisplay(countryCode: string, raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+
+  const groups = PHONE_FORMAT_GROUPS[countryCode] ?? PHONE_FORMAT_GROUPS["+1"];
+  const parts: string[] = [];
+  let cursor = 0;
+
+  for (const groupSize of groups) {
+    if (cursor >= digits.length) break;
+    parts.push(digits.slice(cursor, cursor + groupSize));
+    cursor += groupSize;
+  }
+
+  if (cursor < digits.length) {
+    parts.push(digits.slice(cursor));
+  }
+
+  return parts.join("-");
+}
 
 function normalizePhone(countryCode: string, raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -39,6 +76,10 @@ const Login = () => {
   const phoneDigits = phoneNumber.replace(/\D/g, "");
   const isPhoneValid = phoneDigits.length >= 7;
 
+  useEffect(() => {
+    setPhoneNumber((current) => formatPhoneForDisplay(countryCode, current));
+  }, [countryCode]);
+
   const stepIndex = { "beta-password": 0, phone: 1, "account-password": 2, "display-name": 3 }[step];
 
   const goBack = () => {
@@ -64,15 +105,15 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
+      const hashedSecret = await hashBetaPassword(betaPassword);
       const res = await fetch(
         `https://irhidoryicawwlwrilbb.supabase.co/functions/v1/beta-ensure-user`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-beta-secret": BETA_SHARED_SECRET,
           },
-          body: JSON.stringify({ phone: fullPhone, mode: "probe" }),
+          body: JSON.stringify({ phone: fullPhone, mode: "probe", betaPassword: hashedSecret }),
         }
       );
       const data = await res.json();
@@ -93,15 +134,15 @@ const Login = () => {
     try {
       if (!accountExists) {
         // Create user via edge function first
+        const hashedSecret = await hashBetaPassword(betaPassword);
         const res = await fetch(
           `https://irhidoryicawwlwrilbb.supabase.co/functions/v1/beta-ensure-user`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-beta-secret": BETA_SHARED_SECRET,
             },
-            body: JSON.stringify({ phone: fullPhone, password: accountPassword, mode: "ensure" }),
+            body: JSON.stringify({ phone: fullPhone, password: accountPassword, mode: "ensure", betaPassword: hashedSecret }),
           }
         );
         const data = await res.json();
@@ -266,7 +307,7 @@ const Login = () => {
                     name="username"
                     placeholder="(555) 123-4567"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => setPhoneNumber(formatPhoneForDisplay(countryCode, e.target.value))}
                     autoFocus
                     autoComplete="username"
                     className="flex-1"

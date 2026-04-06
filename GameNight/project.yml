@@ -36,11 +36,6 @@ targets:
         CFBundleSpotlightAlternateNames:
           - CWM
           - GameNight
-    entitlements:
-      path: GameNight/GameNight.entitlements
-      properties:
-        com.apple.developer.associated-domains:
-          - applinks:cardboardwithme.com
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cardboardwithme.app
@@ -49,7 +44,13 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
-        CODE_SIGN_ENTITLEMENTS: GameNight/GameNight.entitlements
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          CODE_SIGN_ENTITLEMENTS: GameNight/GameNight.Debug.entitlements
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
+          CODE_SIGN_ENTITLEMENTS: GameNight/GameNight.Release.entitlements
     dependencies:
       - package: Supabase
 

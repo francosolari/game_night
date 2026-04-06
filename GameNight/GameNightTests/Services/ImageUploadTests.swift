@@ -3,12 +3,12 @@ import PhotosUI
 @testable import GameNight
 
 class ImageUploadTests: XCTestCase {
-    var r2Service: R2StorageService!
+    var r2Service: MockR2StorageService!
     var mockSupabase: MockSupabaseService!
 
     override func setUp() {
         super.setUp()
-        r2Service = R2StorageService()
+        r2Service = MockR2StorageService()
         mockSupabase = MockSupabaseService()
     }
 
@@ -37,6 +37,7 @@ class ImageUploadTests: XCTestCase {
     func testUpdateGameImageUrlSucceeds() async throws {
         let gameId = UUID()
         let imageUrl = "https://r2.example.com/games/\(gameId)/image.jpg"
+        mockSupabase.createTestGame(id: gameId)
         try await mockSupabase.updateGameImageUrl(gameId: gameId, imageUrl: imageUrl)
         let updated = try await mockSupabase.fetchGame(id: gameId)
         XCTAssertEqual(updated.imageUrl, imageUrl)
@@ -45,6 +46,7 @@ class ImageUploadTests: XCTestCase {
     func testUpdateEventCoverUrlSucceeds() async throws {
         let eventId = UUID()
         let coverUrl = "https://r2.example.com/events/\(eventId)/cover.jpg"
+        mockSupabase.createTestEvent(id: eventId, hostId: UUID())
         try await mockSupabase.updateEventCoverUrl(eventId: eventId, coverUrl: coverUrl)
         let updated = try await mockSupabase.fetchEvent(id: eventId)
         XCTAssertEqual(updated.coverImageUrl, coverUrl)
@@ -65,8 +67,15 @@ class ImageUploadTests: XCTestCase {
         }
     }
 
-    enum ImageFormat {
+enum ImageFormat {
         case jpeg, png
+    }
+}
+
+actor MockR2StorageService {
+    func uploadGameImage(data: Data, gameId: UUID) async throws -> String {
+        guard !data.isEmpty else { throw R2Error.uploadFailed }
+        return "https://r2.example.com/games/\(gameId.uuidString)/image.jpg"
     }
 }
 

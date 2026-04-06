@@ -55,11 +55,12 @@ final class CreateEventViewModel: ObservableObject {
 
     @Published var gameSearchQuery = ""
     @Published var gameSearchResults: [BGGSearchResult] = []
+    @Published var cachedGameSearchResults: [Game] = []
+    @Published var libraryGameSearchResults: [Game] = []
     @Published var isSearchingGames = false
-    @Published var manualGameName = ""
     @Published var libraryGames: [Game] = []
 
-    @Published var suggestedContacts: [FrequentContact] = []
+    @Published var suggestedContacts: [UserContact] = []
     @Published var isLoadingSuggestions = true
     @Published var collapsedGroups: Set<String> = []
     @Published private(set) var currentUserId: UUID?
@@ -84,6 +85,7 @@ final class CreateEventViewModel: ObservableObject {
     private let supabase: EventEditingProviding
     private let bgg: EventGameBGGProviding
     private let userDefaults: UserDefaults
+    private var gameSearchTask: Task<Void, Never>?
 
     private enum LocalCoverPreviewStorage {
         static let previewEventIdKey = "create_event.preview_event_id"
@@ -266,18 +268,63 @@ final class CreateEventViewModel: ObservableObject {
         completedSteps.insert(currentStep)
     }
 
-    func searchGames() async {
-        guard !gameSearchQuery.isEmpty else {
+    func searchGames() {
+        gameSearchTask?.cancel()
+        let query = gameSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
             gameSearchResults = []
+            cachedGameSearchResults = []
+            libraryGameSearchResults = []
+            isSearchingGames = false
             return
         }
-        isSearchingGames = true
-        do {
-            gameSearchResults = try await bgg.searchGames(query: gameSearchQuery)
-        } catch {
-            self.error = error.localizedDescription
+
+        gameSearchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+
+            let selectedIds = Set(selectedGames.map(\.gameId))
+            let selectedBggIds = Set(selectedGames.compactMap { $0.game?.bggId })
+
+            let libraryMatches = libraryGames.filter { game in
+                game.name.localizedCaseInsensitiveContains(query) && !selectedIds.contains(game.id)
+            }
+
+            guard !Task.isCancelled else { return }
+            libraryGameSearchResults = Array(libraryMatches.prefix(5))
+
+            let libraryBggIds = Set(libraryMatches.compactMap { $0.bggId })
+
+            isSearchingGames = true
+            do {
+                let cachedMatches = try await supabase.searchCachedGames(query: query)
+                guard !Task.isCancelled else { return }
+
+                let filteredCached = cachedMatches.filter { game in
+                    !selectedIds.contains(game.id) &&
+                    !libraryBggIds.contains(game.bggId ?? -1) &&
+                    (game.bggId == nil || !selectedBggIds.contains(game.bggId!))
+                }
+
+                if !filteredCached.isEmpty {
+                    cachedGameSearchResults = Array(filteredCached.prefix(8))
+                    gameSearchResults = []
+                    isSearchingGames = false
+                    return
+                }
+
+                cachedGameSearchResults = []
+                gameSearchResults = try await bgg.searchGames(query: query)
+                    .filter { !selectedBggIds.contains($0.id) && !libraryBggIds.contains($0.id) }
+                isSearchingGames = false
+            } catch {
+                if Task.isCancelled { return }
+                cachedGameSearchResults = []
+                gameSearchResults = []
+                isSearchingGames = false
+                self.error = error.localizedDescription
+            }
         }
-        isSearchingGames = false
     }
 
     func addGame(bggId: Int, isPrimary: Bool = false) async {
@@ -334,48 +381,20 @@ final class CreateEventViewModel: ObservableObject {
         return savedGame
     }
 
-    func addManualGame(name: String) async {
-        let game = Game(
+    func addExistingGame(_ game: Game) {
+        guard !selectedGames.contains(where: { $0.gameId == game.id }) else { return }
+        let eventGame = EventGame(
             id: UUID(),
-            bggId: nil,
-            name: name,
-            yearPublished: nil,
-            thumbnailUrl: nil,
-            imageUrl: nil,
-            minPlayers: 2,
-            maxPlayers: 4,
-            recommendedPlayers: nil,
-            minPlaytime: 60,
-            maxPlaytime: 120,
-            complexity: 0,
-            bggRating: nil,
-            description: nil,
-            categories: [],
-            mechanics: [],
-            designers: [],
-            publishers: [],
-            artists: [],
-            minAge: nil,
-            bggRank: nil
+            gameId: game.id,
+            game: game,
+            isPrimary: selectedGames.isEmpty,
+            sortOrder: selectedGames.count
         )
-
-        do {
-            let saved = try await supabase.upsertGame(game)
-            let eventGame = EventGame(
-                id: UUID(),
-                gameId: saved.id,
-                game: saved,
-                isPrimary: selectedGames.isEmpty,
-                sortOrder: selectedGames.count
-            )
-            selectedGames.append(eventGame)
-            manualGameName = ""
-
-            // Persist to user's game library
-            try? await supabase.addGameToLibrary(gameId: saved.id, categoryId: nil)
-        } catch {
-            self.error = error.localizedDescription
-        }
+        selectedGames.append(eventGame)
+        gameSearchQuery = ""
+        gameSearchResults = []
+        cachedGameSearchResults = []
+        libraryGameSearchResults = []
     }
 
     func updateManualGameSettings(at index: Int, game: Game) async {
@@ -470,7 +489,19 @@ final class CreateEventViewModel: ObservableObject {
     func loadSuggestedContacts() async {
         isLoadingSuggestions = true
         do {
-            suggestedContacts = try await supabase.fetchFrequentContacts(limit: 20)
+            async let frequentResult = supabase.fetchFrequentContacts(limit: 20)
+            async let savedResult = supabase.fetchSavedContacts()
+            async let groupsResult = supabase.fetchGroups()
+
+            let frequentContacts = (try? await frequentResult) ?? []
+            let savedContacts = (try? await savedResult) ?? []
+            let groups = (try? await groupsResult) ?? []
+
+            suggestedContacts = buildSuggestedContacts(
+                frequentContacts: frequentContacts,
+                savedContacts: savedContacts,
+                groups: groups
+            )
         } catch {
             // Non-critical
         }
@@ -486,19 +517,13 @@ final class CreateEventViewModel: ObservableObject {
         }
     }
 
-    var libraryAutocompleteResults: [Game] {
-        guard !manualGameName.isEmpty else { return [] }
-        let query = manualGameName.lowercased()
-        return libraryGames.filter { $0.name.lowercased().contains(query) }
-    }
-
-    var topSuggestions: [FrequentContact] {
+    var topSuggestions: [UserContact] {
         suggestedContacts
             .filter { contact in
-                !invitees.contains(where: { $0.phoneNumber == contact.contactPhone })
-                    && !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId)
+                !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber })
+                    && !isCurrentUser(phoneNumber: contact.phoneNumber, userId: contact.appUserId)
             }
-            .prefix(3)
+            .prefix(8)
             .map { $0 }
     }
 
@@ -527,10 +552,16 @@ final class CreateEventViewModel: ObservableObject {
         addInvitee(name: contact.name, phoneNumber: contact.phoneNumber, tier: 1, userId: contact.appUserId, source: contact.source)
     }
 
-    func addFrequentContact(_ contact: FrequentContact) {
-        guard !isCurrentUser(phoneNumber: contact.contactPhone, userId: contact.contactUserId) else { return }
-        guard !invitees.contains(where: { $0.phoneNumber == contact.contactPhone }) else { return }
-        addInvitee(name: contact.contactName, phoneNumber: contact.contactPhone, tier: 1, userId: contact.contactUserId, source: .appConnection)
+    func addSuggestedContact(_ contact: UserContact) {
+        guard !isCurrentUser(phoneNumber: contact.phoneNumber, userId: contact.appUserId) else { return }
+        guard !invitees.contains(where: { $0.phoneNumber == contact.phoneNumber }) else { return }
+        addInvitee(
+            name: contact.name,
+            phoneNumber: contact.phoneNumber,
+            tier: 1,
+            userId: contact.appUserId,
+            source: contact.source
+        )
     }
 
     var tier1Invitees: [InviteeEntry] {
@@ -680,9 +711,17 @@ final class CreateEventViewModel: ObservableObject {
                 try await supabase.updateEvent(event)
                 try await syncEventGames(eventId: event.id)
                 try await syncTimeOptions(eventId: event.id)
-                try await syncInviteRecords(eventId: event.id, hostId: hostId)
-
                 createdEvent = try await supabase.fetchEvent(id: event.id)
+
+                // Keep save responsive: finish core event updates first, then sync invites in background.
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        try await self.syncInviteRecords(eventId: event.id, hostId: hostId)
+                    } catch {
+                        print("CreateEventViewModel: background invite sync failed for edit \(event.id): \(error)")
+                    }
+                }
             } catch {
                 self.error = error.localizedDescription
             }
@@ -701,10 +740,19 @@ final class CreateEventViewModel: ObservableObject {
 
             try await supabase.createEventGames(eventId: created.id, games: selectedGames)
             try await supabase.createTimeOptions(resolvedTimeOptions(eventId: created.id))
-            try await createInviteRecords(eventId: created.id, hostId: hostId)
 
             createdEvent = created
             clearLocalCoverPreviewStateIfNeeded()
+
+            // Keep save responsive: send invites in background after event shell is persisted.
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try await self.createInviteRecords(eventId: created.id, hostId: hostId)
+                } catch {
+                    print("CreateEventViewModel: background invite creation failed for event \(created.id): \(error)")
+                }
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -953,6 +1001,93 @@ final class CreateEventViewModel: ObservableObject {
             var updated = option
             updated.eventId = eventId
             return updated
+        }
+    }
+
+    private func buildSuggestedContacts(
+        frequentContacts: [FrequentContact],
+        savedContacts: [SavedContact],
+        groups: [GameGroup]
+    ) -> [UserContact] {
+        let excludedPhones = invitedPhones.map { PhoneNumberFormatter.normalizedForComparison($0) }
+        var seen = Set(excludedPhones)
+
+        if let currentUserPhone {
+            seen.insert(PhoneNumberFormatter.normalizedForComparison(currentUserPhone))
+        }
+
+        let phonebookPhones = Set(savedContacts.map {
+            PhoneNumberFormatter.normalizedForComparison($0.phoneNumber)
+        })
+
+        let mutualEventCounts: [String: Int] = {
+            var map: [String: Int] = [:]
+            for frequent in frequentContacts {
+                let phone = PhoneNumberFormatter.normalizedForComparison(frequent.contactPhone)
+                map[phone] = frequent.mutualEventCount
+            }
+            return map
+        }()
+
+        var result: [UserContact] = []
+
+        for frequent in frequentContacts {
+            if let currentUserId, frequent.contactUserId == currentUserId {
+                continue
+            }
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(frequent.contactPhone)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
+            let isFromPhonebook = phonebookPhones.contains(normalizedPhone)
+            result.append(UserContact(
+                id: frequent.contactUserId ?? UUID(),
+                name: frequent.contactName,
+                phoneNumber: frequent.contactPhone,
+                avatarUrl: frequent.contactAvatarUrl,
+                isAppUser: frequent.isAppUser,
+                appUserId: frequent.contactUserId,
+                source: isFromPhonebook ? .phonebook : .appConnection
+            ))
+        }
+
+        for saved in savedContacts {
+            let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(saved.phoneNumber)
+            guard !seen.contains(normalizedPhone) else { continue }
+            seen.insert(normalizedPhone)
+            result.append(saved.asUserContact)
+        }
+
+        for group in groups {
+            for member in group.members {
+                if let currentUserId, member.userId == currentUserId { continue }
+                let normalizedPhone = PhoneNumberFormatter.normalizedForComparison(member.phoneNumber)
+                guard !seen.contains(normalizedPhone) else { continue }
+                seen.insert(normalizedPhone)
+                result.append(UserContact(
+                    id: member.userId ?? UUID(),
+                    name: member.displayName ?? member.phoneNumber,
+                    phoneNumber: member.phoneNumber,
+                    avatarUrl: nil,
+                    isAppUser: member.userId != nil,
+                    appUserId: member.userId,
+                    source: .appConnection
+                ))
+            }
+        }
+
+        return result.sorted { a, b in
+            let aPhone = PhoneNumberFormatter.normalizedForComparison(a.phoneNumber)
+            let bPhone = PhoneNumberFormatter.normalizedForComparison(b.phoneNumber)
+            let aMutuals = mutualEventCounts[aPhone] ?? 0
+            let bMutuals = mutualEventCounts[bPhone] ?? 0
+
+            if aMutuals != bMutuals {
+                return aMutuals > bMutuals
+            }
+            if a.isAppUser != b.isAppUser {
+                return a.isAppUser
+            }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
     }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct GameNightApp: App {
@@ -9,6 +10,11 @@ struct GameNightApp: App {
     @StateObject private var supabase = SupabaseService.shared
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var pushManager = PushNotificationManager.shared
+    
+    init() {
+        UIScrollView.appearance().showsVerticalScrollIndicator = false
+        UIScrollView.appearance().showsHorizontalScrollIndicator = false
+    }
 
     var body: some Scene {
         WindowGroup {

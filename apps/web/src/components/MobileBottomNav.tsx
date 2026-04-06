@@ -6,8 +6,8 @@ export function MobileBottomNav() {
   const navigate = useNavigate();
   const path = location.pathname;
 
-  // Don't show on login or invite preview pages
-  if (path === "/login" || path.startsWith("/invite")) return null;
+  // Don't show on login, invite preview, inbox conversation, or notification pages
+  if (path === "/login" || path.startsWith("/invite") || path.startsWith("/inbox/") || path === "/notifications") return null;
 
   return (
     <nav

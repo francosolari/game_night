@@ -19,6 +19,9 @@ import CreatorDetail from "./pages/CreatorDetail.tsx";
 import Calendar from "./pages/Calendar.tsx";
 import Groups from "./pages/Groups.tsx";
 import GroupDetail from "./pages/GroupDetail.tsx";
+import Notifications from "./pages/Notifications.tsx";
+import Inbox from "./pages/Inbox.tsx";
+import Conversation from "./pages/Conversation.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -46,6 +49,9 @@ function AppRoutes() {
       <Route path="/calendar" element={<Calendar />} />
       <Route path="/groups" element={<Groups />} />
       <Route path="/groups/:id" element={<GroupDetail />} />
+      <Route path="/notifications" element={<Notifications />} />
+      <Route path="/inbox" element={<Inbox />} />
+      <Route path="/inbox/:conversationId" element={<Conversation />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

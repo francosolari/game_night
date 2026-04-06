@@ -111,7 +111,6 @@ struct CreateEventView: View {
                     .padding(.bottom, 120)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .hideKeyboardOnTap()
                 .background(Theme.Colors.background.ignoresSafeArea())
                 .gesture(
                     DragGesture(minimumDistance: 50, coordinateSpace: .local)
@@ -140,6 +139,7 @@ struct CreateEventView: View {
                             }
                         }
                 )
+                .hideKeyboardOnTap()
 
                 // Bottom action bar
                 VStack(spacing: 0) {
@@ -152,8 +152,7 @@ struct CreateEventView: View {
                                 Task {
                                     await viewModel.saveDraft()
                                     if let savedEvent = viewModel.createdEvent {
-                                        onSaved?(savedEvent)
-                                        dismiss()
+                                        await finishSave(savedEvent)
                                     }
                                 }
                             }
@@ -182,16 +181,14 @@ struct CreateEventView: View {
                                 Task {
                                     await viewModel.saveChanges()
                                     if let savedEvent = viewModel.createdEvent {
-                                        onSaved?(savedEvent)
-                                        dismiss()
+                                        await finishSave(savedEvent)
                                     }
                                 }
                             case .submit:
                                 Task {
                                     await viewModel.createEvent()
                                     if let savedEvent = viewModel.createdEvent {
-                                        onSaved?(savedEvent)
-                                        dismiss()
+                                        await finishSave(savedEvent)
                                     }
                                 }
                             case .next:
@@ -235,9 +232,8 @@ struct CreateEventView: View {
                     Task {
                         await viewModel.saveDraft()
                         if viewModel.createdEvent != nil {
-                            onSaved?(viewModel.createdEvent!)
+                            await finishSave(viewModel.createdEvent!)
                         }
-                        dismiss()
                     }
                 }
                 Button("Discard", role: .destructive) {
@@ -288,6 +284,15 @@ struct CreateEventView: View {
                     }
                 )
             }
+        }
+    }
+
+    private func finishSave(_ savedEvent: GameEvent) async {
+        onSaved?(savedEvent)
+        let refreshAreas: [AppState.RefreshArea] = savedEvent.status == .draft ? [.home] : [.home, .groups]
+        dismiss()
+        Task {
+            await appState.refresh(refreshAreas)
         }
     }
 }

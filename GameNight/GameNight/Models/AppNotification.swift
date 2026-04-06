@@ -27,6 +27,7 @@ struct AppNotification: Identifiable, Codable {
         case textBlast = "text_blast"
         case gameConfirmed = "game_confirmed"
         case eventCancelled = "event_cancelled"
+        case playLogReminder = "play_log_reminder"
 
         var icon: String {
             switch self {
@@ -39,6 +40,7 @@ struct AppNotification: Identifiable, Codable {
             case .textBlast: return "megaphone.fill"
             case .gameConfirmed: return "gamecontroller.fill"
             case .eventCancelled: return "xmark.circle.fill"
+            case .playLogReminder: return "list.bullet"
             }
         }
     }
@@ -51,6 +53,7 @@ struct AppNotification: Identifiable, Codable {
             let body,
             let localizedTime = Self.localizedTimeString(
                 fromUTCISO8601: metadata?["start_time_utc"],
+                preferredTimeZoneIdentifier: metadata?["time_zone_identifier"],
                 orParsedBody: body
             )
         else {
@@ -111,6 +114,7 @@ struct AppNotification: Identifiable, Codable {
 
     private static func localizedTimeString(
         fromUTCISO8601 isoString: String?,
+        preferredTimeZoneIdentifier: String?,
         orParsedBody body: String
     ) -> String? {
         if let isoString {
@@ -118,22 +122,27 @@ struct AppNotification: Identifiable, Codable {
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let date = formatter.date(from: isoString) ?? ISO8601DateFormatter().date(from: isoString)
             if let date {
-                return localizedTimeString(from: date)
+                return localizedTimeString(from: date, preferredTimeZoneIdentifier: preferredTimeZoneIdentifier)
             }
         }
 
-        return localizedTimeString(fromParsedBody: body)
+        return localizedTimeString(fromParsedBody: body, preferredTimeZoneIdentifier: preferredTimeZoneIdentifier)
     }
 
-    private static func localizedTimeString(from date: Date) -> String? {
+    private static func localizedTimeString(from date: Date, preferredTimeZoneIdentifier: String?) -> String? {
         let displayFormatter = DateFormatter()
         displayFormatter.locale = .current
-        displayFormatter.timeZone = .current
-        displayFormatter.dateFormat = "EEE, MMM d at h:mm a"
+        if let preferredTimeZoneIdentifier,
+           let preferredTimeZone = TimeZone(identifier: preferredTimeZoneIdentifier) {
+            displayFormatter.timeZone = preferredTimeZone
+        } else {
+            displayFormatter.timeZone = .current
+        }
+        displayFormatter.dateFormat = "EEE, MMM d 'at' h:mm a"
         return displayFormatter.string(from: date)
     }
 
-    private static func localizedTimeString(fromParsedBody body: String) -> String? {
+    private static func localizedTimeString(fromParsedBody body: String, preferredTimeZoneIdentifier: String?) -> String? {
         let marker = " is locked in for "
         guard
             let range = body.range(of: marker),
@@ -146,12 +155,12 @@ struct AppNotification: Identifiable, Codable {
         let parser = DateFormatter()
         parser.locale = Locale(identifier: "en_US_POSIX")
         parser.timeZone = TimeZone(identifier: "UTC")
-        parser.dateFormat = "EEE, MMM d at h:mm a zzz"
+        parser.dateFormat = "EEE, MMM d 'at' h:mm a zzz"
         guard let date = parser.date(from: timeString) else {
             return nil
         }
 
-        return localizedTimeString(from: date)
+        return localizedTimeString(from: date, preferredTimeZoneIdentifier: preferredTimeZoneIdentifier)
     }
 
     private static func replacingTimeConfirmedBody(_ body: String, with localizedTime: String) -> String {

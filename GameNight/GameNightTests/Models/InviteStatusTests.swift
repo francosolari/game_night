@@ -27,6 +27,18 @@ final class InviteStatusTests: XCTestCase {
         XCTAssertEqual(InviteStatus.waitlisted.color, Theme.Colors.accent)
     }
 
+    func testVotedColorIsAccent() {
+        XCTAssertEqual(InviteStatus.voted.color, Theme.Colors.accent)
+    }
+
+    func testVotedDisplayLabel() {
+        XCTAssertEqual(InviteStatus.voted.displayLabel, "Voted")
+    }
+
+    func testVotedRsvpDisplayLabel() {
+        XCTAssertEqual(InviteStatus.voted.rsvpDisplayLabel, "Vote submitted")
+    }
+
     func testDisplayLabelCoversAllCases() {
         for status in InviteStatus.allCases {
             XCTAssertFalse(status.displayLabel.isEmpty, "\(status) has empty displayLabel")
@@ -70,11 +82,11 @@ final class InviteStatusTests: XCTestCase {
         XCTAssertNil(PollRSVP.derivedStatus(from: [:]))
     }
 
-    func testPollRSVPSubmissionStatusIsPendingWhenVotesExist() {
+    func testPollRSVPSubmissionStatusIsVotedWhenVotesExist() {
         let votes: [UUID: TimeOptionVoteType] = [
             UUID(): .yes
         ]
-        XCTAssertEqual(PollRSVP.submissionStatus(from: votes), .pending)
+        XCTAssertEqual(PollRSVP.submissionStatus(from: votes), .voted)
     }
 
     func testPollRSVPSubmissionStatusIsNilWhenNoVotesExist() {
@@ -112,7 +124,7 @@ final class InviteStatusTests: XCTestCase {
     }
 
     @MainActor
-    func testThemeManagerSwitchingToSystemUsesLatestCapturedScheme() {
+    func testThemeManagerSwitchingToSystemRebuildsFromSystemScheme() {
         let sut = ThemeManager.shared
         let originalMode = sut.mode
         let originalSystem = sut.systemColorScheme
@@ -125,6 +137,6 @@ final class InviteStatusTests: XCTestCase {
         sut.updateSystemColorScheme(.dark)
         sut.mode = .system
 
-        XCTAssertTrue(sut.isDark)
+        XCTAssertEqual(sut.isDark, sut.systemColorScheme == .dark)
     }
 }
